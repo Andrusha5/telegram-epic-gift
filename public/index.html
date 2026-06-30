@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Epic Gift</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div id="app">
+        <header class="header">
+            <div class="user-profile">
+                <img id="user-avatar" class="user-avatar" src="https://via.placeholder.com/40" alt="Avatar">
+                <span id="user-username" class="user-username">Загрузка...</span>
+            </div>
+            <div class="balance-info">
+                <span class="balance-label">Баланс:</span>
+                <span id="user-balance" class="balance-value">0.000 TON</span>
+                <!-- <button id="deposit-button" class="deposit-button">Пополнить</button> -->
+            </div>
+        </header>
+
+        <main id="main-content" class="main-content">
+            <!-- Главная секция -->
+            <section id="home-section" class="active">
+                <h2>Ежедневный кейс</h2>
+                <div class="case-card clickable" id="daily-case-card">
+                    <img src="https://img.icons8.com/color/96/000000/treasure-chest.png" alt="Ежедневный кейс">
+                    <h3>Ежедневный кейс</h3>
+                    <p>Открывайте каждый день и выигрывайте призы!</p>
+                    <button id="open-daily-case-button" class="primary-button">Открыть</button>
+                    <p id="daily-case-timer" class="timer"></p>
+                </div>
+                <div id="admin-panel-button-container" class="admin-buttons hidden">
+                    <button id="open-admin-panel-button" class="secondary-button">Админ-панель</button>
+                </div>
+            </section>
+
+            <!-- Админ-панель (скрыта по умолчанию, показывается только админам) -->
+            <section id="admin-section" class="hidden">
+                <h2>Админ-панель</h2>
+                <div class="admin-tabs">
+                    <button class="admin-tab-button active" data-target="items-management">Предметы</button>
+                    <button class="admin-tab-button" data-target="daily-case-config">Настройка кейса</button>
+                </div>
+                <div id="items-management-tab" class="admin-tab-content active">
+                    <h3>Управление предметами</h3>
+                    <div id="items-list-container">
+                        <!-- Список предметов -->
+                    </div>
+                    <h4>Добавить/Редактировать предмет</h4>
+                    <div class="item-form card">
+                        <input type="hidden" id="item-id">
+                        <input type="text" id="item-name" placeholder="Название предмета" required>
+                        <input type="text" id="item-description" placeholder="Описание">
+                        <input type="text" id="item-image-url" placeholder="URL изображения">
+                        <select id="item-type" required>
+                            <option value="">Выберите тип</option>
+                            <option value="balance">Пополнение баланса (TON)</option>
+                            <option value="gift">Подарок (инвентарь)</option>
+                        </select>
+                        <input type="number" id="item-value" placeholder="Значение (TON/Звезды)" step="0.001">
+                        <button id="save-item-button" class="primary-button">Сохранить предмет</button>
+                        <button id="clear-item-form-button" class="secondary-button">Очистить форму</button>
+                    </div>
+                </div>
+                <div id="daily-case-config-tab" class="admin-tab-content hidden">
+                    <h3>Настройка дропов ежедневного кейса</h3>
+                    <p class="note">Общая сумма шансов должна быть 100%.</p>
+                    <div id="daily-case-drops-config-list">
+                        <!-- Список предметов для настройки шансов -->
+                    </div>
+                    <p>Общий шанс: <span id="total-chance">0%</span></p>
+                    <button id="save-daily-case-drops-button" class="primary-button">Сохранить настройки кейса</button>
+                </div>
+            </section>
+        </main>
+
+        <footer class="footer">
+            <button id="nav-home" class="nav-button active" data-target="home">
+                <img src="https://img.icons8.com/ios-filled/24/ffffff/home-page.png" alt="Главная">
+                Главная
+            </button>
+            <!-- <button id="nav-inventory" class="nav-button" data-target="inventory">
+                <img src="https://img.icons8.com/ios-filled/24/ffffff/stack-of-photos.png" alt="Инвентарь">
+                Инвентарь
+            </button>
+            <button id="nav-rating" class="nav-button" data-target="rating">
+                <img src="https://img.icons8.com/ios-filled/24/ffffff/medal.png" alt="Рейтинг">
+                Рейтинг
+            </button> -->
+        </footer>
+    </div>
+
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="/js/app.js"></script>
+</body>
+</html>

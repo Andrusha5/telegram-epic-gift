@@ -1,0 +1,373 @@
+:root {
+    --bg-color: #1a1a2e; /* Темно-фиолетовый фон */
+    --card-bg-color: #272740; /* Темный фон для карточек */
+    --primary-color: #6a1b9a; /* Ярко-фиолетовый акцент */
+    --secondary-color: #ba68c8; /* Светлый фиолетовый */
+    --text-color: #ffffff; /* Белый текст */
+    --light-text-color: #ccc; /* Светло-серый текст */
+    --border-color: #4a148c; /* Границы */
+    --button-hover-color: #8e24aa;
+    --red-alert: #e57373;
+    --green-success: #81c784;
+}
+
+body {
+    font-family: 'Roboto', sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow-x: hidden;
+}
+
+#app {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    width: 100%;
+    max-width: 600px; /* Ограничение ширины для мобильных */
+    margin: 0 auto;
+    box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
+}
+
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px;
+    background-color: var(--card-bg-color);
+    border-bottom: 1px solid var(--border-color);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.user-profile {
+    display: flex;
+    align-items: center;
+}
+
+.user-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    margin-right: 10px;
+    border: 2px solid var(--primary-color);
+    object-fit: cover;
+}
+
+.user-username {
+    font-weight: bold;
+    font-size: 1.1em;
+}
+
+.balance-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.balance-label {
+    color: var(--light-text-color);
+    font-size: 0.9em;
+}
+
+.balance-value {
+    font-weight: bold;
+    font-size: 1.2em;
+    color: var(--green-success); /* Яркий цвет для баланса */
+}
+
+.main-content {
+    flex-grow: 1;
+    padding: 20px;
+    overflow-y: auto;
+    background-color: var(--bg-color);
+}
+
+section {
+    margin-bottom: 30px;
+}
+
+section.hidden {
+    display: none;
+}
+
+h2 {
+    color: var(--secondary-color);
+    text-align: center;
+    margin-bottom: 25px;
+    font-size: 1.6em;
+    border-bottom: 2px solid var(--border-color);
+    padding-bottom: 10px;
+}
+
+.case-card {
+    background-color: var(--card-bg-color);
+    border-radius: 12px;
+    padding: 20px;
+    text-align: center;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    max-width: 300px; /* Ограничение ширины карточки кейса */
+    margin: 20px auto; /* Центрируем */
+}
+
+.case-card.clickable {
+    cursor: pointer;
+}
+
+.case-card.clickable:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.6);
+}
+
+.case-card img {
+    max-width: 90px;
+    height: auto;
+    margin-bottom: 15px;
+    display: block;
+}
+
+.case-card h3 {
+    margin: 5px 0;
+    color: var(--text-color);
+    font-size: 1.3em;
+}
+
+.case-card p {
+    color: var(--light-text-color);
+    font-size: 0.9em;
+    margin: 0;
+}
+
+.primary-button, .secondary-button {
+    width: calc(100% - 20px);
+    padding: 12px;
+    border-radius: 8px;
+    font-size: 1em;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+    border: none;
+    margin-top: 15px;
+}
+
+.primary-button {
+    background-color: var(--primary-color);
+    color: var(--text-color);
+}
+
+.primary-button:hover {
+    background-color: var(--button-hover-color);
+}
+
+.secondary-button {
+    background-color: #4a148c; /* Darker purple for secondary */
+    color: var(--text-color);
+}
+
+.secondary-button:hover {
+    background-color: #6a1b9a;
+}
+
+.primary-button:disabled, .secondary-button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.timer {
+    color: var(--red-alert);
+    font-weight: bold;
+    margin-top: 10px;
+    font-size: 1em;
+}
+
+.note {
+    font-size: 0.85em;
+    color: var(--light-text-color);
+    margin-top: 20px;
+    text-align: center;
+}
+
+/* Footer Navigation */
+.footer {
+    display: flex;
+    justify-content: space-around;
+    padding: 10px 0;
+    background-color: var(--card-bg-color);
+    border-top: 1px solid var(--border-color);
+    box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.3);
+    position: sticky;
+    bottom: 0;
+    width: 100%;
+}
+
+.nav-button {
+    background: none;
+    border: none;
+    color: var(--light-text-color);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    font-size: 0.8em;
+    cursor: pointer;
+    padding: 5px 0;
+    transition: color 0.2s ease;
+}
+
+.nav-button img {
+    width: 24px;
+    height: 24px;
+    margin-bottom: 5px;
+    filter: invert(0.6); /* Сделать иконки светлее */
+}
+
+.nav-button.active {
+    color: var(--primary-color);
+    font-weight: bold;
+}
+
+.nav-button.active img {
+    filter: invert(0.2) sepia(1) saturate(5) hue-rotate(250deg) brightness(1.2); /* Цветные иконки для активных */
+}
+
+/* Admin Panel Styles */
+.admin-buttons {
+    text-align: center;
+    margin-top: 20px;
+}
+
+.admin-tabs {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 20px;
+}
+
+.admin-tab-button {
+    background-color: #33334f;
+    color: var(--light-text-color);
+    border: none;
+    padding: 10px 20px;
+    cursor: pointer;
+    border-radius: 8px 8px 0 0;
+    transition: background-color 0.2s ease;
+    margin: 0 5px;
+}
+
+.admin-tab-button.active {
+    background-color: var(--primary-color);
+    color: var(--text-color);
+}
+
+.admin-tab-button:hover:not(.active) {
+    background-color: #4a148c;
+}
+
+.admin-tab-content {
+    background-color: var(--card-bg-color);
+    padding: 20px;
+    border-radius: 0 0 12px 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+h3 {
+    color: var(--secondary-color);
+    margin-top: 0;
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+.item-form, .card {
+    background-color: #33334f;
+    padding: 15px;
+    border-radius: 8px;
+    margin-top: 15px;
+}
+
+input[type="text"], input[type="number"], select {
+    width: calc(100% - 20px);
+    padding: 10px;
+    margin-bottom: 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background-color: #444466;
+    color: var(--text-color);
+    font-size: 0.95em;
+    outline: none;
+    box-sizing: border-box;
+}
+
+input[type="text"]:focus, input[type="number"]:focus, select:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 2px rgba(106, 27, 154, 0.5);
+}
+
+#items-list-container, #daily-case-drops-config-list {
+    margin-top: 20px;
+    margin-bottom: 20px;
+}
+
+.item-entry, .case-drop-entry {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background-color: #33334f;
+    padding: 10px 15px;
+    border-radius: 8px;
+    margin-bottom: 10px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+.item-entry-info, .case-drop-entry-info {
+    flex-grow: 1;
+}
+
+.item-entry-info span, .case-drop-entry-info span {
+    display: block;
+    margin-bottom: 3px;
+}
+
+.item-entry-info .name, .case-drop-entry-info .name {
+    font-weight: bold;
+    color: var(--secondary-color);
+    font-size: 1.1em;
+}
+
+.item-entry-actions, .case-drop-entry-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.item-entry-actions button, .case-drop-entry-actions button {
+    background-color: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 5px;
+    border-radius: 4px;
+    transition: background-color 0.2s ease;
+}
+
+.item-entry-actions button img, .case-drop-entry-actions button img {
+    width: 20px;
+    height: 20px;
+    filter: invert(0.8);
+}
+
+.item-entry-actions button:hover, .case-drop-entry-actions button:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.total-chance {
+    text-align: center;
+    font-weight: bold;
+    margin-top: 20px;
+    font-size: 1.2em;
+    color: var(--green-success);
+}
