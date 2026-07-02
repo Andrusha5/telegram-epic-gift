@@ -1,14 +1,10 @@
 {
   "name": "telegram-epic-gift",
   "version": "1.0.0",
-  "description": "Telegram Mini App with daily cases and admin panel",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
   "dependencies": {
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
