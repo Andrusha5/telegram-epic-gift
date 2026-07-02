@@ -7,7 +7,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             WebApp: {
                 initData: 'user=%7B%22id%22%3A123456789%2C%22first_name%22%3A%22Dev%22%2C%22last_name%22%3A%22User%22%2C%22username%22%3A%22verylongusername123%22%7D',
                 initDataUnsafe: {
-                    user: { id: 123456789, username: "admin_test" }
+                    user: { id: 5105755553, username: "admin_test" }
                 },
                 expand: () => {},
                 showPopup: (options, callback) => {
