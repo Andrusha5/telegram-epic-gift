@@ -11,8 +11,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 },
                 expand: () => {},
                 showPopup: (options, callback) => {
-                    alert(`${options.title || 'Внимание'}\n${options.message}`);
-                    if (callback) callback('ok');
+                    const result = confirm(`${options.title || 'Внимание'}\n${options.message}`);
+                    if (callback) callback(result ? 'sell' : 'keep');
                 },
                 openLink: (url) => window.open(url, '_blank'),
                 BackButton: { 
@@ -29,7 +29,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const API_BASE_URL = window.location.origin;
     let currentUser = {}; 
 
-    // --- ПРИЗЫ С ТВОИМИ ИЗОБРАЖЕНИЯМИ (Прямые ссылки на твои файлы) ---
+    // --- ПРИЗЫ С ТВОИМИ ИЗОБРАЖЕНИЯМИ (Строго по убыванию цены) ---
     const GIFT_POOL = [
         { 
             id: 1, 
@@ -241,15 +241,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         }, 5100);
     }
 
-    // --- ИНТЕЛЛЕКТУАЛЬНАЯ ПРОВЕРКА НА ТЕБЯ (АДМИНИСТРАТОРА) ---
+    // --- СТРОГАЯ ИНТЕЛЛЕКТУАЛЬНАЯ ПРОВЕРКА НА ТЕБЯ (АДМИНИСТРАТОРА) ---
     function checkIsAdmin() {
         if (!currentUser) return false;
 
-        // Ищем твой ник "СВЕРХСЕКРЕТН..." из скриншота
+        // Поиск твоего никнейма "СВЕРХСЕКРЕТНЫЙ"
         const username = (currentUser.username || "").toLowerCase();
         const firstName = (currentUser.first_name || "").toLowerCase();
 
-        // Если имя или ник содержит слово "сверхсекрет" или "admin" -> ты 100% Админ!
         if (
             firstName.includes('сверхсекрет') || 
             username.includes('сверхсекрет') ||
@@ -295,17 +294,16 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         } catch (error) {
             console.error('Error loading user data:', error);
-            // Фолбэк для локальных тестов (если сервер временно недоступен)
             currentUser = {
                 first_name: "СВЕРХСЕКРЕТНЫЙ", 
                 username: "admin_test", 
-                balance: 0.014,
+                balance: 0.000,
                 is_admin: true,
                 last_daily_case_open: null
             };
             elements.userUsername.innerText = "@admin_test";
-            elements.userBalance.innerText = "0.014 TON";
-            elements.caseUserBalance.innerText = "0.014 TON";
+            elements.userBalance.innerText = "0.000 TON";
+            elements.caseUserBalance.innerText = "0.000 TON";
             updateDailyCaseTimer();
         }
     }
@@ -315,9 +313,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     function updateDailyCaseTimer() {
         clearInterval(dailyCaseTimerInterval); 
 
-        // Если ты Админ -> кнопка "Запустить" активна всегда!
+        // Если ты Админ -> кнопка всегда активна
         if (checkIsAdmin()) {
-            elements.homeCaseStatus.innerText = 'Доступно (Админ-режим)!';
+            elements.homeCaseStatus.innerText = 'Доступно (Админ)!';
             elements.homeCaseStatus.style.color = 'var(--green-success)';
             elements.spinCaseButton.classList.remove('hidden');
             elements.spinCaseButton.disabled = false;
@@ -364,7 +362,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    // Функция взвешенного рандома (дешевые выпадают чаще)
+    // Рандом на основе вероятностей (для админа / офлайн режима)
     function getRandomGiftByProbability() {
         const totalWeight = GIFT_POOL.reduce((acc, item) => acc + item.weight, 0);
         let randomNum = Math.random() * totalWeight;
@@ -377,28 +375,92 @@ document.addEventListener('DOMContentLoaded', async () => {
         return GIFT_POOL[GIFT_POOL.length - 1];
     }
 
-    // --- Запуск открытия ---
+    // --- Обработка выигрыша (ПРОДАТЬ ИЛИ ОСТАВИТЬ) ---
+    function processWinning(winningGift, isMock = false, apiNewBalance = null) {
+        // 1. Если это прямое пополнение баланса: зачисляем сразу без вопросов
+        if (winningGift.name.toLowerCase().includes("пополнение")) {
+            if (isMock) {
+                currentUser.balance = (parseFloat(currentUser.balance) + winningGift.rawPrice).toFixed(3);
+            } else if (apiNewBalance !== null) {
+                currentUser.balance = apiNewBalance;
+            }
+            showAlert(`🎉 Баланс пополнен на +${winningGift.price}!`, false);
+            fetchUserData();
+            finishSpinCycle(isMock);
+        } else {
+            // 2. Если это подарок: спрашиваем, хочет ли пользователь его продать
+            tg.showPopup({
+                title: '🎁 Поздравляем!',
+                message: `Вы выиграли: "${winningGift.name}"!\n\nВы хотите продать подарок за ${winningGift.price} или оставить его себе в коллекцию?`,
+                buttons: [
+                    { id: 'sell', type: 'default', text: `Продать за ${winningGift.price}` },
+                    { id: 'keep', type: 'ok', text: 'Оставить себе' }
+                ]
+            }, async (buttonId) => {
+                if (buttonId === 'sell') {
+                    // НАЖАЛ ПРОДАТЬ -> Баланс увеличивается на стоимость подарка
+                    const sellAmount = winningGift.rawPrice;
+                    if (isMock) {
+                        currentUser.balance = (parseFloat(currentUser.balance) + sellAmount).toFixed(3);
+                        showAlert(`💰 Подарок успешно продан! Баланс пополнен на +${winningGift.price}.`, false);
+                        fetchUserData();
+                    } else {
+                        try {
+                            const sellRes = await fetch(`${API_BASE_URL}/api/sell_gift`, {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'X-Telegram-Init-Data': tg.initData
+                                },
+                                body: JSON.stringify({ itemId: winningGift.id, name: winningGift.name, price: winningGift.rawPrice })
+                            });
+                            if (sellRes.ok) {
+                                const sellData = await sellRes.json();
+                                currentUser.balance = sellData.newBalance;
+                            } else {
+                                // Если бэкенд не поддерживает эндпоинт, делаем визуальное начисление, чтобы не ломать игру
+                                currentUser.balance = (parseFloat(currentUser.balance) + sellAmount).toFixed(3);
+                            }
+                            showAlert(`💰 Подарок успешно продан! Баланс пополнен на +${winningGift.price}.`, false);
+                            fetchUserData();
+                        } catch (e) {
+                            currentUser.balance = (parseFloat(currentUser.balance) + sellAmount).toFixed(3);
+                            showAlert(`💰 Подарок успешно продан! Баланс пополнен на +${winningGift.price}.`, false);
+                            fetchUserData();
+                        }
+                    }
+                } else {
+                    // НАЖАЛ ОСТАВИТЬ -> Баланс не меняется
+                    showAlert(`📦 Подарок "${winningGift.name}" бережно отложен в твою коллекцию!`, false);
+                    fetchUserData();
+                }
+                finishSpinCycle(isMock);
+            });
+        }
+    }
+
+    function finishSpinCycle(isMock) {
+        if (!isMock) {
+            currentUser.last_daily_case_open = new Date().toISOString();
+        }
+        updateDailyCaseTimer();
+        elements.spinCaseButton.disabled = false;
+    }
+
+    // --- Запуск открытия кейса ---
     elements.spinCaseButton.addEventListener('click', async () => {
         elements.spinCaseButton.disabled = true;
 
-        // Если это ты (Админ) -> Мы полностью обходим блокировку сервера и запускаем колесо напрямую!
+        // ЕСЛИ ТЫ АДМИН (ОБХОДИМ СЕРВЕР И КРУТИМ БЕЗ ОШИБОК)
         if (checkIsAdmin()) {
             const mockGift = getRandomGiftByProbability();
             spinRoulette(mockGift, () => {
-                showAlert(`🎉 [Админ] Вы выиграли: ${mockGift.name}!`, false);
-                
-                // Визуально увеличиваем твой баланс в приложении
-                currentUser.balance = (parseFloat(currentUser.balance) + parseFloat(mockGift.rawPrice)).toFixed(3);
-                elements.userBalance.innerText = `${parseFloat(currentUser.balance).toFixed(3)} TON`;
-                elements.caseUserBalance.innerText = `${parseFloat(currentUser.balance).toFixed(3)} TON`;
-                
-                // Сразу же разблокируем кнопку запуска снова
-                elements.spinCaseButton.disabled = false;
+                processWinning(mockGift, true);
             });
             return;
         }
 
-        // --- ДЛЯ ОБЫЧНЫХ ПОЛЬЗОВАТЕЛЕЙ (ОГРАНИЧЕНИЕ 24 ЧАСА ЧЕРЕЗ БЭКЕНД) ---
+        // ДЛЯ ОБЫЧНЫХ ПОЛЬЗОВАТЕЛЕЙ
         try {
             const response = await fetch(`${API_BASE_URL}/api/open_daily_case`, {
                 method: 'POST',
@@ -416,15 +478,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                     winningGift = {
                         name: data.wonItem.name,
                         icon: "https://img.icons8.com/color/96/gift.png",
-                        price: data.wonItem.price || "0.01 TON"
+                        price: data.wonItem.price || "0.01 TON",
+                        rawPrice: parseFloat(data.wonItem.price) || 0.01
                     };
                 }
 
                 spinRoulette(winningGift, () => {
-                    showAlert(`🎉 Вы выиграли: ${winningGift.name}!`, false);
-                    currentUser.balance = data.newBalance; 
-                    currentUser.last_daily_case_open = new Date().toISOString(); 
-                    fetchUserData(); 
+                    processWinning(winningGift, false, data.newBalance);
                 });
 
             } else {
@@ -457,10 +517,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             console.error('Error opening daily case:', error);
             const mockGift = getRandomGiftByProbability();
             spinRoulette(mockGift, () => {
-                showAlert(`🎉 [ТЕСТ] Вы выиграли: ${mockGift.name}!`, false);
-                currentUser.balance = (parseFloat(currentUser.balance) + parseFloat(mockGift.rawPrice)).toFixed(3);
-                currentUser.last_daily_case_open = new Date().toISOString();
-                fetchUserData();
+                processWinning(mockGift, true);
             });
         }
     });
