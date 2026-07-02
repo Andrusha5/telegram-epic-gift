@@ -1,28 +1,28 @@
 :root {
-    --bg-color: #1a1a2e; /* Темно-фиолетовый фон */
-    --card-bg-color: #272740; /* Темный фон для карточек */
-    --primary-color: #6a1b9a; /* Ярко-фиолетовый акцент */
-    --secondary-color: #ba68c8; /* Светлый фиолетовый */
+    --bg-color: #0b0b10; /* Ультра-темный премиальный фон */
+    --card-bg-color: #161622; /* Темный фон для карточек */
+    --card-inner-bg: #1f1f30; /* Вложенные блоки */
+    --primary-color: #8a2be2; /* Фиолетовый градиентный акцент */
+    --secondary-color: #ffd700; /* Золото для наград и акцентов */
     --text-color: #ffffff; /* Белый текст */
-    --light-text-color: #ccc; /* Светло-серый текст */
-    --border-color: #4a148c; /* Границы */
-    --button-hover-color: #8e24aa;
-    --red-alert: #e57373;
-    --green-success: #81c784;
+    --light-text-color: #8f8f9e; /* Светло-серый текст */
+    --border-color: #262636; /* Границы */
+    --green-success: #00e676; /* Ярко-зеленый */
+    --red-alert: #ff1744; /* Красный таймер */
 }
 
 body {
-    font-family: 'Roboto', sans-serif;
+    font-family: 'Montserrat', sans-serif;
     margin: 0;
     padding: 0;
     background-color: var(--bg-color);
     color: var(--text-color);
     -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
     min-height: 100vh;
     display: flex;
     flex-direction: column;
     overflow-x: hidden;
+    user-select: none;
 }
 
 #app {
@@ -30,344 +30,551 @@ body {
     flex-direction: column;
     min-height: 100vh;
     width: 100%;
-    max-width: 600px; /* Ограничение ширины для мобильных */
+    max-width: 480px; /* Идеально под размер экрана Telegram на мобилках */
     margin: 0 auto;
-    box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
+    background-color: var(--bg-color);
 }
 
+/* Скрытие секций */
+.hidden {
+    display: none !important;
+}
+
+/* ХЕДЕРЫ */
 .header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 15px;
+    padding: 16px;
     background-color: var(--card-bg-color);
     border-bottom: 1px solid var(--border-color);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.brand-title {
+    font-size: 1.2rem;
+    font-weight: 800;
+    letter-spacing: 1px;
+    color: #fff;
+    text-transform: uppercase;
+    text-shadow: 0 0 10px rgba(138, 43, 226, 0.5);
 }
 
 .user-profile {
     display: flex;
     align-items: center;
+    gap: 12px;
 }
 
 .user-avatar {
-    width: 40px;
-    height: 40px;
+    width: 46px;
+    height: 46px;
     border-radius: 50%;
-    margin-right: 10px;
     border: 2px solid var(--primary-color);
     object-fit: cover;
 }
 
-.user-username {
-    font-weight: bold;
-    font-size: 1.1em;
+.user-info {
+    display: flex;
+    flex-direction: column;
 }
 
-.balance-info {
+.user-username {
+    font-weight: 700;
+    font-size: 1rem;
+    color: #fff;
+}
+
+.balance-container {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 6px;
+    font-size: 0.85rem;
 }
 
 .balance-label {
     color: var(--light-text-color);
-    font-size: 0.9em;
 }
 
 .balance-value {
-    font-weight: bold;
-    font-size: 1.2em;
-    color: var(--green-success); /* Яркий цвет для баланса */
+    font-weight: 700;
+    color: var(--green-success);
 }
 
-.main-content {
-    flex-grow: 1;
-    padding: 20px;
-    overflow-y: auto;
-    background-color: var(--bg-color);
-}
-
-section {
-    margin-bottom: 30px;
-}
-
-section.hidden {
-    display: none;
-}
-
-h2 {
-    color: var(--secondary-color);
-    text-align: center;
-    margin-bottom: 25px;
-    font-size: 1.6em;
-    border-bottom: 2px solid var(--border-color);
-    padding-bottom: 10px;
-}
-
-.case-card {
-    background-color: var(--card-bg-color);
-    border-radius: 12px;
-    padding: 20px;
-    text-align: center;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    max-width: 300px; /* Ограничение ширины карточки кейса */
-    margin: 20px auto; /* Центрируем */
-}
-
-.case-card.clickable {
-    cursor: pointer;
-}
-
-.case-card.clickable:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.6);
-}
-
-.case-card img {
-    max-width: 90px;
-    height: auto;
-    margin-bottom: 15px;
-    display: block;
-}
-
-.case-card h3 {
-    margin: 5px 0;
-    color: var(--text-color);
-    font-size: 1.3em;
-}
-
-.case-card p {
-    color: var(--light-text-color);
-    font-size: 0.9em;
-    margin: 0;
-}
-
-.primary-button, .secondary-button {
-    width: calc(100% - 20px);
-    padding: 12px;
-    border-radius: 8px;
-    font-size: 1em;
-    font-weight: bold;
-    cursor: pointer;
-    transition: background-color 0.2s ease;
-    border: none;
-    margin-top: 15px;
-}
-
-.primary-button {
-    background-color: var(--primary-color);
-    color: var(--text-color);
-}
-
-.primary-button:hover {
-    background-color: var(--button-hover-color);
-}
-
-.secondary-button {
-    background-color: #4a148c; /* Darker purple for secondary */
-    color: var(--text-color);
-}
-
-.secondary-button:hover {
-    background-color: #6a1b9a;
-}
-
-.primary-button:disabled, .secondary-button:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-}
-
-.timer {
-    color: var(--red-alert);
-    font-weight: bold;
-    margin-top: 10px;
-    font-size: 1em;
-}
-
-.note {
-    font-size: 0.85em;
-    color: var(--light-text-color);
-    margin-top: 20px;
-    text-align: center;
-}
-
-/* Footer Navigation */
-.footer {
-    display: flex;
-    justify-content: space-around;
-    padding: 10px 0;
-    background-color: var(--card-bg-color);
-    border-top: 1px solid var(--border-color);
-    box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.3);
-    position: sticky;
-    bottom: 0;
-    width: 100%;
-}
-
-.nav-button {
-    background: none;
-    border: none;
-    color: var(--light-text-color);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    font-size: 0.8em;
-    cursor: pointer;
-    padding: 5px 0;
-    transition: color 0.2s ease;
-}
-
-.nav-button img {
-    width: 24px;
-    height: 24px;
-    margin-bottom: 5px;
-    filter: invert(0.6); /* Сделать иконки светлее */
-}
-
-.nav-button.active {
-    color: var(--primary-color);
-    font-weight: bold;
-}
-
-.nav-button.active img {
-    filter: invert(0.2) sepia(1) saturate(5) hue-rotate(250deg) brightness(1.2); /* Цветные иконки для активных */
-}
-
-/* Admin Panel Styles */
-.admin-buttons {
-    text-align: center;
-    margin-top: 20px;
-}
-
-.admin-tabs {
-    display: flex;
-    justify-content: center;
-    margin-bottom: 20px;
-}
-
-.admin-tab-button {
-    background-color: #33334f;
-    color: var(--light-text-color);
-    border: none;
-    padding: 10px 20px;
-    cursor: pointer;
-    border-radius: 8px 8px 0 0;
-    transition: background-color 0.2s ease;
-    margin: 0 5px;
-}
-
-.admin-tab-button.active {
-    background-color: var(--primary-color);
-    color: var(--text-color);
-}
-
-.admin-tab-button:hover:not(.active) {
-    background-color: #4a148c;
-}
-
-.admin-tab-content {
-    background-color: var(--card-bg-color);
-    padding: 20px;
-    border-radius: 0 0 12px 12px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-}
-
-h3 {
-    color: var(--secondary-color);
-    margin-top: 0;
-    text-align: center;
-    margin-bottom: 20px;
-}
-
-.item-form, .card {
-    background-color: #33334f;
-    padding: 15px;
-    border-radius: 8px;
-    margin-top: 15px;
-}
-
-input[type="text"], input[type="number"], select {
-    width: calc(100% - 20px);
-    padding: 10px;
-    margin-bottom: 10px;
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
-    background-color: #444466;
-    color: var(--text-color);
-    font-size: 0.95em;
-    outline: none;
-    box-sizing: border-box;
-}
-
-input[type="text"]:focus, input[type="number"]:focus, select:focus {
-    border-color: var(--primary-color);
-    box-shadow: 0 0 0 2px rgba(106, 27, 154, 0.5);
-}
-
-#items-list-container, #daily-case-drops-config-list {
-    margin-top: 20px;
-    margin-bottom: 20px;
-}
-
-.item-entry, .case-drop-entry {
+/* Навигационный хедер для экрана кейса */
+.header-nav {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    background-color: #33334f;
-    padding: 10px 15px;
-    border-radius: 8px;
-    margin-bottom: 10px;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+    padding: 12px 16px;
+    background-color: var(--card-bg-color);
+    border-bottom: 1px solid var(--border-color);
 }
 
-.item-entry-info, .case-drop-entry-info {
+.back-button {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-color);
+    color: #fff;
+    padding: 8px 14px;
+    border-radius: 20px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: 0.2s ease;
+}
+
+.back-button:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.nav-title {
+    font-size: 1rem;
+    font-weight: 700;
+}
+
+.deposit-button {
+    background: linear-gradient(135deg, #6200ea, #8a2be2);
+    border: none;
+    color: #fff;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-weight: 700;
+    font-size: 0.85rem;
+    cursor: pointer;
+    box-shadow: 0 4px 10px rgba(138, 43, 226, 0.3);
+}
+
+.user-bar-sub {
+    background: #11111a;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.user-bar-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.user-avatar-small {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 1.5px solid var(--primary-color);
+}
+
+.balance-sub-label {
+    font-size: 0.8rem;
+    color: var(--light-text-color);
+}
+
+.balance-sub-value {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #00e676;
+}
+
+/* КАРТОЧКА КЕЙСА НА ГЛАВНОЙ */
+.main-content {
+    flex-grow: 1;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+}
+
+.welcome-banner {
+    background: linear-gradient(135deg, #1a103c, #0d0722);
+    border: 1px solid #321e5c;
+    border-radius: 16px;
+    padding: 16px;
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+.welcome-banner h2 {
+    font-size: 1.2rem;
+    font-weight: 800;
+    margin: 0 0 8px 0;
+    color: #fff;
+}
+
+.welcome-banner p {
+    font-size: 0.85rem;
+    color: var(--light-text-color);
+    margin: 0;
+}
+
+.section-divider-title {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--light-text-color);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 12px;
+}
+
+.case-banner-card {
+    background: linear-gradient(135deg, #1c1c2d, #141420);
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    padding: 20px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    position: relative;
+    cursor: pointer;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+    transition: transform 0.2s ease, border-color 0.2s;
+}
+
+.case-banner-card:hover {
+    transform: scale(1.02);
+    border-color: var(--primary-color);
+}
+
+.case-banner-badge {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    background: var(--secondary-color);
+    color: #000;
+    font-size: 0.7rem;
+    font-weight: 800;
+    padding: 3px 8px;
+    border-radius: 8px;
+}
+
+.case-banner-img {
+    width: 68px;
+    height: 68px;
+}
+
+.case-banner-info {
     flex-grow: 1;
 }
 
-.item-entry-info span, .case-drop-entry-info span {
-    display: block;
-    margin-bottom: 3px;
+.case-banner-info h3 {
+    margin: 0 0 6px 0;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #fff;
 }
 
-.item-entry-info .name, .case-drop-entry-info .name {
-    font-weight: bold;
-    color: var(--secondary-color);
-    font-size: 1.1em;
+.case-banner-info p {
+    margin: 0;
+    font-size: 0.8rem;
+    color: var(--green-success);
+    font-weight: 600;
 }
 
-.item-entry-actions, .case-drop-entry-actions {
+.case-banner-arrow {
+    font-size: 1.4rem;
+    color: var(--light-text-color);
+    font-weight: 700;
+}
+
+/* СТРАНИЦА КЕЙСА */
+.case-page-header {
+    margin-bottom: 12px;
+}
+
+.case-title-block {
     display: flex;
+    align-items: center;
     gap: 10px;
 }
 
-.item-entry-actions button, .case-drop-entry-actions button {
-    background-color: transparent;
+.case-icon-mini {
+    font-size: 1.5rem;
+}
+
+.case-main-title {
+    display: block;
+    font-size: 1.2rem;
+    font-weight: 800;
+    color: #fff;
+}
+
+.case-secondary-title {
+    font-size: 0.8rem;
+    color: var(--light-text-color);
+}
+
+/* ТОП ДРОП БАННЕР (Как на макете) */
+.top-drop-banner {
+    background: #1c1310;
+    border: 1px solid #3c2419;
+    border-radius: 12px;
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 24px;
+}
+
+.drop-badge {
+    background: #ff5722;
+    color: #fff;
+    font-size: 0.7rem;
+    font-weight: 800;
+    padding: 4px 8px;
+    border-radius: 6px;
+}
+
+.drop-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    background: #2c1d18;
+}
+
+.drop-info {
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1;
+}
+
+.drop-name {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: #fff;
+}
+
+.drop-price {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #ffd700;
+}
+
+.drop-time {
+    font-size: 0.75rem;
+    color: var(--light-text-color);
+}
+
+/* РУЛЕТКА */
+.roulette-wrapper {
+    position: relative;
+    width: 100%;
+    margin: 10px 0 20px 0;
+    overflow: hidden;
+    border-radius: 16px;
+    border: 1.5px solid var(--border-color);
+    background-color: #0d0d14;
+    padding: 12px 0;
+}
+
+/* Прицел по центру */
+.roulette-pointer {
+    position: absolute;
+    left: 50%;
+    width: 4px;
+    background-color: #9b5de5;
+    z-index: 10;
+    transform: translateX(-50%);
+    box-shadow: 0 0 12px #9b5de5;
+}
+
+.pointer-top {
+    top: 0;
+    height: 15px;
+    border-radius: 0 0 4px 4px;
+}
+
+.pointer-bottom {
+    bottom: 0;
+    height: 15px;
+    border-radius: 4px 4px 0 0;
+}
+
+.roulette-container {
+    width: 100%;
+    height: 90px;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+}
+
+.roulette-track {
+    display: flex;
+    gap: 8px;
+    padding-left: 50%; /* Сдвиг для старта по центру */
+    will-change: transform;
+}
+
+.roulette-item {
+    min-width: 84px;
+    width: 84px;
+    height: 84px;
+    background: #1a1a26;
+    border: 1.5px solid #2e2e42;
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    box-sizing: border-box;
+    transition: background 0.3s;
+}
+
+.roulette-item.highlight {
+    background: radial-gradient(circle, rgba(138,43,226,0.2) 0%, rgba(26,26,38,1) 100%);
+    border-color: var(--primary-color);
+}
+
+.roulette-item img {
+    width: 48px;
+    height: 48px;
+    object-fit: contain;
+    margin-bottom: 2px;
+}
+
+.roulette-item .item-value-mini {
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: var(--secondary-color);
+}
+
+/* КНОПКА ЗАПУСКА И ТАЙМЕР */
+.case-control-area {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-bottom: 30px;
+    width: 100%;
+}
+
+.action-button-gradient {
+    width: 100%;
+    background: linear-gradient(135deg, #8e2de2, #4a00e0);
     border: none;
+    color: #fff;
+    padding: 16px;
+    border-radius: 14px;
+    font-size: 1.1rem;
+    font-weight: 800;
     cursor: pointer;
-    padding: 5px;
-    border-radius: 4px;
-    transition: background-color 0.2s ease;
+    box-shadow: 0 6px 20px rgba(74, 0, 224, 0.4);
+    transition: transform 0.1s, opacity 0.2s;
 }
 
-.item-entry-actions button img, .case-drop-entry-actions button img {
-    width: 20px;
-    height: 20px;
-    filter: invert(0.8);
+.action-button-gradient:active {
+    transform: scale(0.98);
 }
 
-.item-entry-actions button:hover, .case-drop-entry-actions button:hover {
-    background-color: rgba(255, 255, 255, 0.1);
+.action-button-gradient:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    box-shadow: none;
 }
 
-.total-chance {
+/* Карточка таймера (В точности как на втором фото) */
+.timer-card {
+    width: 100%;
+    background-color: #161622;
+    border: 1.5px solid var(--border-color);
+    border-radius: 14px;
+    padding: 16px;
     text-align: center;
-    font-weight: bold;
-    margin-top: 20px;
-    font-size: 1.2em;
-    color: var(--green-success);
+    box-sizing: border-box;
+}
+
+.timer-title {
+    display: block;
+    font-size: 0.9rem;
+    color: var(--light-text-color);
+    font-weight: 600;
+    margin-bottom: 8px;
+}
+
+.timer-clock {
+    font-size: 1.4rem;
+    font-weight: 800;
+    color: #fff;
+    letter-spacing: 1px;
+}
+
+/* СЕТКА НАГРАД */
+.rewards-section {
+    margin-top: 10px;
+}
+
+.rewards-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+.rewards-header-icon {
+    font-size: 1.2rem;
+}
+
+.rewards-header h3 {
+    margin: 0;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #fff;
+}
+
+.rewards-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+}
+
+/* Карточка награды в сетке */
+.reward-card {
+    background-color: var(--card-bg-color);
+    border: 1.5px solid var(--border-color);
+    border-radius: 14px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+    box-sizing: border-box;
+    aspect-ratio: 1 / 1.1;
+    transition: border-color 0.2s;
+}
+
+/* Золотая рамка для дорогих наград */
+.reward-card.gold-tier {
+    border-color: rgba(255, 215, 0, 0.4);
+}
+
+.reward-badge-price {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: var(--secondary-color);
+    font-size: 0.65rem;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    gap: 3px;
+}
+
+.reward-card img {
+    width: 52px;
+    height: 52px;
+    object-fit: contain;
+    margin-top: 10px;
+    margin-bottom: 8px;
+}
+
+.reward-name {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--light-text-color);
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    width: 100%;
 }
