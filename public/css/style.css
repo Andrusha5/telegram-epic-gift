@@ -30,7 +30,7 @@ body {
     flex-direction: column;
     min-height: 100vh;
     width: 100%;
-    max-width: 480px; /* Идеально под размер экрана Telegram на мобилках */
+    max-width: 480px; /* Под размер экрана Telegram */
     margin: 0 auto;
     background-color: var(--bg-color);
 }
@@ -302,7 +302,7 @@ body {
     color: var(--light-text-color);
 }
 
-/* ТОП ДРОП БАННЕР (Как на макете) */
+/* ТОП ДРОП БАННЕР */
 .top-drop-banner {
     background: #1c1310;
     border: 1px solid #3c2419;
@@ -469,7 +469,7 @@ body {
     box-shadow: none;
 }
 
-/* Карточка таймера (В точности как на втором фото) */
+/* Карточка таймера */
 .timer-card {
     width: 100%;
     background-color: #161622;
@@ -495,7 +495,7 @@ body {
     letter-spacing: 1px;
 }
 
-/* СЕТКА НАГРАД */
+/* СЕТКА НАГРАД (Два столбика) */
 .rewards-section {
     margin-top: 10px;
 }
@@ -520,61 +520,72 @@ body {
 
 .rewards-grid {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 10px;
+    grid-template-columns: repeat(2, 1fr) !important; /* Ровно 2 столбика */
+    gap: 12px;
 }
 
 /* Карточка награды в сетке */
 .reward-card {
     background-color: var(--card-bg-color);
     border: 1.5px solid var(--border-color);
-    border-radius: 14px;
+    border-radius: 16px;
     padding: 12px;
     display: flex;
     flex-direction: column;
     align-items: center;
     position: relative;
     box-sizing: border-box;
-    aspect-ratio: 1 / 1.1;
-    transition: border-color 0.2s;
+    transition: border-color 0.2s, transform 0.2s;
 }
 
 /* Золотая рамка для дорогих наград */
 .reward-card.gold-tier {
-    border-color: rgba(255, 215, 0, 0.4);
+    border-color: rgba(255, 215, 0, 0.45);
+    box-shadow: 0 0 10px rgba(255, 215, 0, 0.05);
 }
 
-.reward-badge-price {
-    position: absolute;
-    top: 8px;
-    right: 8px;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+/* ЦЕНА СВЕРХУ */
+.reward-price-top {
+    font-size: 0.85rem;
+    font-weight: 800;
     color: var(--secondary-color);
-    font-size: 0.65rem;
-    font-weight: 700;
-    padding: 2px 6px;
-    border-radius: 8px;
+    margin-bottom: 6px;
     display: flex;
     align-items: center;
-    gap: 3px;
+    gap: 4px;
+    text-shadow: 0 0 5px rgba(255, 215, 0, 0.2);
 }
 
 .reward-card img {
-    width: 52px;
-    height: 52px;
+    width: 64px;
+    height: 64px;
     object-fit: contain;
-    margin-top: 10px;
     margin-bottom: 8px;
 }
 
+/* НАЗВАНИЕ ПОДАРКА */
 .reward-name {
-    font-size: 0.75rem;
-    font-weight: 600;
-    color: var(--light-text-color);
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #fff;
     text-align: center;
+    margin-bottom: 8px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
     width: 100%;
 }
+
+/* КРАСИВЫЙ СТИЛЬ RANDOM СНИЗУ */
+.reward-random-badge {
+    background: rgba(138, 43, 226, 0.15);
+    border: 1px solid rgba(138, 43, 226, 0.4);
+    color: #b388ff;
+    font-size: 0.65rem;
+    font-weight: 800;
+    padding: 3px 12px;
+    border-radius: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    box-shadow: 0 0 8px rgba(138, 43, 226, 0.2);
+        }
