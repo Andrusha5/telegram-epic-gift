@@ -1,7 +1,11 @@
 document.addEventListener('DOMContentLoaded', async () => {
-    const tg = window.Telegram.WebApp;
-    if (!tg) {
-        console.error("Telegram WebApp SDK не загружен. Запустите в Telegram.");
+    // Безопасное получение Telegram WebApp SDK без падений
+    let tg = null;
+    if (window.Telegram && window.Telegram.WebApp) {
+        tg = window.Telegram.WebApp;
+        tg.expand();
+    } else {
+        console.warn("Telegram WebApp SDK не загружен. Создаем безопасную заглушку.");
         window.Telegram = {
             WebApp: {
                 initData: 'user=%7B%22id%22%3A123456789%2C%22first_name%22%3A%22%D0%A1%D0%92%D0%95%D0%A0%D0%A5%D0%A1%D0%95%D0%9A%D0%A0%D0%95%D0%A2%D0%9D%D0%AB%D0%99%22%2C%22last_name%22%3A%22User%22%2C%22username%22%3A%22verylongusername123%22%7D',
@@ -21,14 +25,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
             }
         };
-    } else {
-        tg.expand();
+        tg = window.Telegram.WebApp;
     }
 
     const API_BASE_URL = window.location.origin;
     let currentUser = {}; 
 
-    // --- ПРИЗЫ С ТВОИМИ ИЗОБРАЖЕНИЯМИ (Строго по убыванию цены) ---
+    // --- ПРИЗЫ С ТВОИМИ ИЗОБРАЖЕНИЯМИ (Чистые ссылки без &amp;quot;) ---
     const GIFT_POOL = [
         { id: 1, name: "Статуя птицы серая", icon: "https://unlimbot.hb.ru-msk.vkcloud-storage.ru/uploads/954503c70e7e4d70b330820aa63c3a2664b43859d4fc5932.jpg", price: "20 TON", rawPrice: 20.0, isGold: true, type: "gift", weight: 1 },
         { id: 2, name: "Тыква", icon: "https://unlimbot.hb.ru-msk.vkcloud-storage.ru/uploads/7da852289f424f4d8dbb74918372a50122e06951b2946cd3.jpg", price: "8 TON", rawPrice: 8.0, isGold: true, type: "gift", weight: 3 },
@@ -66,14 +69,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         rewardsGrid: document.getElementById('rewards-grid')
     };
 
+    // --- Переключение страниц ---
     function navigateTo(sectionId) {
         if (sectionId === 'home') {
-            elements.caseSection.classList.add('hidden');
-            elements.homeSection.classList.remove('hidden');
+            if (elements.caseSection) elements.caseSection.classList.add('hidden');
+            if (elements.homeSection) elements.homeSection.classList.remove('hidden');
             if (tg.BackButton) tg.BackButton.hide();
         } else if (sectionId === 'case') {
-            elements.homeSection.classList.add('hidden');
-            elements.caseSection.classList.remove('hidden');
+            if (elements.homeSection) elements.homeSection.classList.add('hidden');
+            if (elements.caseSection) elements.caseSection.classList.remove('hidden');
             if (tg.BackButton) {
                 tg.BackButton.show();
                 tg.BackButton.onClick(() => navigateTo('home'));
@@ -82,8 +86,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    elements.dailyCaseBanner.addEventListener('click', () => navigateTo('case'));
-    elements.backToHomeButton.addEventListener('click', () => navigateTo('home'));
+    if (elements.dailyCaseBanner) {
+        elements.dailyCaseBanner.addEventListener('click', () => navigateTo('case'));
+    }
+    if (elements.backToHomeButton) {
+        elements.backToHomeButton.addEventListener('click', () => navigateTo('home'));
+    }
 
     function showAlert(message, isError = false) {
         if (tg && tg.showPopup) {
@@ -97,8 +105,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    // --- Отрисовка наград в два столбика ---
+    // --- Отрисовка наград ---
     function renderRewardsGrid() {
+        if (!elements.rewardsGrid) return;
         elements.rewardsGrid.innerHTML = '';
         GIFT_POOL.forEach(gift => {
             const card = document.createElement('div');
@@ -118,6 +127,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // --- Инициализация ленты рулетки ---
     function initRouletteTrack() {
+        if (!elements.rouletteTrack) return;
         elements.rouletteTrack.style.transition = 'none';
         elements.rouletteTrack.style.transform = 'translateX(0px)';
         
@@ -137,8 +147,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    // --- Математически выверенная анимация прокрутки ---
+    // --- Анимация прокрутки ---
     function spinRoulette(winningItem, onComplete) {
+        if (!elements.rouletteTrack) {
+            onComplete();
+            return;
+        }
         const itemWidth = 84; 
         const gap = 8; 
         const itemFullWidth = itemWidth + gap; 
@@ -165,7 +179,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }, 5100);
     }
 
-    // --- Проверка на Админа на фронтенде (Ник СВЕРХСЕКРЕТНЫЙ или флаг из базы) ---
+    // --- Проверка на Админа на фронтенде ---
     function checkIsAdmin() {
         if (!currentUser) return false;
         
@@ -205,17 +219,17 @@ document.addEventListener('DOMContentLoaded', async () => {
                     user.first_name;
             }
 
-            elements.userUsername.innerText = usernameToDisplay;
-            elements.userAvatar.src = user.avatar_url || 'https://via.placeholder.com/40';
-            elements.userBalance.innerText = `${parseFloat(user.balance).toFixed(3)} TON`;
+            if (elements.userUsername) elements.userUsername.innerText = usernameToDisplay;
+            if (elements.userAvatar) elements.userAvatar.src = user.avatar_url || 'https://via.placeholder.com/40';
+            if (elements.userBalance) elements.userBalance.innerText = `${parseFloat(user.balance).toFixed(3)} TON`;
 
-            elements.caseUserAvatar.src = user.avatar_url || 'https://via.placeholder.com/40';
-            elements.caseUserBalance.innerText = `${parseFloat(user.balance).toFixed(3)} TON`;
+            if (elements.caseUserAvatar) elements.caseUserAvatar.src = user.avatar_url || 'https://via.placeholder.com/40';
+            if (elements.caseUserBalance) elements.caseUserBalance.innerText = `${parseFloat(user.balance).toFixed(3)} TON`;
 
             updateDailyCaseTimer();
 
         } catch (error) {
-            console.error('Error loading user data:', error);
+            console.error("Error loading user data:", error);
             currentUser = {
                 first_name: "СВЕРХСЕКРЕТНЫЙ", 
                 username: "admin_test", 
@@ -223,9 +237,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                 is_admin: true,
                 last_daily_case_open: null
             };
-            elements.userUsername.innerText = "@admin_test";
-            elements.userBalance.innerText = "0.000 TON";
-            elements.caseUserBalance.innerText = "0.000 TON";
+            if (elements.userUsername) elements.userUsername.innerText = "@admin_test";
+            if (elements.userBalance) elements.userBalance.innerText = "0.000 TON";
+            if (elements.caseUserBalance) elements.caseUserBalance.innerText = "0.000 TON";
             updateDailyCaseTimer();
         }
     }
@@ -235,22 +249,29 @@ document.addEventListener('DOMContentLoaded', async () => {
     function updateDailyCaseTimer() {
         clearInterval(dailyCaseTimerInterval); 
 
-        // ЕСЛИ ТЫ АДМИН — ТАЙМЕРА НЕТ, КРУТИ БЕСКОНЕЧНО!
         if (checkIsAdmin()) {
-            elements.homeCaseStatus.innerText = 'Доступно без ограничений (Админ)!';
-            elements.homeCaseStatus.style.color = 'var(--green-success)';
-            elements.spinCaseButton.classList.remove('hidden');
-            elements.spinCaseButton.disabled = false;
-            elements.timerContainer.classList.add('hidden');
+            if (elements.homeCaseStatus) {
+                elements.homeCaseStatus.innerText = 'Доступно без ограничений (Админ)!';
+                elements.homeCaseStatus.style.color = 'var(--green-success)';
+            }
+            if (elements.spinCaseButton) {
+                elements.spinCaseButton.classList.remove('hidden');
+                elements.spinCaseButton.disabled = false;
+            }
+            if (elements.timerContainer) elements.timerContainer.classList.add('hidden');
             return;
         }
 
         if (!currentUser.last_daily_case_open) {
-            elements.homeCaseStatus.innerText = 'Доступно!';
-            elements.homeCaseStatus.style.color = 'var(--green-success)';
-            elements.spinCaseButton.classList.remove('hidden');
-            elements.spinCaseButton.disabled = false;
-            elements.timerContainer.classList.add('hidden');
+            if (elements.homeCaseStatus) {
+                elements.homeCaseStatus.innerText = 'Доступно!';
+                elements.homeCaseStatus.style.color = 'var(--green-success)';
+            }
+            if (elements.spinCaseButton) {
+                elements.spinCaseButton.classList.remove('hidden');
+                elements.spinCaseButton.disabled = false;
+            }
+            if (elements.timerContainer) elements.timerContainer.classList.add('hidden');
             return;
         }
 
@@ -261,30 +282,37 @@ document.addEventListener('DOMContentLoaded', async () => {
         const timeLeftMs = nextOpenTime.getTime() - now.getTime();
 
         if (timeLeftMs <= 0) {
-            elements.homeCaseStatus.innerText = 'Доступно!';
-            elements.homeCaseStatus.style.color = 'var(--green-success)';
-            elements.spinCaseButton.classList.remove('hidden');
-            elements.spinCaseButton.disabled = false;
-            elements.timerContainer.classList.add('hidden');
+            if (elements.homeCaseStatus) {
+                elements.homeCaseStatus.innerText = 'Доступно!';
+                elements.homeCaseStatus.style.color = 'var(--green-success)';
+            }
+            if (elements.spinCaseButton) {
+                elements.spinCaseButton.classList.remove('hidden');
+                elements.spinCaseButton.disabled = false;
+            }
+            if (elements.timerContainer) elements.timerContainer.classList.add('hidden');
         } else {
-            elements.spinCaseButton.classList.add('hidden');
-            elements.spinCaseButton.disabled = true;
-            elements.timerContainer.classList.remove('hidden');
+            if (elements.spinCaseButton) {
+                elements.spinCaseButton.classList.add('hidden');
+                elements.spinCaseButton.disabled = true;
+            }
+            if (elements.timerContainer) elements.timerContainer.classList.remove('hidden');
 
             const hours = Math.floor(timeLeftMs / (1000 * 60 * 60));
             const minutes = Math.floor((timeLeftMs % (1000 * 60 * 60)) / (1000 * 60));
             const seconds = Math.floor((timeLeftMs % (1000 * 60)) / 1000);
             
             const timerString = `${hours}h ${minutes}m ${seconds}s`;
-            elements.dailyCaseTimer.innerText = timerString;
-            elements.homeCaseStatus.innerText = `Доступно через: ${timerString}`;
-            elements.homeCaseStatus.style.color = 'var(--red-alert)';
+            if (elements.dailyCaseTimer) elements.dailyCaseTimer.innerText = timerString;
+            if (elements.homeCaseStatus) {
+                elements.homeCaseStatus.innerText = `Доступно через: ${timerString}`;
+                elements.homeCaseStatus.style.color = 'var(--red-alert)';
+            }
 
             dailyCaseTimerInterval = setInterval(updateDailyCaseTimer, 1000); 
         }
     }
 
-    // Рандом на основе вероятностей (для админа / офлайн режима)
     function getRandomGiftByProbability() {
         const totalWeight = GIFT_POOL.reduce((acc, item) => acc + item.weight, 0);
         let randomNum = Math.random() * totalWeight;
@@ -297,7 +325,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         return GIFT_POOL[GIFT_POOL.length - 1];
     }
 
-    // --- Обработка выигрыша (ПРОДАТЬ ИЛИ ОСТАВИТЬ) ---
     function processWinning(winningGift, isMock = false, apiNewBalance = null) {
         if (winningGift.type === "balance" || winningGift.name.toLowerCase().includes("пополнение")) {
             if (isMock) {
@@ -360,81 +387,78 @@ document.addEventListener('DOMContentLoaded', async () => {
             currentUser.last_daily_case_open = new Date().toISOString();
         }
         updateDailyCaseTimer();
-        elements.spinCaseButton.disabled = false;
+        if (elements.spinCaseButton) elements.spinCaseButton.disabled = false;
     }
 
-    // --- Нажатие Запустить ---
-    elements.spinCaseButton.addEventListener('click', async () => {
-        elements.spinCaseButton.disabled = true;
+    if (elements.spinCaseButton) {
+        elements.spinCaseButton.addEventListener('click', async () => {
+            elements.spinCaseButton.disabled = true;
 
-        // Полная пересборка ленты перед каждым вращением
-        initRouletteTrack();
+            initRouletteTrack();
 
-        setTimeout(async () => {
-            // ЕСЛИ ТЫ АДМИН (ОБХОДИМ СЕРВЕРНЫЙ ТАЙМЕР И ЗАПУСКАЕМ КРУТКУ НАПРЯМУЮ)
-            if (checkIsAdmin()) {
-                const mockGift = getRandomGiftByProbability();
-                spinRoulette(mockGift, () => {
-                    processWinning(mockGift, true);
-                });
-                return;
-            }
+            setTimeout(async () => {
+                if (checkIsAdmin()) {
+                    const mockGift = getRandomGiftByProbability();
+                    spinRoulette(mockGift, () => {
+                        processWinning(mockGift, true);
+                    });
+                    return;
+                }
 
-            // ДЛЯ ОБЫЧНЫХ ПОЛЬЗОВАТЕЛЕЙ (ОТПРАВЛЯЕМ ЗАПРОС НА СЕРВЕР)
-            try {
-                const response = await fetch(`${API_BASE_URL}/api/open_daily_case`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-Telegram-Init-Data': tg.initData
-                    }
-                });
-
-                const data = await response.json();
-
-                if (response.ok) {
-                    let winningGift = GIFT_POOL.find(g => g.id === data.wonItem.id);
-                    if (!winningGift) {
-                        winningGift = GIFT_POOL.find(g => g.name.toLowerCase() === data.wonItem.name.toLowerCase());
-                    }
-
-                    spinRoulette(winningGift, () => {
-                        processWinning(winningGift, false, data.newBalance);
+                try {
+                    const response = await fetch(`${API_BASE_URL}/api/open_daily_case`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-Telegram-Init-Data': tg.initData
+                        }
                     });
 
-                } else {
-                    if (data.error && data.error.includes('подписчиком канала')) {
-                        try {
-                            const infoRes = await fetch(`${API_BASE_URL}/api/daily_case_info`, {
-                                headers: { 'X-Telegram-Init-Data': tg.initData }
-                            });
-                            const infoData = await infoRes.json();
-                            const channelUrl = `https://t.me/${infoData.channel_username}`;
+                    const data = await response.json();
 
-                            tg.showPopup({
-                                title: 'Нужна подписка',
-                                message: 'Пожалуйста, подпишитесь на наш телеграм-канал, чтобы открыть ежедневный кейс!',
-                                buttons: [{ id: 'subscribe', type: 'default', text: 'Подписаться' }]
-                            }, (buttonId) => {
-                                if (buttonId === 'subscribe') {
-                                    tg.openLink(channelUrl);
-                                }
-                            });
-                        } catch (err) {
-                            showAlert(data.error, true);
+                    if (response.ok) {
+                        let winningGift = GIFT_POOL.find(g => g.id === data.wonItem.id);
+                        if (!winningGift) {
+                            winningGift = GIFT_POOL.find(g => g.name.toLowerCase() === data.wonItem.name.toLowerCase());
                         }
+
+                        spinRoulette(winningGift, () => {
+                            processWinning(winningGift, false, data.newBalance);
+                        });
+
                     } else {
-                        showAlert(data.error || 'Ошибка при открытии кейса.', true);
+                        if (data.error && data.error.includes('подписчиком канала')) {
+                            try {
+                                const infoRes = await fetch(`${API_BASE_URL}/api/daily_case_info`, {
+                                    headers: { 'X-Telegram-Init-Data': tg.initData }
+                                });
+                                const infoData = await infoRes.json();
+                                const channelUrl = `https://t.me/${infoData.channel_username}`;
+
+                                tg.showPopup({
+                                    title: 'Нужна подписка',
+                                    message: 'Пожалуйста, подпишитесь на наш телеграм-канал, чтобы открыть ежедневный кейс!',
+                                    buttons: [{ id: 'subscribe', type: 'default', text: 'Подписаться' }]
+                                }, (buttonId) => {
+                                    if (buttonId === 'subscribe') {
+                                        tg.openLink(channelUrl);
+                                    }
+                                });
+                            } catch (err) {
+                                showAlert(data.error, true);
+                            }
+                        } else {
+                            showAlert(data.error || 'Ошибка при открытии кейса.', true);
+                        }
+                        elements.spinCaseButton.disabled = false;
                     }
+                } catch (error) {
+                    console.error('Error opening daily case:', error);
                     elements.spinCaseButton.disabled = false;
                 }
-            } catch (error) {
-                console.error('Error opening daily case:', error);
-                // Если непредвиденная ошибка сети, разрешаем нажать кнопку снова
-                elements.spinCaseButton.disabled = false;
-            }
-        }, 50);
-    });
+            }, 50);
+        });
+    }
 
     renderRewardsGrid();
     await fetchUserData(); 
