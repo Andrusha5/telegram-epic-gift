@@ -4,7 +4,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         console.error("Telegram WebApp SDK не загружен. Запустите в Telegram.");
         window.Telegram = {
             WebApp: {
-                initData: 'user=%7B%22id%22%3A123456789%2C%22first_name%22%3A%22%D0%A1%D0%92%D0%95%D0%A0%D0%A5%D0%A1%D0%95%D0%9A%D0%A0%D0%95%D0%A2%D0%9D%D0%AB%D0%99%22%2C%22username%22%3A%22verylongusername123%22%7D',
+                initData: 'user=%7B%22id%22%3A123456789%2C%22first_name%22%3A%22%D0%A1%D0%92%D0%95%D0%A0%D0%A5%D0%A1%D0%95%D0%9A%D0%A0%D0%95%D0%A2%D0%9D%D0%AB%D0%99%22%2C%22last_name%22%3A%22User%22%2C%22username%22%3A%22verylongusername123%22%7D',
                 initDataUnsafe: {
                     user: { id: 123456789, first_name: "СВЕРХСЕКРЕТНЫЙ", username: "admin_test" }
                 },
@@ -103,11 +103,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         GIFT_POOL.forEach(gift => {
             const card = document.createElement('div');
             card.className = `reward-card ${gift.isGold ? 'gold-tier' : ''}`;
+            
+            // Показываем плашку random только у ПОДАРКОВ (type: "gift"). У пополнений убираем!
+            const randomBadge = gift.type === 'gift' ? '<div class="reward-random-badge">random</div>' : '';
+
             card.innerHTML = `
                 <div class="reward-price-top">${gift.price}</div>
                 <img src="${gift.icon}" alt="${gift.name}" onerror="this.src='https://img.icons8.com/color/96/gift.png'">
                 <div class="reward-name">${gift.name}</div>
-                <div class="reward-random-badge">random</div>
+                ${randomBadge}
             `;
             elements.rewardsGrid.appendChild(card);
         });
@@ -131,12 +135,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    // --- Анимация прокрутки ---
+    // --- Математически выверенная анимация прокрутки ---
     function spinRoulette(winningItem, onComplete) {
         const itemWidth = 84; 
         const gap = 8; 
         const itemFullWidth = itemWidth + gap; 
-        const targetIndex = 35; 
+        const targetIndex = 35; // Предмет, который остановится под прицелом
 
         const trackItems = elements.rouletteTrack.children;
         if (trackItems[targetIndex]) {
@@ -147,9 +151,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             `;
         }
 
-        const containerWidth = elements.rouletteTrack.parentElement.offsetWidth;
-        const centerOffset = containerWidth / 2 - itemFullWidth / 2;
-        const totalTranslate = (targetIndex * itemFullWidth) - centerOffset;
+        // Вычисляем точную дистанцию сдвига, чтобы winningItem остановился РОВНО по центру прицела
+        const totalTranslate = (targetIndex * itemFullWidth) + (itemWidth / 2);
 
         elements.rouletteTrack.style.transition = 'transform 5s cubic-bezier(0.15, 0.85, 0.15, 1)';
         elements.rouletteTrack.style.transform = `translateX(-${totalTranslate}px)`;
@@ -324,57 +327,64 @@ document.addEventListener('DOMContentLoaded', async () => {
     elements.spinCaseButton.addEventListener('click', async () => {
         elements.spinCaseButton.disabled = true;
 
-        try {
-            const response = await fetch(`${API_BASE_URL}/api/open_daily_case`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-Telegram-Init-Data': tg.initData
-                }
-            });
+        // Очищаем и заново генерируем ленту для повторной плавной анимации
+        initRouletteTrack();
 
-            const data = await response.json();
-
-            if (response.ok) {
-                let winningGift = GIFT_POOL.find(g => g.id === data.wonItem.id);
-                if (!winningGift) {
-                    winningGift = GIFT_POOL.find(g => g.name.toLowerCase() === data.wonItem.name.toLowerCase());
-                }
-
-                spinRoulette(winningGift, () => {
-                    processWinning(winningGift, false, data.newBalance);
+        // Задержка 50мс перед стартом. Это критически важно, чтобы браузер успел применить сброс ленты на 0px,
+        // иначе анимация повторной прокрутки зависнет.
+        setTimeout(async () => {
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/open_daily_case`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Telegram-Init-Data': tg.initData
+                    }
                 });
 
-            } else {
-                if (data.error && data.error.includes('подписчиком канала')) {
-                    try {
-                        const infoRes = await fetch(`${API_BASE_URL}/api/daily_case_info`, {
-                            headers: { 'X-Telegram-Init-Data': tg.initData }
-                        });
-                        const infoData = await infoRes.json();
-                        const channelUrl = `https://t.me/${infoData.channel_username}`;
+                const data = await response.json();
 
-                        tg.showPopup({
-                            title: 'Нужна подписка',
-                            message: 'Пожалуйста, подпишитесь на наш телеграм-канал, чтобы открыть ежедневный кейс!',
-                            buttons: [{ id: 'subscribe', type: 'default', text: 'Подписаться' }]
-                        }, (buttonId) => {
-                            if (buttonId === 'subscribe') {
-                                tg.openLink(channelUrl);
-                            }
-                        });
-                    } catch (err) {
-                        showAlert(data.error, true);
+                if (response.ok) {
+                    let winningGift = GIFT_POOL.find(g => g.id === data.wonItem.id);
+                    if (!winningGift) {
+                        winningGift = GIFT_POOL.find(g => g.name.toLowerCase() === data.wonItem.name.toLowerCase());
                     }
+
+                    spinRoulette(winningGift, () => {
+                        processWinning(winningGift, false, data.newBalance);
+                    });
+
                 } else {
-                    showAlert(data.error || 'Ошибка при открытии кейса.', true);
+                    if (data.error && data.error.includes('подписчиком канала')) {
+                        try {
+                            const infoRes = await fetch(`${API_BASE_URL}/api/daily_case_info`, {
+                                headers: { 'X-Telegram-Init-Data': tg.initData }
+                            });
+                            const infoData = await infoRes.json();
+                            const channelUrl = `https://t.me/${infoData.channel_username}`;
+
+                            tg.showPopup({
+                                title: 'Нужна подписка',
+                                message: 'Пожалуйста, подпишитесь на наш телеграм-канал, чтобы открыть ежедневный кейс!',
+                                buttons: [{ id: 'subscribe', type: 'default', text: 'Подписаться' }]
+                            }, (buttonId) => {
+                                if (buttonId === 'subscribe') {
+                                    tg.openLink(channelUrl);
+                                }
+                            });
+                        } catch (err) {
+                            showAlert(data.error, true);
+                        }
+                    } else {
+                        showAlert(data.error || 'Ошибка при открытии кейса.', true);
+                    }
+                    elements.spinCaseButton.disabled = false;
                 }
+            } catch (error) {
+                console.error('Error opening daily case:', error);
                 elements.spinCaseButton.disabled = false;
             }
-        } catch (error) {
-            console.error('Error opening daily case:', error);
-            elements.spinCaseButton.disabled = false;
-        }
+        }, 50);
     });
 
     renderRewardsGrid();
