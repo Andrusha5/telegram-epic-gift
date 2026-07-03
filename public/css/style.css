@@ -1,14 +1,14 @@
 :root {
-    --bg-color: #0b0b10; /* Ультра-темный премиальный фон */
-    --card-bg-color: #161622; /* Темный фон для карточек */
-    --card-inner-bg: #1f1f30; /* Вложенные блоки */
-    --primary-color: #8a2be2; /* Фиолетовый градиентный акцент */
-    --secondary-color: #ffd700; /* Золото для наград и акцентов */
-    --text-color: #ffffff; /* Белый текст */
-    --light-text-color: #8f8f9e; /* Светло-серый текст */
-    --border-color: #262636; /* Границы */
-    --green-success: #00e676; /* Ярко-зеленый */
-    --red-alert: #ff1744; /* Красный таймер */
+    --bg-color: #0b0b10; 
+    --card-bg-color: #161622; 
+    --card-inner-bg: #1f1f30; 
+    --primary-color: #8a2be2; 
+    --secondary-color: #ffd700; 
+    --text-color: #ffffff; 
+    --light-text-color: #8f8f9e; 
+    --border-color: #262636; 
+    --green-success: #00e676; 
+    --red-alert: #ff1744; 
 }
 
 body {
@@ -30,17 +30,15 @@ body {
     flex-direction: column;
     min-height: 100vh;
     width: 100%;
-    max-width: 480px; /* Под размер экрана Telegram */
+    max-width: 480px; 
     margin: 0 auto;
     background-color: var(--bg-color);
 }
 
-/* Скрытие секций */
 .hidden {
     display: none !important;
 }
 
-/* ХЕДЕРЫ */
 .header {
     padding: 16px;
     background-color: var(--card-bg-color);
@@ -100,7 +98,6 @@ body {
     color: var(--green-success);
 }
 
-/* Навигационный хедер для экрана кейса */
 .header-nav {
     display: flex;
     justify-content: space-between;
@@ -176,7 +173,6 @@ body {
     color: #00e676;
 }
 
-/* КАРТОЧКА КЕЙСА НА ГЛАВНОЙ */
 .main-content {
     flex-grow: 1;
     padding: 16px;
@@ -275,7 +271,6 @@ body {
     font-weight: 700;
 }
 
-/* СТРАНИЦА КЕЙСА */
 .case-page-header {
     margin-bottom: 12px;
 }
@@ -302,58 +297,6 @@ body {
     color: var(--light-text-color);
 }
 
-/* ТОП ДРОП БАННЕР */
-.top-drop-banner {
-    background: #1c1310;
-    border: 1px solid #3c2419;
-    border-radius: 12px;
-    padding: 10px 16px;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    margin-bottom: 24px;
-}
-
-.drop-badge {
-    background: #ff5722;
-    color: #fff;
-    font-size: 0.7rem;
-    font-weight: 800;
-    padding: 4px 8px;
-    border-radius: 6px;
-}
-
-.drop-avatar {
-    width: 36px;
-    height: 36px;
-    border-radius: 8px;
-    background: #2c1d18;
-}
-
-.drop-info {
-    display: flex;
-    flex-direction: column;
-    flex-grow: 1;
-}
-
-.drop-name {
-    font-size: 0.9rem;
-    font-weight: 700;
-    color: #fff;
-}
-
-.drop-price {
-    font-size: 0.8rem;
-    font-weight: 700;
-    color: #ffd700;
-}
-
-.drop-time {
-    font-size: 0.75rem;
-    color: var(--light-text-color);
-}
-
-/* РУЛЕТКА */
 .roulette-wrapper {
     position: relative;
     width: 100%;
@@ -365,7 +308,6 @@ body {
     padding: 12px 0;
 }
 
-/* Прицел по центру */
 .roulette-pointer {
     position: absolute;
     left: 50%;
@@ -399,7 +341,7 @@ body {
 .roulette-track {
     display: flex;
     gap: 8px;
-    padding-left: 50%; /* Сдвиг для старта по центру */
+    padding-left: 50%; 
     will-change: transform;
 }
 
@@ -418,9 +360,10 @@ body {
     transition: background 0.3s;
 }
 
+/* ФИОЛЕТОВАЯ РАМКА УДАЛЕНА. ТЕПЕРЬ ОНА НЕ ОТЛИЧАЕТСЯ ОТ ДРУГИХ ПРЕДМЕТОВ ДЛЯ СЛУЧАЙНОСТИ */
 .roulette-item.highlight {
-    background: radial-gradient(circle, rgba(138,43,226,0.2) 0%, rgba(26,26,38,1) 100%);
-    border-color: var(--primary-color);
+    background: #1a1a26;
+    border-color: #2e2e42;
 }
 
 .roulette-item img {
@@ -436,7 +379,6 @@ body {
     color: var(--secondary-color);
 }
 
-/* КНОПКА ЗАПУСКА И ТАЙМЕР */
 .case-control-area {
     display: flex;
     flex-direction: column;
@@ -455,12 +397,13 @@ body {
     font-size: 1.1rem;
     font-weight: 800;
     cursor: pointer;
-    box-shadow: 0 6px 20px rgba(74, 0, 224, 0.4);
-    transition: transform 0.1s, opacity 0.2s;
+    transition: background-color 0.2s ease;
+    border: none;
+    margin-top: 15px;
 }
 
-.action-button-gradient:active {
-    transform: scale(0.98);
+.action-button-gradient:hover {
+    background-color: var(--button-hover-color);
 }
 
 .action-button-gradient:disabled {
@@ -469,7 +412,6 @@ body {
     box-shadow: none;
 }
 
-/* Карточка таймера */
 .timer-card {
     width: 100%;
     background-color: #161622;
@@ -495,7 +437,6 @@ body {
     letter-spacing: 1px;
 }
 
-/* СЕТКА НАГРАД (Два столбика) */
 .rewards-section {
     margin-top: 10px;
 }
@@ -520,11 +461,10 @@ body {
 
 .rewards-grid {
     display: grid;
-    grid-template-columns: repeat(2, 1fr) !important; /* Ровно 2 столбика */
+    grid-template-columns: repeat(2, 1fr) !important; 
     gap: 12px;
 }
 
-/* Карточка награды в сетке */
 .reward-card {
     background-color: var(--card-bg-color);
     border: 1.5px solid var(--border-color);
@@ -538,13 +478,11 @@ body {
     transition: border-color 0.2s, transform 0.2s;
 }
 
-/* Золотая рамка для дорогих наград */
 .reward-card.gold-tier {
     border-color: rgba(255, 215, 0, 0.45);
     box-shadow: 0 0 10px rgba(255, 215, 0, 0.05);
 }
 
-/* ЦЕНА СВЕРХУ */
 .reward-price-top {
     font-size: 0.85rem;
     font-weight: 800;
@@ -563,7 +501,6 @@ body {
     margin-bottom: 8px;
 }
 
-/* НАЗВАНИЕ ПОДАРКА */
 .reward-name {
     font-size: 0.8rem;
     font-weight: 700;
@@ -576,7 +513,6 @@ body {
     width: 100%;
 }
 
-/* КРАСИВЫЙ СТИЛЬ RANDOM СНИЗУ */
 .reward-random-badge {
     background: rgba(138, 43, 226, 0.15);
     border: 1px solid rgba(138, 43, 226, 0.4);
@@ -588,4 +524,4 @@ body {
     text-transform: uppercase;
     letter-spacing: 1px;
     box-shadow: 0 0 8px rgba(138, 43, 226, 0.2);
-        }
+    }
