@@ -30,16 +30,16 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // --- ПРИЗЫ С ТВОИМИ ИЗОБРАЖЕНИЯМИ СТРОГО ПО УБЫВАНИЮ ЦЕНЫ ---
     const GIFT_POOL = [
-        { id: 1, name: "Статуя птицы серая", icon: "https://unlimbot.hb.ru-msk.vkcloud-storage.ru/uploads/6262d763ce124416b2eb7cf48a323a2c2c45dc7e4f84de03.jpg", price: "20 TON", rawPrice: 20.0, isGold: true, type: "gift", weight: 1 },
-        { id: 2, name: "Тыква", icon: "https://unlimbot.hb.ru-msk.vkcloud-storage.ru/uploads/a6869ef65e5e4ab9ba22013af53f9957e7e9381254536623.jpg", price: "8 TON", rawPrice: 8.0, isGold: true, type: "gift", weight: 3 },
-        { id: 3, name: "Шляпа", icon: "https://unlimbot.hb.ru-msk.vkcloud-storage.ru/uploads/fcd501f2d1654d16b512a9723e8f102ebc04347da7ef5c1f.jpg", price: "7 TON", rawPrice: 7.0, isGold: true, type: "gift", weight: 5 },
-        { id: 4, name: "Собачка Snoop Dogg", icon: "https://unlimbot.hb.ru-msk.vkcloud-storage.ru/uploads/bafec44b25434ca69b962f8277f564ef181a101685b50369.jpg", price: "4 TON", rawPrice: 4.0, isGold: false, type: "gift", weight: 10 },
-        { id: 5, name: "Рюкзак черный", icon: "https://unlimbot.hb.ru-msk.vkcloud-storage.ru/uploads/84a14e456c064cdab02f14d6ef56c8c54f47423543a82827.jpg", price: "3 TON", rawPrice: 3.0, isGold: false, type: "gift", weight: 15 },
-        { id: 6, name: "Доширак лапша", icon: "https://unlimbot.hb.ru-msk.vkcloud-storage.ru/uploads/bcf764f6cab448b8ad9a58b2a9e5e9733b2c534759a22f8e.jpg", price: "2.7 TON", rawPrice: 2.7, isGold: false, type: "gift", weight: 25 },
-        { id: 7, name: "Факел", icon: "https://unlimbot.hb.ru-msk.vkcloud-storage.ru/uploads/0b7d47418da047888496984f2f4fddfe64906b4bb9588226.jpg", price: "2.5 TON", rawPrice: 2.5, isGold: false, type: "gift", weight: 30 },
-        { id: 8, name: "Мороженое пломбир", icon: "https://unlimbot.hb.ru-msk.vkcloud-storage.ru/uploads/1ce11145f3934ac9be6c5eec1ca5d5d3f4c08d68ea89a742.jpg", price: "2.5 TON", rawPrice: 2.5, isGold: false, type: "gift", weight: 30 },
-        { id: 9, name: "Алмазик", icon: "https://unlimbot.hb.ru-msk.vkcloud-storage.ru/uploads/4f59213305a24acb815e18cf4fac97061f838b569220012f.jpg", price: "0.9 TON", rawPrice: 0.9, isGold: false, type: "gift", weight: 70 },
-        { id: 10, name: "Роза", icon: "https://unlimbot.hb.ru-msk.vkcloud-storage.ru/uploads/48f35ee3c45b4e64978eb110dc3550e3b15f6196d77cb161.jpg", price: "0.27 TON", rawPrice: 0.27, isGold: false, type: "gift", weight: 120 },
+        { id: 1, name: "Статуя птицы серая", icon: "https://unlimbot.hb.ru-msk.vkcloud-storage.ru/uploads/a15ef5a616964ad48de31e7779dc651559165842e8905537.jpg", price: "20 TON", rawPrice: 20.0, isGold: true, type: "gift", weight: 1 },
+        { id: 2, name: "Тыква", icon: "https://unlimbot.hb.ru-msk.vkcloud-storage.ru/uploads/7fe46a97621f4ab286f3360f268b914e1661901cd480cad2.jpg", price: "8 TON", rawPrice: 8.0, isGold: true, type: "gift", weight: 3 },
+        { id: 3, name: "Шляпа", icon: "https://unlimbot.hb.ru-msk.vkcloud-storage.ru/uploads/3aec999f8d2542e98cc863e71a4335d2f876403464dd3913.jpg", price: "7 TON", rawPrice: 7.0, isGold: true, type: "gift", weight: 5 },
+        { id: 4, name: "Собачка Snoop Dogg", icon: "https://unlimbot.hb.ru-msk.vkcloud-storage.ru/uploads/79f40e763499413b997df812784594f02ca8ec7806343001.jpg", price: "4 TON", rawPrice: 4.0, isGold: false, type: "gift", weight: 10 },
+        { id: 5, name: "Рюкзак черный", icon: "https://unlimbot.hb.ru-msk.vkcloud-storage.ru/uploads/5aa2b14a857449b8b817eb4caffc9571bf75e63246b1508c.jpg", price: "3 TON", rawPrice: 3.0, isGold: false, type: "gift", weight: 15 },
+        { id: 6, name: "Доширак лапша", icon: "https://unlimbot.hb.ru-msk.vkcloud-storage.ru/uploads/2bf122c07f914044b6c958983672fd6a8738718581397551.jpg", price: "2.7 TON", rawPrice: 2.7, isGold: false, type: "gift", weight: 25 },
+        { id: 7, name: "Факел", icon: "https://unlimbot.hb.ru-msk.vkcloud-storage.ru/uploads/e740a14b679d4fcda7461b963139bb6cc70c710407998b28.jpg", price: "2.5 TON", rawPrice: 2.5, isGold: false, type: "gift", weight: 30 },
+        { id: 8, name: "Мороженое пломбир", icon: "https://unlimbot.hb.ru-msk.vkcloud-storage.ru/uploads/e3da5ecc53464275b6c674d79fd42359bed025e793d09832.jpg", price: "2.5 TON", rawPrice: 2.5, isGold: false, type: "gift", weight: 30 },
+        { id: 9, name: "Алмазик", icon: "https://unlimbot.hb.ru-msk.vkcloud-storage.ru/uploads/2ecbb975c55440fb9a3080239908c98235cb9c7a16ca8710.jpg", price: "0.9 TON", rawPrice: 0.9, isGold: false, type: "gift", weight: 70 },
+        { id: 10, name: "Роза", icon: "https://unlimbot.hb.ru-msk.vkcloud-storage.ru/uploads/fd7f3163114743218e17219b5c87c84bc77db66beb0454ac.jpg", price: "0.27 TON", rawPrice: 0.27, isGold: false, type: "gift", weight: 120 },
         // Пополнения баланса (от большего к меньшему)
         { id: 11, name: "Пополнение 0.1 TON", icon: "https://img.icons8.com/color/96/coins.png", price: "0.1 TON", rawPrice: 0.1, isGold: false, type: "balance", weight: 200 },
         { id: 12, name: "Пополнение 0.07 TON", icon: "https://img.icons8.com/color/96/coins.png", price: "0.07 TON", rawPrice: 0.07, isGold: false, type: "balance", weight: 300 },
@@ -121,6 +121,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     function initRouletteTrack() {
         elements.rouletteTrack.style.transition = 'none';
         elements.rouletteTrack.style.transform = 'translateX(0px)';
+        
+        // Принудительный сброс DOM-анимации, чтобы повторные прокрутки не багались у админа!
+        void elements.rouletteTrack.offsetWidth; 
+
         elements.rouletteTrack.innerHTML = '';
 
         for (let i = 0; i < 50; i++) {
@@ -144,15 +148,18 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         const trackItems = elements.rouletteTrack.children;
         if (trackItems[targetIndex]) {
-            trackItems[targetIndex].className = 'roulette-item highlight';
+            // ФИОЛЕТОВЫЙ ВЫДЕЛЯЮЩИЙ КЛАСС (highlight) УБРАН ДЛЯ ДОСТИЖЕНИЯ ЭФФЕКТА РЕАЛЬНОГО РАНДОМА
+            trackItems[targetIndex].className = 'roulette-item';
             trackItems[targetIndex].innerHTML = `
                 <img src="${winningItem.icon}" alt="${winningItem.name}" onerror="this.src='https://img.icons8.com/color/96/gift.png'">
-                <span class="item-value-mini" style="color:var(--green-success)">${winningItem.price}</span>
+                <span class="item-value-mini">${winningItem.price}</span>
             `;
         }
 
-        // Вычисляем точную дистанцию сдвига, чтобы winningItem остановился РОВНО по центру прицела
-        const totalTranslate = (targetIndex * itemFullWidth) + (itemWidth / 2);
+        // Вычисляем точную дистанцию сдвига, чтобы winningItem остановился РОВНО по центру прицела (без сдвигов)
+        const containerWidth = elements.rouletteTrack.parentElement.offsetWidth;
+        const centerOffset = (containerWidth / 2) - (itemWidth / 2);
+        const totalTranslate = (targetIndex * itemFullWidth) - centerOffset;
 
         elements.rouletteTrack.style.transition = 'transform 5s cubic-bezier(0.15, 0.85, 0.15, 1)';
         elements.rouletteTrack.style.transform = `translateX(-${totalTranslate}px)`;
@@ -168,7 +175,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         return currentUser.is_admin === true;
     }
 
-    // --- Загрузка данных пользователя ---
+    // --- Загрузка данных профиля пользователя ---
     async function fetchUserData() {
         try {
             const response = await fetch(`${API_BASE_URL}/api/user`, {
@@ -327,11 +334,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     elements.spinCaseButton.addEventListener('click', async () => {
         elements.spinCaseButton.disabled = true;
 
-        // Очищаем и заново генерируем ленту для повторной плавной анимации
+        // Полная пересборка ленты для повторной прокрутки без зависаний
         initRouletteTrack();
 
-        // Задержка 50мс перед стартом. Это критически важно, чтобы браузер успел применить сброс ленты на 0px,
-        // иначе анимация повторной прокрутки зависнет.
+        // Задержка 50мс перед запуском анимации, чтобы браузер гарантированно применил сброс на 0px
         setTimeout(async () => {
             try {
                 const response = await fetch(`${API_BASE_URL}/api/open_daily_case`, {
