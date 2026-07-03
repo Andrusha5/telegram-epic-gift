@@ -41,7 +41,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         { id: 9, name: "Алмазик", icon: "https://unlimbot.hb.ru-msk.vkcloud-storage.ru/uploads/afdc136081d946a48e604a37f3ab43e27bac6e6419778bd1.jpg&quot;, price: "0.9 TON", rawPrice: 0.9, isGold: false, type: "gift", weight: 70 },
         { id: 10, name: "Роза", icon: "https://unlimbot.hb.ru-msk.vkcloud-storage.ru/uploads/b595febe2739482d9aa250edb5fce5893e24113d46164d46.jpg&quot;, price: "0.27 TON", rawPrice: 0.27, isGold: false, type: "gift", weight: 120 },
         // Пополнения баланса (от большего к меньшему)
-        { id: 11, name: "Пополнение 0.1 TON", icon: "https://avatars.mds.yandex.net/i?id=cff482b5e7e414d42d94ca960a78bc4b33741d9a-12473946-images-thumbs&n=13&quot;, price: "0.1 TON", rawPrice: 0.1, isGold: false, type: "balance", weight: 200 },
+        { id: 11, name: "Пополнение 0.1 TON", icon: "https://img.icons8.com/color/96/coins.png&quot;, price: "0.1 TON", rawPrice: 0.1, isGold: false, type: "balance", weight: 200 },
         { id: 12, name: "Пополнение 0.07 TON", icon: "https://img.icons8.com/color/96/coins.png&quot;, price: "0.07 TON", rawPrice: 0.07, isGold: false, type: "balance", weight: 300 },
         { id: 13, name: "Пополнение 0.05 TON", icon: "https://img.icons8.com/color/96/coins.png&quot;, price: "0.05 TON", rawPrice: 0.05, isGold: false, type: "balance", weight: 400 },
         { id: 14, name: "Пополнение 0.03 TON", icon: "https://img.icons8.com/color/96/coins.png&quot;, price: "0.03 TON", rawPrice: 0.03, isGold: false, type: "balance", weight: 500 }
