@@ -28,18 +28,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     const API_BASE_URL = window.location.origin;
     let currentUser = {}; 
 
-    // --- ПРИЗЫ С ТВОИМИ ИЗОБРАЖЕНИЯМИ СТРОГО ПО УБЫВАНИЮ ЦЕНЫ ---
+    // --- ПРИЗЫ С ТВОИМИ ИЗОБРАЖЕНИЯМИ СТРОГО СОВПАДАЮЩИЕ С РЕАЛЬНОСТЬЮ (По убыванию цены) ---
     const GIFT_POOL = [
-        { id: 1, name: "Статуя птицы серая", icon: "https://unlimbot.hb.ru-msk.vkcloud-storage.ru/uploads/a15ef5a616964ad48de31e7779dc651559165842e8905537.jpg", price: "20 TON", rawPrice: 20.0, isGold: true, type: "gift", weight: 1 },
-        { id: 2, name: "Тыква", icon: "https://unlimbot.hb.ru-msk.vkcloud-storage.ru/uploads/7fe46a97621f4ab286f3360f268b914e1661901cd480cad2.jpg", price: "8 TON", rawPrice: 8.0, isGold: true, type: "gift", weight: 3 },
-        { id: 3, name: "Шляпа", icon: "https://unlimbot.hb.ru-msk.vkcloud-storage.ru/uploads/3aec999f8d2542e98cc863e71a4335d2f876403464dd3913.jpg", price: "7 TON", rawPrice: 7.0, isGold: true, type: "gift", weight: 5 },
-        { id: 4, name: "Собачка Snoop Dogg", icon: "https://unlimbot.hb.ru-msk.vkcloud-storage.ru/uploads/79f40e763499413b997df812784594f02ca8ec7806343001.jpg", price: "4 TON", rawPrice: 4.0, isGold: false, type: "gift", weight: 10 },
-        { id: 5, name: "Рюкзак черный", icon: "https://unlimbot.hb.ru-msk.vkcloud-storage.ru/uploads/5aa2b14a857449b8b817eb4caffc9571bf75e63246b1508c.jpg", price: "3 TON", rawPrice: 3.0, isGold: false, type: "gift", weight: 15 },
-        { id: 6, name: "Доширак лапша", icon: "https://unlimbot.hb.ru-msk.vkcloud-storage.ru/uploads/2bf122c07f914044b6c958983672fd6a8738718581397551.jpg", price: "2.7 TON", rawPrice: 2.7, isGold: false, type: "gift", weight: 25 },
-        { id: 7, name: "Факел", icon: "https://unlimbot.hb.ru-msk.vkcloud-storage.ru/uploads/e740a14b679d4fcda7461b963139bb6cc70c710407998b28.jpg", price: "2.5 TON", rawPrice: 2.5, isGold: false, type: "gift", weight: 30 },
-        { id: 8, name: "Мороженое пломбир", icon: "https://unlimbot.hb.ru-msk.vkcloud-storage.ru/uploads/e3da5ecc53464275b6c674d79fd42359bed025e793d09832.jpg", price: "2.5 TON", rawPrice: 2.5, isGold: false, type: "gift", weight: 30 },
-        { id: 9, name: "Алмазик", icon: "https://unlimbot.hb.ru-msk.vkcloud-storage.ru/uploads/2ecbb975c55440fb9a3080239908c98235cb9c7a16ca8710.jpg", price: "0.9 TON", rawPrice: 0.9, isGold: false, type: "gift", weight: 70 },
-        { id: 10, name: "Роза", icon: "https://unlimbot.hb.ru-msk.vkcloud-storage.ru/uploads/fd7f3163114743218e17219b5c87c84bc77db66beb0454ac.jpg", price: "0.27 TON", rawPrice: 0.27, isGold: false, type: "gift", weight: 120 },
+        { id: 1, name: "Статуя птицы серая", icon: "https://unlimbot.hb.ru-msk.vkcloud-storage.ru/uploads/a4ddba996b304ed48118547363bf124191da7bb40deb532d.jpg", price: "20 TON", rawPrice: 20.0, isGold: true, type: "gift", weight: 1 },
+        { id: 2, name: "Тыква", icon: "https://unlimbot.hb.ru-msk.vkcloud-storage.ru/uploads/c5e6656920a94373951204199f5834b44e30c33a961865c2.jpg", price: "8 TON", rawPrice: 8.0, isGold: true, type: "gift", weight: 3 },
+        { id: 3, name: "Шляпа", icon: "https://unlimbot.hb.ru-msk.vkcloud-storage.ru/uploads/668ac26d91c343b7972d8d74243b8a21ca21ba758b8f1471.jpg", price: "7 TON", rawPrice: 7.0, isGold: true, type: "gift", weight: 5 },
+        { id: 4, name: "Собачка Snoop Dogg", icon: "https://unlimbot.hb.ru-msk.vkcloud-storage.ru/uploads/afdc136081d946a48e604a37f3ab43e27bac6e6419778bd1.jpg", price: "4 TON", rawPrice: 4.0, isGold: false, type: "gift", weight: 10 },
+        { id: 5, name: "Рюкзак черный", icon: "https://unlimbot.hb.ru-msk.vkcloud-storage.ru/uploads/b595febe2739482d9aa250edb5fce5893e24113d46164d46.jpg", price: "3 TON", rawPrice: 3.0, isGold: false, type: "gift", weight: 15 },
+        { id: 6, name: "Доширак лапша", icon: "https://unlimbot.hb.ru-msk.vkcloud-storage.ru/uploads/954503c70e7e4d70b330820aa63c3a2664b43859d4fc5932.jpg", price: "2.7 TON", rawPrice: 2.7, isGold: false, type: "gift", weight: 25 },
+        { id: 7, name: "Факел", icon: "https://unlimbot.hb.ru-msk.vkcloud-storage.ru/uploads/7da852289f424f4d8dbb74918372a50122e06951b2946cd3.jpg", price: "2.5 TON", rawPrice: 2.5, isGold: false, type: "gift", weight: 30 },
+        { id: 8, name: "Мороженое пломбир", icon: "https://unlimbot.hb.ru-msk.vkcloud-storage.ru/uploads/e8f404864d1b4fbfb591f0d577333bb7104e6b42b7b7aeff.jpg", price: "2.5 TON", rawPrice: 2.5, isGold: false, type: "gift", weight: 30 },
+        { id: 9, name: "Алмазик", icon: "https://unlimbot.hb.ru-msk.vkcloud-storage.ru/uploads/c6a7b6471f8c4118aaf9bdc540ae6a00a21971af7fcb4cb6.jpg", price: "0.9 TON", rawPrice: 0.9, isGold: false, type: "gift", weight: 70 },
+        { id: 10, name: "Роза", icon: "https://unlimbot.hb.ru-msk.vkcloud-storage.ru/uploads/b90f1ee2e18f4f45b092c6f1f5ec65f5b3283fdc18f3c876.jpg", price: "0.27 TON", rawPrice: 0.27, isGold: false, type: "gift", weight: 120 },
         // Пополнения баланса (от большего к меньшему)
         { id: 11, name: "Пополнение 0.1 TON", icon: "https://img.icons8.com/color/96/coins.png", price: "0.1 TON", rawPrice: 0.1, isGold: false, type: "balance", weight: 200 },
         { id: 12, name: "Пополнение 0.07 TON", icon: "https://img.icons8.com/color/96/coins.png", price: "0.07 TON", rawPrice: 0.07, isGold: false, type: "balance", weight: 300 },
