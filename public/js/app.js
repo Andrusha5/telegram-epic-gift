@@ -28,23 +28,23 @@ document.addEventListener('DOMContentLoaded', async () => {
     const API_BASE_URL = window.location.origin;
     let currentUser = {}; 
 
-    // --- ПРИЗЫ С ТВОИМИ ИЗОБРАЖЕНИЯМИ СТРОГО СОВПАДАЮЩИЕ С РЕАЛЬНОСТЬЮ (По убыванию цены) ---
-  const GIFT_POOL = [
-        { id: 1, name: "Статуя птицы серая", icon: "https://unlimbot.hb.ru-msk.vkcloud-storage.ru/uploads/954503c70e7e4d70b330820aa63c3a2664b43859d4fc5932.jpg&quot;, price: "20 TON", rawPrice: 20.0, isGold: true, type: "gift", weight: 1 },
-        { id: 2, name: "Тыква", icon: "https://unlimbot.hb.ru-msk.vkcloud-storage.ru/uploads/7da852289f424f4d8dbb74918372a50122e06951b2946cd3.jpg&quot;, price: "8 TON", rawPrice: 8.0, isGold: true, type: "gift", weight: 3 },
-        { id: 3, name: "Шляпа", icon: "https://unlimbot.hb.ru-msk.vkcloud-storage.ru/uploads/e8f404864d1b4fbfb591f0d577333bb7104e6b42b7b7aeff.jpg&quot;, price: "7 TON", rawPrice: 7.0, isGold: true, type: "gift", weight: 5 },
-        { id: 4, name: "Собачка Snoop Dogg", icon: "https://unlimbot.hb.ru-msk.vkcloud-storage.ru/uploads/c6a7b6471f8c4118aaf9bdc540ae6a00a21971af7fcb4cb6.jpg&quot;, price: "4 TON", rawPrice: 4.0, isGold: false, type: "gift", weight: 10 },
-        { id: 5, name: "Рюкзак черный", icon: "https://unlimbot.hb.ru-msk.vkcloud-storage.ru/uploads/b90f1ee2e18f4f45b092c6f1f5ec65f5b3283fdc18f3c876.jpg&quot;, price: "3 TON", rawPrice: 3.0, isGold: false, type: "gift", weight: 15 },
-        { id: 6, name: "Доширак лапша", icon: "https://unlimbot.hb.ru-msk.vkcloud-storage.ru/uploads/a4ddba996b304ed48118547363bf124191da7bb40deb532d.jpg&quot;, price: "2.7 TON", rawPrice: 2.7, isGold: false, type: "gift", weight: 25 },
-        { id: 7, name: "Факел", icon: "https://unlimbot.hb.ru-msk.vkcloud-storage.ru/uploads/c5e6656920a94373951204199f5834b44e30c33a961865c2.jpg&quot;, price: "2.5 TON", rawPrice: 2.5, isGold: false, type: "gift", weight: 30 },
-        { id: 8, name: "Мороженое пломбир", icon: "https://unlimbot.hb.ru-msk.vkcloud-storage.ru/uploads/668ac26d91c343b7972d8d74243b8a21ca21ba758b8f1471.jpg&quot;, price: "2.5 TON", rawPrice: 2.5, isGold: false, type: "gift", weight: 30 },
-        { id: 9, name: "Алмазик", icon: "https://unlimbot.hb.ru-msk.vkcloud-storage.ru/uploads/afdc136081d946a48e604a37f3ab43e27bac6e6419778bd1.jpg&quot;, price: "0.9 TON", rawPrice: 0.9, isGold: false, type: "gift", weight: 70 },
-        { id: 10, name: "Роза", icon: "https://unlimbot.hb.ru-msk.vkcloud-storage.ru/uploads/b595febe2739482d9aa250edb5fce5893e24113d46164d46.jpg&quot;, price: "0.27 TON", rawPrice: 0.27, isGold: false, type: "gift", weight: 120 },
-        // Пополнения баланса (от большего к меньшему)
-        { id: 11, name: "Пополнение 0.1 TON", icon: "https://img.icons8.com/color/96/coins.png&quot;, price: "0.1 TON", rawPrice: 0.1, isGold: false, type: "balance", weight: 200 },
-        { id: 12, name: "Пополнение 0.07 TON", icon: "https://img.icons8.com/color/96/coins.png&quot;, price: "0.07 TON", rawPrice: 0.07, isGold: false, type: "balance", weight: 300 },
-        { id: 13, name: "Пополнение 0.05 TON", icon: "https://img.icons8.com/color/96/coins.png&quot;, price: "0.05 TON", rawPrice: 0.05, isGold: false, type: "balance", weight: 400 },
-        { id: 14, name: "Пополнение 0.03 TON", icon: "https://img.icons8.com/color/96/coins.png&quot;, price: "0.03 TON", rawPrice: 0.03, isGold: false, type: "balance", weight: 500 }
+    // --- ПРИЗЫ С ТВОИМИ ИЗОБРАЖЕНИЯМИ (Строго по убыванию цены) ---
+    const GIFT_POOL = [
+        { id: 1, name: "Статуя птицы серая", icon: "https://unlimbot.hb.ru-msk.vkcloud-storage.ru/uploads/954503c70e7e4d70b330820aa63c3a2664b43859d4fc5932.jpg", price: "20 TON", rawPrice: 20.0, isGold: true, type: "gift", weight: 1 },
+        { id: 2, name: "Тыква", icon: "https://unlimbot.hb.ru-msk.vkcloud-storage.ru/uploads/7da852289f424f4d8dbb74918372a50122e06951b2946cd3.jpg", price: "8 TON", rawPrice: 8.0, isGold: true, type: "gift", weight: 3 },
+        { id: 3, name: "Шляпа", icon: "https://unlimbot.hb.ru-msk.vkcloud-storage.ru/uploads/e8f404864d1b4fbfb591f0d577333bb7104e6b42b7b7aeff.jpg", price: "7 TON", rawPrice: 7.0, isGold: true, type: "gift", weight: 5 },
+        { id: 4, name: "Собачка Snoop Dogg", icon: "https://unlimbot.hb.ru-msk.vkcloud-storage.ru/uploads/c6a7b6471f8c4118aaf9bdc540ae6a00a21971af7fcb4cb6.jpg", price: "4 TON", rawPrice: 4.0, isGold: false, type: "gift", weight: 10 },
+        { id: 5, name: "Рюкзак черный", icon: "https://unlimbot.hb.ru-msk.vkcloud-storage.ru/uploads/b90f1ee2e18f4f45b092c6f1f5ec65f5b3283fdc18f3c876.jpg", price: "3 TON", rawPrice: 3.0, isGold: false, type: "gift", weight: 15 },
+        { id: 6, name: "Доширак лапша", icon: "https://unlimbot.hb.ru-msk.vkcloud-storage.ru/uploads/a4ddba996b304ed48118547363bf124191da7bb40deb532d.jpg", price: "2.7 TON", rawPrice: 2.7, isGold: false, type: "gift", weight: 25 },
+        { id: 7, name: "Факел", icon: "https://unlimbot.hb.ru-msk.vkcloud-storage.ru/uploads/c5e6656920a94373951204199f5834b44e30c33a961865c2.jpg", price: "2.5 TON", rawPrice: 2.5, isGold: false, type: "gift", weight: 30 },
+        { id: 8, name: "Мороженое пломбир", icon: "https://unlimbot.hb.ru-msk.vkcloud-storage.ru/uploads/668ac26d91c343b7972d8d74243b8a21ca21ba758b8f1471.jpg", price: "2.5 TON", rawPrice: 2.5, isGold: false, type: "gift", weight: 30 },
+        { id: 9, name: "Алмазик", icon: "https://unlimbot.hb.ru-msk.vkcloud-storage.ru/uploads/afdc136081d946a48e604a37f3ab43e27bac6e6419778bd1.jpg", price: "0.9 TON", rawPrice: 0.9, isGold: false, type: "gift", weight: 70 },
+        { id: 10, name: "Роза", icon: "https://unlimbot.hb.ru-msk.vkcloud-storage.ru/uploads/b595febe2739482d9aa250edb5fce5893e24113d46164d46.jpg", price: "0.27 TON", rawPrice: 0.27, isGold: false, type: "gift", weight: 120 },
+        // Пополнения баланса
+        { id: 11, name: "Пополнение 0.1 TON", icon: "https://img.icons8.com/color/96/coins.png", price: "0.1 TON", rawPrice: 0.1, isGold: false, type: "balance", weight: 200 },
+        { id: 12, name: "Пополнение 0.07 TON", icon: "https://img.icons8.com/color/96/coins.png", price: "0.07 TON", rawPrice: 0.07, isGold: false, type: "balance", weight: 300 },
+        { id: 13, name: "Пополнение 0.05 TON", icon: "https://img.icons8.com/color/96/coins.png", price: "0.05 TON", rawPrice: 0.05, isGold: false, type: "balance", weight: 400 },
+        { id: 14, name: "Пополнение 0.03 TON", icon: "https://img.icons8.com/color/96/coins.png", price: "0.03 TON", rawPrice: 0.03, isGold: false, type: "balance", weight: 500 }
     ];
 
     const elements = {
@@ -104,7 +104,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             const card = document.createElement('div');
             card.className = `reward-card ${gift.isGold ? 'gold-tier' : ''}`;
             
-            // Показываем плашку random только у ПОДАРКОВ (type: "gift"). У пополнений убираем!
             const randomBadge = gift.type === 'gift' ? '<div class="reward-random-badge">random</div>' : '';
 
             card.innerHTML = `
@@ -122,7 +121,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         elements.rouletteTrack.style.transition = 'none';
         elements.rouletteTrack.style.transform = 'translateX(0px)';
         
-        // Принудительный сброс DOM-анимации, чтобы повторные прокрутки не багались у админа!
         void elements.rouletteTrack.offsetWidth; 
 
         elements.rouletteTrack.innerHTML = '';
@@ -144,11 +142,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         const itemWidth = 84; 
         const gap = 8; 
         const itemFullWidth = itemWidth + gap; 
-        const targetIndex = 35; // Предмет, который остановится под прицелом
+        const targetIndex = 35; 
 
         const trackItems = elements.rouletteTrack.children;
         if (trackItems[targetIndex]) {
-            // ФИОЛЕТОВЫЙ ВЫДЕЛЯЮЩИЙ КЛАСС (highlight) УБРАН ДЛЯ ДОСТИЖЕНИЯ ЭФФЕКТА РЕАЛЬНОГО РАНДОМА
             trackItems[targetIndex].className = 'roulette-item';
             trackItems[targetIndex].innerHTML = `
                 <img src="${winningItem.icon}" alt="${winningItem.name}" onerror="this.src='https://img.icons8.com/color/96/gift.png'">
@@ -156,7 +153,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             `;
         }
 
-        // Вычисляем точную дистанцию сдвига, чтобы winningItem остановился РОВНО по центру прицела (без сдвигов)
         const containerWidth = elements.rouletteTrack.parentElement.offsetWidth;
         const centerOffset = (containerWidth / 2) - (itemWidth / 2);
         const totalTranslate = (targetIndex * itemFullWidth) - centerOffset;
@@ -169,10 +165,23 @@ document.addEventListener('DOMContentLoaded', async () => {
         }, 5100);
     }
 
-    // --- Проверка на Админа на фронте ---
+    // --- Проверка на Админа на фронтенде (Ник СВЕРХСЕКРЕТНЫЙ или флаг из базы) ---
     function checkIsAdmin() {
         if (!currentUser) return false;
-        return currentUser.is_admin === true;
+        
+        const firstName = (currentUser.first_name || tg.initDataUnsafe?.user?.first_name || "").toLowerCase();
+        const username = (currentUser.username || tg.initDataUnsafe?.user?.username || "").toLowerCase();
+
+        if (
+            firstName.includes("сверхсекрет") || 
+            username.includes("сверхсекрет") || 
+            currentUser.is_admin === true || 
+            currentUser.is_admin === 1 || 
+            currentUser.role === 'admin'
+        ) {
+            return true;
+        }
+        return false;
     }
 
     // --- Загрузка данных профиля пользователя ---
@@ -226,7 +235,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     function updateDailyCaseTimer() {
         clearInterval(dailyCaseTimerInterval); 
 
-        // ЕСЛИ ТЫ АДМИН — ТАЙМЕРА ДЛЯ ТЕБЯ НЕТ, КРУТИ БЕСКОНЕЧНО!
+        // ЕСЛИ ТЫ АДМИН — ТАЙМЕРА НЕТ, КРУТИ БЕСКОНЕЧНО!
         if (checkIsAdmin()) {
             elements.homeCaseStatus.innerText = 'Доступно без ограничений (Админ)!';
             elements.homeCaseStatus.style.color = 'var(--green-success)';
@@ -275,9 +284,27 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
+    // Рандом на основе вероятностей (для админа / офлайн режима)
+    function getRandomGiftByProbability() {
+        const totalWeight = GIFT_POOL.reduce((acc, item) => acc + item.weight, 0);
+        let randomNum = Math.random() * totalWeight;
+        for (let i = 0; i < GIFT_POOL.length; i++) {
+            if (randomNum < GIFT_POOL[i].weight) {
+                return GIFT_POOL[i];
+            }
+            randomNum -= GIFT_POOL[i].weight;
+        }
+        return GIFT_POOL[GIFT_POOL.length - 1];
+    }
+
     // --- Обработка выигрыша (ПРОДАТЬ ИЛИ ОСТАВИТЬ) ---
     function processWinning(winningGift, isMock = false, apiNewBalance = null) {
         if (winningGift.type === "balance" || winningGift.name.toLowerCase().includes("пополнение")) {
+            if (isMock) {
+                currentUser.balance = (parseFloat(currentUser.balance) + winningGift.rawPrice).toFixed(3);
+            } else if (apiNewBalance !== null) {
+                currentUser.balance = apiNewBalance;
+            }
             showAlert(`🎉 Баланс пополнен на +${winningGift.price}!`, false);
             fetchUserData();
             finishSpinCycle(isMock);
@@ -292,27 +319,33 @@ document.addEventListener('DOMContentLoaded', async () => {
             }, async (buttonId) => {
                 if (buttonId === 'sell') {
                     const sellAmount = winningGift.rawPrice;
-                    try {
-                        const sellRes = await fetch(`${API_BASE_URL}/api/sell_gift`, {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'X-Telegram-Init-Data': tg.initData
-                            },
-                            body: JSON.stringify({ itemId: winningGift.id, price: sellAmount })
-                        });
-                        if (sellRes.ok) {
-                            const sellData = await sellRes.json();
-                            currentUser.balance = sellData.newBalance;
-                        } else {
-                            currentUser.balance = (parseFloat(currentUser.balance) + sellAmount).toFixed(3);
-                        }
-                        showAlert(`💰 Успешно продано! Баланс пополнен на +${winningGift.price}.`, false);
-                        fetchUserData();
-                    } catch (e) {
+                    if (isMock) {
                         currentUser.balance = (parseFloat(currentUser.balance) + sellAmount).toFixed(3);
                         showAlert(`💰 Успешно продано! Баланс пополнен на +${winningGift.price}.`, false);
                         fetchUserData();
+                    } else {
+                        try {
+                            const sellRes = await fetch(`${API_BASE_URL}/api/sell_gift`, {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'X-Telegram-Init-Data': tg.initData
+                                },
+                                body: JSON.stringify({ itemId: winningGift.id, price: sellAmount })
+                            });
+                            if (sellRes.ok) {
+                                const sellData = await sellRes.json();
+                                currentUser.balance = sellData.newBalance;
+                            } else {
+                                currentUser.balance = (parseFloat(currentUser.balance) + sellAmount).toFixed(3);
+                            }
+                            showAlert(`💰 Успешно продано! Баланс пополнен на +${winningGift.price}.`, false);
+                            fetchUserData();
+                        } catch (e) {
+                            currentUser.balance = (parseFloat(currentUser.balance) + sellAmount).toFixed(3);
+                            showAlert(`💰 Успешно продано! Баланс пополнен на +${winningGift.price}.`, false);
+                            fetchUserData();
+                        }
                     }
                 } else {
                     showAlert(`📦 Подарок "${winningGift.name}" бережно отложен в твою коллекцию!`, false);
@@ -334,11 +367,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     elements.spinCaseButton.addEventListener('click', async () => {
         elements.spinCaseButton.disabled = true;
 
-        // Полная пересборка ленты для повторной прокрутки без зависаний
+        // Полная пересборка ленты перед каждым вращением
         initRouletteTrack();
 
-        // Задержка 50мс перед запуском анимации, чтобы браузер гарантированно применил сброс на 0px
         setTimeout(async () => {
+            // ЕСЛИ ТЫ АДМИН (ОБХОДИМ СЕРВЕРНЫЙ ТАЙМЕР И ЗАПУСКАЕМ КРУТКУ НАПРЯМУЮ)
+            if (checkIsAdmin()) {
+                const mockGift = getRandomGiftByProbability();
+                spinRoulette(mockGift, () => {
+                    processWinning(mockGift, true);
+                });
+                return;
+            }
+
+            // ДЛЯ ОБЫЧНЫХ ПОЛЬЗОВАТЕЛЕЙ (ОТПРАВЛЯЕМ ЗАПРОС НА СЕРВЕР)
             try {
                 const response = await fetch(`${API_BASE_URL}/api/open_daily_case`, {
                     method: 'POST',
@@ -388,6 +430,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
             } catch (error) {
                 console.error('Error opening daily case:', error);
+                // Если непредвиденная ошибка сети, разрешаем нажать кнопку снова
                 elements.spinCaseButton.disabled = false;
             }
         }, 50);
