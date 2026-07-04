@@ -9,6 +9,7 @@
     --border-color: #262636; 
     --green-success: #00e676; 
     --red-alert: #ff1744; 
+    --glow-color: rgba(138, 43, 226, 0.4);
 }
 
 body {
@@ -23,6 +24,7 @@ body {
     flex-direction: column;
     overflow-x: hidden;
     user-select: none;
+    -webkit-tap-highlight-color: transparent;
 }
 
 #app {
@@ -40,6 +42,7 @@ body {
     display: none !important;
 }
 
+/* ШАПКА */
 .header {
     padding: 16px;
     background-color: var(--card-bg-color);
@@ -50,12 +53,12 @@ body {
 }
 
 .brand-title {
-    font-size: 1.2rem;
+    font-size: 1.25rem;
     font-weight: 800;
-    letter-spacing: 1px;
+    letter-spacing: 1.5px;
     color: #fff;
     text-transform: uppercase;
-    text-shadow: 0 0 10px rgba(138, 43, 226, 0.5);
+    text-shadow: 0 0 15px rgba(138, 43, 226, 0.6);
 }
 
 .user-profile {
@@ -65,11 +68,12 @@ body {
 }
 
 .user-avatar {
-    width: 46px;
-    height: 46px;
+    width: 44px;
+    height: 44px;
     border-radius: 50%;
     border: 2px solid var(--primary-color);
     object-fit: cover;
+    box-shadow: 0 0 10px rgba(138, 43, 226, 0.3);
 }
 
 .user-info {
@@ -79,7 +83,7 @@ body {
 
 .user-username {
     font-weight: 700;
-    font-size: 1rem;
+    font-size: 0.95rem;
     color: #fff;
 }
 
@@ -88,6 +92,7 @@ body {
     align-items: center;
     gap: 6px;
     font-size: 0.85rem;
+    margin-top: 2px;
 }
 
 .balance-label {
@@ -95,8 +100,9 @@ body {
 }
 
 .balance-value {
-    font-weight: 700;
+    font-weight: 800;
     color: var(--green-success);
+    text-shadow: 0 0 8px rgba(0, 230, 118, 0.2);
 }
 
 .header-nav {
@@ -112,24 +118,24 @@ body {
     background: rgba(255, 255, 255, 0.05);
     border: 1px solid var(--border-color);
     color: #fff;
-    padding: 8px 14px;
+    padding: 8px 16px;
     border-radius: 20px;
-    font-size: 0.9rem;
-    font-weight: 600;
+    font-size: 0.85rem;
+    font-weight: 700;
     cursor: pointer;
     display: flex;
     align-items: center;
     gap: 6px;
-    transition: 0.2s ease;
+    transition: background 0.2s, transform 0.1s;
 }
 
-.back-button:hover {
-    background: rgba(255, 255, 255, 0.1);
+.back-button:active {
+    transform: scale(0.95);
 }
 
 .nav-title {
     font-size: 1rem;
-    font-weight: 700;
+    font-weight: 800;
 }
 
 .user-bar-sub {
@@ -158,13 +164,13 @@ body {
 
 .balance-sub-value {
     font-size: 0.95rem;
-    font-weight: 700;
-    color: #00e676;
+    font-weight: 800;
+    color: var(--green-success);
 }
 
 .main-content {
     flex-grow: 1;
-    padding: 16px 16px 80px 16px; /* 80px снизу для меню навигации */
+    padding: 16px 16px 100px 16px; /* Запас снизу, чтобы парящее меню ничего не перекрывало */
     display: flex;
     flex-direction: column;
     box-sizing: border-box;
@@ -180,20 +186,21 @@ body {
 }
 
 .welcome-banner h2 {
-    font-size: 1.2rem;
+    font-size: 1.15rem;
     font-weight: 800;
     margin: 0 0 8px 0;
     color: #fff;
 }
 
 .welcome-banner p {
-    font-size: 0.85rem;
+    font-size: 0.8rem;
     color: var(--light-text-color);
     margin: 0;
+    line-height: 1.4;
 }
 
 .section-divider-title {
-    font-size: 0.95rem;
+    font-size: 0.9rem;
     font-weight: 700;
     color: var(--light-text-color);
     text-transform: uppercase;
@@ -215,9 +222,8 @@ body {
     transition: transform 0.2s ease, border-color 0.2s;
 }
 
-.case-banner-card:hover {
-    transform: scale(1.02);
-    border-color: var(--primary-color);
+.case-banner-card:active {
+    transform: scale(0.98);
 }
 
 .case-banner-badge {
@@ -226,24 +232,20 @@ body {
     right: 12px;
     background: var(--secondary-color);
     color: #000;
-    font-size: 0.7rem;
+    font-size: 0.65rem;
     font-weight: 800;
     padding: 3px 8px;
-    border-radius: 8px;
+    border-radius: 6px;
 }
 
 .case-banner-img {
-    width: 68px;
-    height: 68px;
-}
-
-.case-banner-info {
-    flex-grow: 1;
+    width: 64px;
+    height: 64px;
 }
 
 .case-banner-info h3 {
     margin: 0 0 6px 0;
-    font-size: 1.1rem;
+    font-size: 1.05rem;
     font-weight: 700;
     color: #fff;
 }
@@ -261,32 +263,7 @@ body {
     font-weight: 700;
 }
 
-.case-page-header {
-    margin-bottom: 12px;
-}
-
-.case-title-block {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.case-icon-mini {
-    font-size: 1.5rem;
-}
-
-.case-main-title {
-    display: block;
-    font-size: 1.2rem;
-    font-weight: 800;
-    color: #fff;
-}
-
-.case-secondary-title {
-    font-size: 0.8rem;
-    color: var(--light-text-color);
-}
-
+/* РУЛЕТКА */
 .roulette-wrapper {
     position: relative;
     width: 100%;
@@ -302,10 +279,10 @@ body {
     position: absolute;
     left: 50%;
     width: 4px;
-    background-color: #9b5de5;
+    background-color: var(--primary-color);
     z-index: 10;
     transform: translateX(-50%);
-    box-shadow: 0 0 12px #9b5de5;
+    box-shadow: 0 0 12px var(--primary-color);
 }
 
 .pointer-top {
@@ -331,7 +308,6 @@ body {
 .roulette-track {
     display: flex;
     gap: 8px;
-    padding-left: 50%; 
     will-change: transform;
 }
 
@@ -347,25 +323,18 @@ body {
     justify-content: center;
     align-items: center;
     box-sizing: border-box;
-    transition: background 0.3s;
-}
-
-/* Рамка победного элемента больше не выделяется цветом */
-.roulette-item.highlight {
-    background: #1a1a26;
-    border-color: #2e2e42;
 }
 
 .roulette-item img {
-    width: 48px;
-    height: 48px;
+    width: 46px;
+    height: 46px;
     object-fit: contain;
     margin-bottom: 2px;
 }
 
-.roulette-item .item-value-mini {
+.roulette-item span {
     font-size: 0.65rem;
-    font-weight: 700;
+    font-weight: 800;
     color: var(--secondary-color);
 }
 
@@ -373,7 +342,7 @@ body {
     display: flex;
     flex-direction: column;
     align-items: center;
-    margin-bottom: 30px;
+    margin-bottom: 25px;
     width: 100%;
 }
 
@@ -384,7 +353,7 @@ body {
     color: #fff;
     padding: 16px;
     border-radius: 14px;
-    font-size: 1.1rem;
+    font-size: 1rem;
     font-weight: 800;
     cursor: pointer;
     box-shadow: 0 4px 15px rgba(138, 43, 226, 0.4);
@@ -413,37 +382,35 @@ body {
 
 .timer-title {
     display: block;
-    font-size: 0.9rem;
+    font-size: 0.85rem;
     color: var(--light-text-color);
     font-weight: 600;
-    margin-bottom: 8px;
+    margin-bottom: 6px;
 }
 
 .timer-clock {
-    font-size: 1.4rem;
+    font-size: 1.3rem;
     font-weight: 800;
     color: #fff;
     letter-spacing: 1px;
 }
 
+/* СЕТКА НАГРАД (Строго в пределах экрана) */
 .rewards-section {
     margin-top: 10px;
+    width: 100%;
 }
 
 .rewards-header {
     display: flex;
     align-items: center;
     gap: 8px;
-    margin-bottom: 16px;
-}
-
-.rewards-header-icon {
-    font-size: 1.2rem;
+    margin-bottom: 12px;
 }
 
 .rewards-header h3 {
     margin: 0;
-    font-size: 1.05rem;
+    font-size: 1rem;
     font-weight: 700;
     color: #fff;
 }
@@ -452,6 +419,8 @@ body {
     display: grid;
     grid-template-columns: repeat(2, 1fr) !important; 
     gap: 12px;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .reward-card {
@@ -464,34 +433,31 @@ body {
     align-items: center;
     position: relative;
     box-sizing: border-box;
-    transition: border-color 0.2s, transform 0.2s;
+    transition: border-color 0.2s;
 }
 
 .reward-card.gold-tier {
-    border-color: rgba(255, 215, 0, 0.45);
+    border-color: rgba(255, 215, 0, 0.4);
     box-shadow: 0 0 10px rgba(255, 215, 0, 0.05);
 }
 
 .reward-price-top {
-    font-size: 0.85rem;
+    font-size: 0.8rem;
     font-weight: 800;
     color: var(--secondary-color);
     margin-bottom: 6px;
-    display: flex;
-    align-items: center;
-    gap: 4px;
     text-shadow: 0 0 5px rgba(255, 215, 0, 0.2);
 }
 
 .reward-card img {
-    width: 64px;
-    height: 64px;
+    width: 58px;
+    height: 58px;
     object-fit: contain;
     margin-bottom: 8px;
 }
 
 .reward-name {
-    font-size: 0.8rem;
+    font-size: 0.75rem;
     font-weight: 700;
     color: #fff;
     text-align: center;
@@ -506,72 +472,14 @@ body {
     background: rgba(138, 43, 226, 0.15);
     border: 1px solid rgba(138, 43, 226, 0.4);
     color: #b388ff;
-    font-size: 0.65rem;
+    font-size: 0.6rem;
     font-weight: 800;
-    padding: 3px 12px;
-    border-radius: 10px;
+    padding: 3px 10px;
+    border-radius: 8px;
     text-transform: uppercase;
-    letter-spacing: 1px;
-    box-shadow: 0 0 8px rgba(138, 43, 226, 0.2);
 }
 
-/* НИЖНЯЯ ПАНЕЛЬ НАВИГАЦИИ */
-.bottom-nav {
-    position: fixed;
-    bottom: 0;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 100%;
-    max-width: 480px;
-    background-color: var(--card-bg-color);
-    border-top: 1px solid var(--border-color);
-    display: flex;
-    justify-content: space-around;
-    padding: 8px 0;
-    z-index: 100;
-    box-shadow: 0 -4px 15px rgba(0, 0, 0, 0.4);
-}
-
-.bottom-nav-spacer {
-    height: 70px;
-    width: 100%;
-}
-
-.nav-tab {
-    background: none;
-    border: none;
-    color: var(--light-text-color);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 4px;
-    font-family: inherit;
-    cursor: pointer;
-    flex-grow: 1;
-    transition: color 0.2s;
-}
-
-.nav-tab.active {
-    color: #ffffff;
-    text-shadow: 0 0 8px rgba(255, 255, 255, 0.4);
-}
-
-.nav-tab.active .nav-icon {
-    transform: scale(1.1);
-    filter: drop-shadow(0 0 4px rgba(138, 43, 226, 0.6));
-}
-
-.nav-icon {
-    font-size: 1.3rem;
-    transition: transform 0.2s;
-}
-
-.nav-text {
-    font-size: 0.7rem;
-    font-weight: 700;
-}
-
-/* СТИЛИ ИНВЕНТАРЯ */
+/* ИНВЕНТАРЬ */
 .inventory-hint {
     background: rgba(138, 43, 226, 0.08);
     border: 1px dashed rgba(138, 43, 226, 0.3);
@@ -582,12 +490,6 @@ body {
     text-align: center;
     margin-bottom: 20px;
     line-height: 1.4;
-}
-
-.inventory-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr) !important;
-    gap: 12px;
 }
 
 .inventory-card {
@@ -602,13 +504,9 @@ body {
     box-sizing: border-box;
 }
 
-.inventory-card.gold-tier {
-    border-color: rgba(255, 215, 0, 0.45);
-}
-
 .inventory-card img {
-    width: 64px;
-    height: 64px;
+    width: 58px;
+    height: 58px;
     object-fit: contain;
     margin-bottom: 8px;
 }
@@ -619,10 +517,10 @@ body {
     right: 8px;
     background: var(--primary-color);
     color: #fff;
-    font-size: 0.75rem;
+    font-size: 0.65rem;
     font-weight: 800;
     padding: 2px 6px;
-    border-radius: 8px;
+    border-radius: 6px;
 }
 
 .send-to-tg-button {
@@ -632,18 +530,106 @@ body {
     color: #fff;
     padding: 8px;
     border-radius: 8px;
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     font-weight: 800;
     cursor: pointer;
     margin-top: 8px;
     text-align: center;
-    box-shadow: 0 2px 8px rgba(0, 162, 255, 0.2);
 }
 
 .empty-inventory {
     text-align: center;
     color: var(--light-text-color);
-    font-size: 0.9rem;
+    font-size: 0.85rem;
     padding: 40px 10px;
     grid-column: span 2;
 }
+
+/* СТИЛЬНЫЙ iOS/CYBERPUNK BOTTOM DOCK MENU */
+.bottom-nav {
+    position: fixed; 
+    bottom: 16px; /* Меню "парит" над нижним краем экрана */
+    left: 50%; 
+    transform: translateX(-50%);
+    width: calc(100% - 32px); /* Аккуратные отступы по краям */
+    max-width: 448px; 
+    background: rgba(22, 22, 34, 0.8); /* Полупрозрачное размытое стекло */
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 24px;
+    display: flex; 
+    justify-content: space-around; 
+    padding: 8px 0;
+    z-index: 1000;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), 0 0 20px rgba(138, 43, 226, 0.15);
+    box-sizing: border-box;
+}
+
+.nav-tab {
+    flex: 1; 
+    display: flex; 
+    flex-direction: column; 
+    align-items: center; 
+    justify-content: center;
+    color: #7b7b8e;
+    cursor: pointer;
+    position: relative;
+    padding: 4px 0;
+    transition: color 0.3s ease;
+}
+
+.nav-tab-icon-wrapper {
+    width: 24px;
+    height: 24px;
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.nav-tab-svg {
+    width: 20px;
+    height: 20px;
+    stroke: currentColor;
+    transition: stroke 0.3s ease;
+}
+
+.nav-text { 
+    font-size: 0.65rem; 
+    font-weight: 700; 
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    transition: opacity 0.3s, transform 0.3s;
+}
+
+/* Эффект свечения точки под активной вкладкой */
+.active-indicator {
+    position: absolute;
+    bottom: -4px;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background-color: #fff;
+    box-shadow: 0 0 8px #fff, 0 0 15px var(--primary-color);
+    opacity: 0;
+    transform: scale(0);
+    transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+/* АКТИВНОЕ СОСТОЯНИЕ */
+.nav-tab.active { 
+    color: #ffffff; 
+}
+
+.nav-tab.active .nav-tab-icon-wrapper {
+    transform: translateY(-2px) scale(1.15);
+    color: #fff;
+    filter: drop-shadow(0 0 8px var(--primary-color));
+}
+
+.nav-tab.active .active-indicator {
+    opacity: 1;
+    transform: scale(1);
+    }
