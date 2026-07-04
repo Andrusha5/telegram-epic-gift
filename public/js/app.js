@@ -37,7 +37,28 @@ document.addEventListener('DOMContentLoaded', async () => {
         navTabs: document.querySelectorAll('.nav-tab')
     };
 
-    // --- Логика переключения меню ---
+    // --- КРАСИВЫЕ КАСТОМНЫЕ УВЕДОМЛЕНИЯ (5 секунд) ---
+    function showNotification(message, icon = '🎁') {
+        const container = document.getElementById('toast-container');
+        if (!container) return;
+
+        const toast = document.createElement('div');
+        toast.className = 'custom-toast';
+        toast.innerHTML = `
+            <div class="custom-toast-icon">${icon}</div>
+            <div class="custom-toast-content">${message}</div>
+        `;
+        container.appendChild(toast);
+        
+        setTimeout(() => toast.classList.add('show'), 50);
+
+        setTimeout(() => {
+            toast.classList.remove('show');
+            setTimeout(() => toast.remove(), 400);
+        }, 5000);
+    }
+
+    // --- Переключение страниц ---
     function navigateTo(target) {
         [elements.homeSection, elements.caseSection, elements.inventorySection].forEach(s => s.classList.add('hidden'));
         elements.bottomNavigation.classList.remove('hidden');
@@ -51,7 +72,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             fetchInventory(); 
         } else if (target === 'case') {
             elements.caseSection.classList.remove('hidden');
-            elements.bottomNavigation.classList.add('hidden'); // Скрываем док при открытом кейсе
+            elements.bottomNavigation.classList.add('hidden'); 
             initRouletteTrack();
         }
     }
@@ -69,19 +90,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('daily-case-banner').addEventListener('click', () => navigateTo('case'));
     document.getElementById('back-to-home-button').addEventListener('click', () => navigateTo('home'));
 
-    function showAlert(message, isError = false) {
-        if (tg && tg.showPopup) {
-            tg.showPopup({
-                title: isError ? 'Ошибка' : 'Успех',
-                message: message,
-                buttons: [{ id: 'ok', type: 'ok', text: 'Ок' }]
-            });
-        } else {
-            alert(message);
-        }
-    }
-
-    // --- Отрисовка наград ---
+    // --- Отрисовка наград в два столбика ---
     function renderRewardsGrid() {
         elements.rewardsGrid.innerHTML = '';
         GIFT_POOL.forEach(gift => {
@@ -99,7 +108,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    // --- Загрузка пользователя (с защитой от зависания) ---
+    // --- Загрузка пользователя (с защитой от зависания и установкой аватаров) ---
     async function fetchUserData() {
         try {
             const res = await fetch(`${API_BASE_URL}/api/user`, { 
@@ -108,30 +117,37 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (!res.ok) throw new Error();
             currentUser = await res.json();
         } catch (e) {
-            console.warn("Сбой сети. Запуск в аварийном офлайн-режиме.");
+            console.warn("Сеть недоступна. Запуск в офлайн-режиме.");
             currentUser = {
                 balance: 21.980,
-                username: tg.initDataUnsafe?.user?.username || "Администратор",
-                first_name: tg.initDataUnsafe?.user?.first_name || "Администратор",
+                username: tg.initDataUnsafe?.user?.username || "СВЕРХСЕКРЕТНЫЙ",
+                first_name: tg.initDataUnsafe?.user?.first_name || "СВЕРХСЕКРЕТНЫЙ",
                 avatar_url: "https://img.icons8.com/color/96/user.png",
                 is_admin: true
             };
         }
 
-        // Синхронизируем балансы
         elements.balanceDisplay.forEach(d => {
             if (d) d.innerText = `${parseFloat(currentUser.balance || 0).toFixed(3)} TON`;
         });
 
-        document.getElementById('user-avatar').src = currentUser.avatar_url || "https://img.icons8.com/color/96/user.png";
-        document.getElementById('inv-user-avatar').src = currentUser.avatar_url || "https://img.icons8.com/color/96/user.png";
+        // ПРИНУДИТЕЛЬНО ОБНОВЛЯЕМ АВАТАР ВО ВСЕХ ТРЕХ МЕСТАХ
+        const avUrls = currentUser.avatar_url || "https://img.icons8.com/color/96/user.png";
+        
+        ['user-avatar', 'case-user-avatar', 'inv-user-avatar'].forEach(id => {
+            const img = document.getElementById(id);
+            if (img) {
+                img.src = avUrls;
+                img.onerror = () => { img.src = "https://img.icons8.com/color/96/user.png"; };
+            }
+        });
         
         document.getElementById('user-username').innerText = currentUser.username || currentUser.first_name || "Пользователь";
         document.getElementById('inv-user-username').innerText = currentUser.username || currentUser.first_name || "Пользователь";
         document.getElementById('home-case-status').innerText = "Доступен!";
     }
 
-    // --- Загрузка инвентаря ---
+    // --- Загрузка инвентаря с верными кнопками и ценами ---
     async function fetchInventory() {
         try {
             const res = await fetch(`${API_BASE_URL}/api/inventory`, { 
@@ -154,14 +170,69 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const card = document.createElement('div');
                 card.className = 'reward-card';
                 card.innerHTML = `
+                    <div class="reward-price-top">${parseFloat(item.value).toFixed(2)} TON</div>
                     <div class="item-qty">x${item.quantity}</div>
                     <img src="${item.image_url}" onerror="this.src='https://img.icons8.com/color/96/gift.png'">
                     <div class="reward-name">${item.name}</div>
-                    <button class="send-to-tg-button">Отправить в ТГ</button>
+                    <div class="inv-actions">
+                        <button class="inv-btn withdraw-btn">Вывести</button>
+                        <button class="inv-btn sell-btn">Продать</button>
+                    </div>
                 `;
 
-                card.querySelector('.send-to-tg-button').addEventListener('click', () => {
-                    showAlert(`📤 Функция отправки подарка "${item.name}" в Telegram настраивается в боте!`);
+                // Обработчик вывода предмета
+                card.querySelector('.withdraw-btn').addEventListener('click', async () => {
+                    const confirmAction = confirm(`Вы уверены, что хотите вывести подарок "${item.name}" в Telegram? Он пропадет из вашего инвентаря.`);
+                    if (!confirmAction) return;
+
+                    try {
+                        const withdrawRes = await fetch(`${API_BASE_URL}/api/withdraw_gift`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-Telegram-Init-Data': tg.initData || ""
+                            },
+                            body: JSON.stringify({ itemId: item.item_id })
+                        });
+
+                        if (withdrawRes.ok) {
+                            showNotification(`Заявка на вывод подарка "${item.name}" создана! Мы свяжемся с вами в ЛС.`, '📥');
+                            fetchInventory(); // Обновляем инвентарь на экране
+                        } else {
+                            showNotification('Не удалось создать заявку на вывод.', '⚠️');
+                        }
+                    } catch (err) {
+                        showNotification('Ошибка связи с сервером при выводе.', '⚠️');
+                    }
+                });
+
+                // Обработчик продажи предмета
+                card.querySelector('.sell-btn').addEventListener('click', async () => {
+                    const confirmAction = confirm(`Вы уверены, что хотите продать подарок "${item.name}" за ${item.value} TON?`);
+                    if (!confirmAction) return;
+
+                    try {
+                        const sellRes = await fetch(`${API_BASE_URL}/api/sell_gift`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-Telegram-Init-Data': tg.initData || ""
+                            },
+                            body: JSON.stringify({ itemId: item.item_id, price: item.value })
+                        });
+
+                        if (sellRes.ok) {
+                            const sellData = await sellRes.json();
+                            currentUser.balance = sellData.newBalance;
+                            showNotification(`Подарок "${item.name}" успешно продан за +${item.value} TON!`, '💰');
+                            fetchUserData();
+                            fetchInventory();
+                        } else {
+                            showNotification('Не удалось продать подарок.', '⚠️');
+                        }
+                    } catch (err) {
+                        showNotification('Ошибка связи с сервером при продаже.', '⚠️');
+                    }
                 });
 
                 elements.inventoryGrid.appendChild(card);
@@ -176,7 +247,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         elements.rouletteTrack.style.transition = 'none';
         elements.rouletteTrack.style.transform = 'translateX(0px)';
         
-        void elements.rouletteTrack.offsetWidth; // Force-reflow для предотвращения багов сброса анимации у админа
+        void elements.rouletteTrack.offsetWidth; 
 
         elements.rouletteTrack.innerHTML = '';
 
@@ -192,12 +263,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    // Математически точная анимация прокрутки БЕЗ РАССИНХРОНОВ
+    // МАТЕМАТИЧЕСКИ ТОЧНЫЙ СПИН БЕЗ РАССИНХРОНОВ (ОСТАНАВЛИВАЕТСЯ ТАК, КАК НАПИСАНО)
     function spinRoulette(winningItem, onComplete) {
         const itemWidth = 84; 
         const gap = 8; 
-        const itemFullWidth = itemWidth + gap; 
-        const targetIndex = 35; // Целевой индекс рулетки
+        const itemFullWidth = itemWidth + gap; // 92
+        const targetIndex = 35; 
 
         const trackItems = elements.rouletteTrack.children;
         if (trackItems[targetIndex]) {
@@ -208,7 +279,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             `;
         }
 
-        // Позиционируем элемент ровно по центру
         const containerWidth = elements.rouletteTrack.parentElement.offsetWidth;
         const centerOffset = (containerWidth / 2) - (itemWidth / 2);
         const totalTranslate = (targetIndex * itemFullWidth) - centerOffset;
@@ -221,16 +291,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         }, 5100);
     }
 
-    // --- Обработка побед (Начисление средств / Сохранение) ---
+    // --- Обработка выигрыша ---
     function processWinning(winningGift, isMock = false, apiNewBalance = null) {
         if (winningGift.type === "balance" || winningGift.name.toLowerCase().includes("пополнение")) {
-            showAlert(`🎉 Баланс успешно пополнен на +${winningGift.price}!`, false);
+            showNotification(`🎉 Вы выиграли пополнение баланса на +${winningGift.price}!`, '💰');
             fetchUserData();
             elements.spinBtn.disabled = false;
         } else {
             tg.showPopup({
                 title: '🎁 Поздравляем!',
-                message: `Вы выиграли: "${winningGift.name}"!\n\nПродать этот подарок за ${winningGift.price} или оставить себе в инвентарь?`,
+                message: `Вы выиграли подарок: "${winningGift.name}"!\n\nПродать этот подарок за ${winningGift.price} или оставить себе в инвентарь?`,
                 buttons: [
                     { id: 'sell', type: 'default', text: `Продать за ${winningGift.price}` },
                     { id: 'keep', type: 'ok', text: 'Оставить себе' }
@@ -249,14 +319,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                         if (sellRes.ok) {
                             const sellData = await sellRes.json();
                             currentUser.balance = sellData.newBalance;
+                            showNotification(`💰 Вы успешно продали подарок за +${winningGift.price}!`, '💰');
+                            fetchUserData();
                         }
-                        showAlert(`💰 Успешно продано! Баланс пополнен на +${winningGift.price}.`, false);
-                        fetchUserData();
                     } catch (e) {
-                        showAlert(`💰 Ошибка сети при продаже.`, true);
+                        showNotification('Ошибка связи с сервером.', '⚠️');
                     }
                 } else {
-                    showAlert(`📦 Подарок "${winningGift.name}" бережно сохранен в вашем Инвентаре!`, false);
+                    showNotification(`📦 Подарок "${winningGift.name}" успешно сохранен в вашем Инвентаре!`, '🎒');
                     fetchUserData();
                 }
                 elements.spinBtn.disabled = false;
@@ -289,11 +359,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                     });
 
                 } else {
-                    showAlert(data.error || 'Ошибка при открытии кейса.', true);
+                    showNotification(data.error || 'Ошибка при открытии кейса.', '⚠️');
                     elements.spinBtn.disabled = false;
                 }
             } catch (error) {
-                showAlert('Произошла ошибка соединения с базой.', true);
+                showNotification('Произошла ошибка соединения с базой данных.', '⚠️');
                 elements.spinBtn.disabled = false;
             }
         }, 50);
