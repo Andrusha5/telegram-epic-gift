@@ -37,7 +37,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         navTabs: document.querySelectorAll('.nav-tab')
     };
 
-    // --- КРАСИВЫЕ КАСТОМНЫЕ УВЕДОМЛЕНИЯ ВВЕРХУ ЭКРАНА ---
+    // --- КРАСИВЫЕ КЛИЕНТСКИЕ УВЕДОМЛЕНИЯ ВНИЗУ (С КНОПКОЙ ЗАКРЫТИЯ ×) ---
     function showNotification(message, icon = '🎁') {
         const container = document.getElementById('toast-container');
         if (!container) return;
@@ -47,18 +47,28 @@ document.addEventListener('DOMContentLoaded', async () => {
         toast.innerHTML = `
             <div class="custom-toast-icon">${icon}</div>
             <div class="custom-toast-content">${message}</div>
+            <button class="custom-toast-close">&times;</button>
         `;
         container.appendChild(toast);
         
         setTimeout(() => toast.classList.add('show'), 50);
 
-        setTimeout(() => {
+        // Кнопка закрытия убирает тост моментально
+        toast.querySelector('.custom-toast-close').addEventListener('click', () => {
             toast.classList.remove('show');
             setTimeout(() => toast.remove(), 400);
+        });
+
+        // Автоматическое скрытие через 5 секунд
+        setTimeout(() => {
+            if (toast.parentNode) {
+                toast.classList.remove('show');
+                setTimeout(() => toast.remove(), 400);
+            }
         }, 5000);
     }
 
-    // --- РОСКОШНОЕ КАСТОМНОЕ МОДАЛЬНОЕ ОКНО ПО ЦЕНТРУ ---
+    // --- МОДАЛЬНОЕ ОКНО ПО ЦЕНТРУ ---
     function showCustomModal({ icon = '🎁', title, message, buttons = [], onClose = null }) {
         const overlay = document.getElementById('custom-modal');
         const modalIcon = document.getElementById('modal-icon');
@@ -89,7 +99,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         };
 
         closeX.onclick = handleClose;
-
         overlay.classList.remove('hidden');
     }
 
@@ -105,6 +114,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             elements.inventorySection.classList.remove('hidden');
             setActiveTab('inventory');
             fetchInventory(); 
+            initDepositSelect(); // Заполняем выпадающий список подарков при переходе в инвентарь
         } else if (target === 'case') {
             elements.caseSection.classList.remove('hidden');
             elements.bottomNavigation.classList.add('hidden'); 
@@ -125,7 +135,63 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('daily-case-banner').addEventListener('click', () => navigateTo('case'));
     document.getElementById('back-to-home-button').addEventListener('click', () => navigateTo('home'));
 
-    // --- Отрисовка наград ---
+    // --- Заполнение списка призов для ввода (Депозит) ---
+    function initDepositSelect() {
+        const select = document.getElementById('deposit-item-select');
+        if (!select) return;
+        select.innerHTML = '';
+
+        // Фильтруем только подарки (не пополнения)
+        const giftsOnly = GIFT_POOL.filter(g => g.type === 'gift');
+        giftsOnly.forEach(gift => {
+            const option = document.createElement('option');
+            option.value = gift.id;
+            option.innerText = `${gift.name} (${gift.price})`;
+            select.appendChild(option);
+        });
+    }
+
+    // --- Обработка нажатия подтверждения Ввода подарка ---
+    document.getElementById('deposit-confirm-button').addEventListener('click', async () => {
+        const select = document.getElementById('deposit-item-select');
+        const itemId = select.value;
+        const selectedGift = GIFT_POOL.find(g => g.id == itemId);
+
+        showCustomModal({
+            icon: `<img src="${selectedGift.icon}" style="width:70px;height:70px;object-fit:contain;">`,
+            title: 'Подтвердить передачу?',
+            message: `Вы подтверждаете, что отправили подарок "${selectedGift.name}" на аккаунт @Sintopa в Телеграм?\n\nАдминистратор проверит отправку и зачислит предмет.`,
+            buttons: [
+                {
+                    text: 'Да, подтверждаю',
+                    primary: true,
+                    onClick: async () => {
+                        try {
+                            const res = await fetch(`${API_BASE_URL}/api/deposit_gift_request`, {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'X-Telegram-Init-Data': tg.initData || ""
+                                },
+                                body: JSON.stringify({ itemId: itemId })
+                            });
+
+                            if (res.ok) {
+                                showNotification(`Заявка на ввод подарка "${selectedGift.name}" создана и отправлена админу!`, '📥');
+                            } else {
+                                showNotification('Не удалось создать заявку.', '⚠️');
+                            }
+                        } catch (err) {
+                            showNotification('Ошибка связи с сервером.', '⚠️');
+                        }
+                    }
+                },
+                { text: 'Отмена', primary: false }
+            ]
+        });
+    });
+
+    // --- Отрисовка наград кейса ---
     function renderRewardsGrid() {
         elements.rewardsGrid.innerHTML = '';
         GIFT_POOL.forEach(gift => {
@@ -242,7 +308,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    // --- Загрузка инвентаря ---
+    // --- Загрузка плоского инвентаря ---
     async function fetchInventory() {
         try {
             const res = await fetch(`${API_BASE_URL}/api/inventory`, { 
@@ -262,7 +328,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
 
             items.forEach(item => {
-                // Находим правильную картинку из нашего GIFT_POOL, чтобы исключить рассинхроны!
                 const matchedItem = GIFT_POOL.find(g => g.name.toLowerCase() === item.name.toLowerCase()) || {};
                 const imageSrc = matchedItem.icon || item.image_url;
 
@@ -270,7 +335,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 card.className = 'reward-card';
                 card.innerHTML = `
                     <div class="reward-price-top">${parseFloat(item.value).toFixed(2)} TON</div>
-                    <div class="item-qty">x${item.quantity}</div>
                     <img src="${imageSrc}" onerror="this.src='https://img.icons8.com/color/96/gift.png'">
                     <div class="reward-name">${item.name}</div>
                     <div class="inv-actions">
@@ -284,7 +348,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     showCustomModal({
                         icon: `<img src="${imageSrc}" style="width:70px;height:70px;object-fit:contain;">`,
                         title: 'Вывод подарка',
-                        message: `Отправить "${item.name}" вам в Telegram? Он будет списан из инвентаря.`,
+                        message: `Отправить "${item.name}" вам в Telegram? Он будет списан из вашего инвентаря.`,
                         buttons: [
                             {
                                 text: 'Подтвердить вывод',
@@ -363,7 +427,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    // --- Рулетка ---
+    // --- Инициализация ленты рулетки ---
     function initRouletteTrack() {
         elements.rouletteTrack.style.transition = 'none';
         elements.rouletteTrack.style.transform = 'translateX(0px)';
@@ -383,7 +447,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    // МАТЕМАТИЧЕСКИ ИДЕАЛЬНЫЙ СПИН (ОСТАНОВКА ТОЧНО В ЦЕНТРЕ НАГРАДЫ)
+    // --- Математически идеальная прокрутка рулетки ---
     function spinRoulette(winningItem, onComplete) {
         const itemWidth = 84; 
         const gap = 8; 
