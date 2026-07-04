@@ -4,24 +4,22 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>BestGifts</title>
-    <link rel="stylesheet" href="/css/style.css?v=5.0">
+    <link rel="stylesheet" href="/css/style.css?v=6.0">
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&display=swap" rel="stylesheet">
 </head>
 <body>
     <div id="app">
-        <!-- Контейнер для кастомных уведомлений -->
+        <!-- Контейнер для красивых уведомлений внизу -->
         <div id="toast-container" class="toast-container"></div>
 
-        <!-- Контейнер для дизайнерских модальных окон (вместо alert/confirm) -->
+        <!-- Дизайнерские модальные окна -->
         <div id="custom-modal" class="modal-overlay hidden">
             <div class="modal-card">
                 <button id="modal-close-btn" class="modal-close-x">&times;</button>
                 <div id="modal-icon" class="modal-icon-glow">🎁</div>
                 <h3 id="modal-title">Поздравляем!</h3>
                 <p id="modal-message">Вы выиграли подарок!</p>
-                <div id="modal-actions" class="modal-buttons-layout">
-                    <!-- Кнопки генерируются динамически -->
-                </div>
+                <div id="modal-actions" class="modal-buttons-layout"></div>
             </div>
         </div>
 
@@ -64,9 +62,7 @@
         <!-- ЭКРАН КЕЙСА -->
         <section id="case-section" class="hidden">
             <header class="header-nav">
-                <button id="back-to-home-button" class="back-button">
-                    <span class="back-icon">←</span> Назад
-                </button>
+                <button id="back-to-home-button" class="back-button">← Назад</button>
                 <div class="nav-title">🎁 BestGifts</div>
                 <div style="width: 70px;"></div>
             </header>
@@ -94,7 +90,6 @@
                 <div class="roulette-wrapper">
                     <div class="roulette-pointer pointer-top"></div>
                     <div class="roulette-pointer pointer-bottom"></div>
-                    
                     <div class="roulette-container">
                         <div id="roulette-track" class="roulette-track"></div>
                     </div>
@@ -102,7 +97,6 @@
 
                 <div class="case-control-area">
                     <button id="spin-case-button" class="action-button-gradient">Запустить</button>
-                    
                     <div id="timer-container" class="timer-card hidden">
                         <span class="timer-title">Возвращайтесь через</span>
                         <div id="daily-case-timer" class="timer-clock">23h 59m 49s</div>
@@ -137,9 +131,22 @@
             </header>
 
             <main class="main-content">
-                <div class="inventory-hint">
-                    🎁 Выводите подарки прямо в Telegram или продавайте их за реальные TON!
+                <!-- ФОРМА ВВОДА ПОДАРКОВ (NFT DEPOSIT PANEL) -->
+                <div class="deposit-panel">
+                    <h3>📥 Ввод подарков NFT</h3>
+                    <p class="deposit-desc">1. Отправьте ваш NFT-подарок в Telegram на аккаунт:</p>
+                    <a href="https://t.me/Sintopa" class="deposit-telegram-link" target="_blank">✈️ Отправить на @Sintopa</a>
+                    <p class="deposit-desc" style="margin-top: 10px;">2. Выберите отправленный вами подарок ниже и подтвердите передачу:</p>
+                    
+                    <div class="deposit-form-row">
+                        <select id="deposit-item-select" class="deposit-select">
+                            <!-- Заполняется динамически -->
+                        </select>
+                        <button id="deposit-confirm-button" class="deposit-btn-confirm">Подтвердить передачу</button>
+                    </div>
                 </div>
+
+                <div class="section-divider-title" style="margin-top: 15px;">Мои Подарки</div>
                 <div id="inventory-grid" class="rewards-grid">
                     <!-- Заполняется из JS -->
                 </div>
@@ -174,6 +181,6 @@
     </div>
 
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <script src="/js/app.js?v=5.0"></script>
+    <script src="/js/app.js?v=6.0"></script>
 </body>
-    </html>
+                        </html>
