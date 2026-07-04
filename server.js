@@ -3,7 +3,7 @@ const path = require('path');
 const crypto = require('crypto');
 require('dotenv').config();
 
-// Глобальные перехватчики ошибок, чтобы Render никогда не падал при старте
+// Глобальные перехватчики ошибок
 process.on('unhandledRejection', (reason, promise) => {
     console.error('⚠️ [Safe Engine] Unhandled Rejection:', reason);
 });
@@ -14,12 +14,10 @@ process.on('uncaughtException', (err) => {
 const db = require('./db');
 const botModule = require('./bot');
 
-// Безопасный импорт бота и его функций
 const bot = botModule.bot || botModule;
 const checkUserSubscription = botModule.checkUserSubscription || (async () => true);
 const getUserAvatarUrl = botModule.getUserAvatarUrl || (async () => null);
 
-// Автоматическое определение структуры экспорта пула БД (db или db.pool)
 const pool = db.pool || db;
 const query = (text, params) => pool.query(text, params);
 
@@ -30,7 +28,7 @@ const CHANNEL_USERNAME = process.env.CHANNEL_USERNAME || "";
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Middleware безопасности Telegram
+// Middleware безопасности
 app.use(async (req, res, next) => {
     const initData = req.headers['x-telegram-init-data'] || req.query.initData;
 
@@ -120,20 +118,36 @@ app.get('/api/user', async (req, res) => {
     }
 });
 
-// 2. Получение инвентаря
+// 2. Получение инвентаря (ПЛОСКИЙ ВАРИАНТ - БЕЗ x2/x3)
 app.get('/api/inventory', async (req, res) => {
     if (!req.telegramUser || !req.telegramUser.id) {
         return res.status(401).json({ error: 'Unauthorized' });
     }
     try {
-        const inventory = (await query(`
+        const inventoryRows = (await query(`
             SELECT ui.item_id, ui.quantity, i.name, i.image_url, i.value, i.type
             FROM user_inventory ui
             JOIN items i ON ui.item_id = i.id
             WHERE ui.user_id = $1 AND ui.quantity > 0
             ORDER BY i.value DESC
         `, [req.telegramUser.id])).rows;
-        res.json(inventory);
+
+        // Разворачиваем сгруппированные подарки в плоский список
+        const inventoryFlat = [];
+        for (const row of inventoryRows) {
+            for (let i = 0; i < row.quantity; i++) {
+                inventoryFlat.push({
+                    item_id: row.item_id,
+                    name: row.name,
+                    image_url: row.image_url,
+                    value: row.value,
+                    type: row.type,
+                    quantity: 1 // всегда пишем 1, чтобы не было никаких x2 на фронте
+                });
+            }
+        }
+
+        res.json(inventoryFlat);
     } catch (error) {
         console.error("Ошибка в /api/inventory:", error);
         res.status(500).json({ error: 'Internal server error' });
@@ -264,7 +278,7 @@ app.post('/api/sell_gift', async (req, res) => {
     }
 });
 
-// 5. Вывод подарка (Абсолютно безопасный и без синтаксических ошибок)
+// 5. Вывод подарка (Абсолютно безопасный)
 app.post('/api/withdraw_gift', async (req, res) => {
     if (!req.telegramUser || !req.telegramUser.id) return res.status(401).json({ error: 'Unauthorized' });
     const userId = req.telegramUser.id;
@@ -296,14 +310,13 @@ app.post('/api/withdraw_gift', async (req, res) => {
         await client.query('COMMIT');
         client.release();
 
-        // Асинхронная отправка уведомления админу (без блокирования основного потока)
+        // Асинхронная отправка уведомления админу
         const adminId = process.env.ADMIN_TELEGRAM_ID;
         if (adminId && bot && typeof bot.sendMessage === 'function') {
             const userMention = user.username ? `@${user.username}` : `${user.first_name || 'Без имени'}`;
             const chatLink = `tg://user?id=${userId}`;
             const tmeLink = user.username ? `https://t.me/${user.username}` : `https://t.me/user?id=${userId}`;
 
-            // Простая, чистая и безопасная строка без лишней конкатенации
             const message = `🚨 *Новая заявка на вывод подарка!*\n\n` +
                             `🎁 *Подарок:* ${itemDetails.name} (${itemDetails.value} TON)\n` +
                             `👤 *Пользователь:* ${user.first_name || ''} ${user.last_name || ''} (${userMention})\n` +
@@ -326,7 +339,122 @@ app.post('/api/withdraw_gift', async (req, res) => {
     }
 });
 
-// 6. Получение информации о канале
+// 6. Заявка на Ввод подарка (NFT DEPOSIT REQUEST)
+app.post('/api/deposit_gift_request', async (req, res) => {
+    if (!req.telegramUser || !req.telegramUser.id) return res.status(401).json({ error: 'Unauthorized' });
+    const userId = req.telegramUser.id;
+    const { itemId } = req.body;
+
+    const parsedItemId = parseInt(itemId, 10);
+    if (isNaN(parsedItemId)) {
+        return res.status(400).json({ error: 'Неверный ID подарка.' });
+    }
+
+    try {
+        // Получаем информацию о подарке
+        const itemDetails = (await query('SELECT name, value FROM items WHERE id = $1', [parsedItemId])).rows[0];
+        if (!itemDetails) {
+            return res.status(400).json({ error: 'Подарок не найден в системе.' });
+        }
+
+        // Получаем информацию о пользователе
+        const userRes = await query('SELECT username, first_name, last_name FROM users WHERE id = $1', [userId]);
+        const user = userRes.rows[0];
+
+        const adminId = process.env.ADMIN_TELEGRAM_ID;
+        if (adminId && bot && typeof bot.sendMessage === 'function') {
+            const userMention = user.username ? `@${user.username}` : `${user.first_name || 'Без имени'}`;
+            const chatLink = `tg://user?id=${userId}`;
+            const tmeLink = user.username ? `https://t.me/${user.username}` : `https://t.me/user?id=${userId}`;
+
+            // Отправляем админу сообщение с кнопками подтверждения и отклонения
+            const message = `📥 *Новая заявка на ВВОД подарка NFT!*\n\n` +
+                            `🎁 *Подарок:* ${itemDetails.name} (${itemDetails.value} TON)\n` +
+                            `👤 *Отправитель:* ${user.first_name || ''} ${user.last_name || ''} (${userMention})\n` +
+                            `🆔 *Telegram ID:* `${userId}`\n\n` +
+                            `💬 [Открыть чат с пользователем](${chatLink})\n` +
+                            `🔗 [Прямая ссылка t.me](${tmeLink})\n\n` +
+                            `_Проверьте получение подарка на вашем аккаунте @Sintopa и нажмите кнопку ниже:_`;
+
+            const options = {
+                parse_mode: 'Markdown',
+                reply_markup: {
+                    inline_keyboard: [
+                        [
+                            { text: '✅ Подтвердить', callback_data: `dep_app_${userId}_${parsedItemId}` },
+                            { text: '❌ Отклонить', callback_data: `dep_rej_${userId}_${parsedItemId}` }
+                        ]
+                    ]
+                }
+            };
+
+            bot.sendMessage(adminId, message, options).catch(err => {
+                console.error("Не удалось отправить заявку ввода админу:", err);
+            });
+        }
+
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Ошибка отправки заявки на ввод:', error);
+        res.status(500).json({ error: 'Ошибка сервера.' });
+    }
+});
+
+// --- АВТОМАТИЧЕСКАЯ ОБРАБОТКА ИНЛАЙН-КНОПОК АДМИНА В ТГ ---
+if (bot && typeof bot.on === 'function') {
+    bot.on('callback_query', async (callbackQuery) => {
+        const action = callbackQuery.data;
+        const msg = callbackQuery.message;
+        
+        if (action.startsWith('dep_app_') || action.startsWith('dep_rej_')) {
+            const parts = action.split('_'); // ['dep', 'app/rej', userId, itemId]
+            const isApprove = parts[1] === 'app';
+            const targetUserId = parseInt(parts[2], 10);
+            const itemId = parseInt(parts[3], 10);
+
+            try {
+                // Название подарка
+                const itemRes = await query('SELECT name FROM items WHERE id = $1', [itemId]);
+                const itemName = itemRes.rows[0]?.name || 'Подарок';
+
+                if (isApprove) {
+                    // Зачисляем подарок пользователю в базу
+                    await query(
+                        'INSERT INTO user_inventory (user_id, item_id, quantity) VALUES ($1, $2, 1) ON CONFLICT (user_id, item_id) DO UPDATE SET quantity = user_inventory.quantity + 1',
+                        [targetUserId, itemId]
+                    );
+
+                    // Уведомляем пользователя
+                    bot.sendMessage(targetUserId, `🎉 *Подарок зачислен!*\n\nАдминистратор проверил вашу транзакцию. Подарок *"${itemName}"* успешно введен в ваш инвентарь!`, { parse_mode: 'Markdown' }).catch(() => {});
+
+                    // Обновляем сообщение в чате админа
+                    bot.editMessageText(`✅ Заявка на ввод подарка *"${itemName}"* от пользователя `${targetUserId}` одобрена. Предмет успешно зачислен в инвентарь!`, {
+                        chat_id: msg.chat.id,
+                        message_id: msg.message_id,
+                        parse_mode: 'Markdown'
+                    }).catch(() => {});
+                } else {
+                    // Уведомляем пользователя об отклонении
+                    bot.sendMessage(targetUserId, `❌ *Ввод подарка отклонен!*\n\nВаша заявка на ввод подарка *"${itemName}"* была отклонена администратором. Пожалуйста, убедитесь, что вы отправили NFT на аккаунт @Sintopa.`, { parse_mode: 'Markdown' }).catch(() => {});
+
+                    // Обновляем сообщение в чате админа
+                    bot.editMessageText(`❌ Заявка на ввод подарка *"${itemName}"* от пользователя `${targetUserId}` была успешно отклонена вами.`, {
+                        chat_id: msg.chat.id,
+                        message_id: msg.message_id,
+                        parse_mode: 'Markdown'
+                    }).catch(() => {});
+                }
+            } catch (err) {
+                console.error('Ошибка в callback_query обработчике:', err);
+            }
+        }
+
+        // Подтверждаем клик по кнопке (убирает значок загрузки на кнопке в ТГ)
+        bot.answerCallbackQuery(callbackQuery.id).catch(() => {});
+    });
+}
+
+// 7. Получение информации о канале
 app.get('/api/daily_case_info', (req, res) => {
     res.json({ channel_username: CHANNEL_USERNAME });
 });
