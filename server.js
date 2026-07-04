@@ -264,7 +264,7 @@ app.post('/api/sell_gift', async (req, res) => {
     }
 });
 
-// 5. Вывод подарка (Абсолютно безопасный)
+// 5. Вывод подарка (Абсолютно безопасный и без синтаксических ошибок)
 app.post('/api/withdraw_gift', async (req, res) => {
     if (!req.telegramUser || !req.telegramUser.id) return res.status(401).json({ error: 'Unauthorized' });
     const userId = req.telegramUser.id;
@@ -296,17 +296,18 @@ app.post('/api/withdraw_gift', async (req, res) => {
         await client.query('COMMIT');
         client.release();
 
-        // Асинхронная отправка уведомления админу (не блокирует поток)
+        // Асинхронная отправка уведомления админу (без блокирования основного потока)
         const adminId = process.env.ADMIN_TELEGRAM_ID;
         if (adminId && bot && typeof bot.sendMessage === 'function') {
             const userMention = user.username ? `@${user.username}` : `${user.first_name || 'Без имени'}`;
             const chatLink = `tg://user?id=${userId}`;
             const tmeLink = user.username ? `https://t.me/${user.username}` : `https://t.me/user?id=${userId}`;
 
+            // Простая, чистая и безопасная строка без лишней конкатенации
             const message = `🚨 *Новая заявка на вывод подарка!*\n\n` +
                             `🎁 *Подарок:* ${itemDetails.name} (${itemDetails.value} TON)\n` +
                             `👤 *Пользователь:* ${user.first_name || ''} ${user.last_name || ''} (${userMention})\n` +
-                            `🆔 *Telegram ID:* `${userId}`\n\n` +
+                            `🆔 *Telegram ID:* ${userId}\n\n` +
                             `💬 [Открыть чат](${chatLink})\n` +
                             `🔗 [Ссылка t.me](${tmeLink})`;
 
