@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>BestGifts</title>
-    <link rel="stylesheet" href="/css/style.css">
+    <link rel="stylesheet" href="/css/style.css?v=3.0">
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&display=swap" rel="stylesheet">
 </head>
 <body>
@@ -14,7 +14,7 @@
             <header class="header">
                 <div class="brand-title">🎁 BestGifts</div>
                 <div class="user-profile">
-                    <img id="user-avatar" class="user-avatar" src="https://via.placeholder.com/40" alt="Avatar">
+                    <img id="user-avatar" class="user-avatar" src="https://img.icons8.com/color/96/user.png" alt=" ">
                     <div class="user-info">
                         <span id="user-username" class="user-username">Загрузка...</span>
                         <div class="balance-container">
@@ -52,12 +52,12 @@
                     <span class="back-icon">←</span> Назад
                 </button>
                 <div class="nav-title">🎁 BestGifts</div>
-                <div style="width: 70px;"></div> <!-- Заглушка для центрирования -->
+                <div style="width: 70px;"></div>
             </header>
             
             <div class="user-bar-sub">
                 <div class="user-bar-left">
-                    <img id="case-user-avatar" class="user-avatar-small" src="https://via.placeholder.com/40" alt="Avatar">
+                    <img id="case-user-avatar" class="user-avatar-small" src="https://img.icons8.com/color/96/user.png" alt="Avatar">
                     <span class="balance-sub-label">Ваш баланс:</span>
                     <span id="case-user-balance" class="balance-sub-value">0.000 TON</span>
                 </div>
@@ -109,7 +109,7 @@
             <header class="header">
                 <div class="brand-title">🎒 Ваш Инвентарь</div>
                 <div class="user-profile">
-                    <img id="inv-user-avatar" class="user-avatar" src="https://via.placeholder.com/40" alt="Avatar">
+                    <img id="inv-user-avatar" class="user-avatar" src="https://img.icons8.com/color/96/user.png" alt="Avatar">
                     <div class="user-info">
                         <span id="inv-user-username" class="user-username">Загрузка...</span>
                         <div class="balance-container">
@@ -124,26 +124,40 @@
                 <div class="inventory-hint">
                     🎁 Оставляйте подарки себе, чтобы собирать коллекцию и отправлять их друзьям!
                 </div>
-                <div id="inventory-grid" class="inventory-grid">
-                    <!-- Будет заполнено через JS -->
+                <div id="inventory-grid" class="rewards-grid">
+                    <!-- Заполняется динамически -->
                 </div>
             </main>
         </section>
 
-        <!-- НИЖНЕЕ МЕНЮ НАВИГАЦИИ -->
+        <!-- ДИЗАЙНЕРСКОЕ НЕОНОВОЕ ПАРЯЩЕЕ МЕНЮ -->
         <nav id="bottom-navigation" class="bottom-nav">
-            <button class="nav-tab active" data-target="home">
-                <span class="nav-icon">🏠</span>
+            <div class="nav-tab active" data-target="home">
+                <div class="nav-tab-icon-wrapper">
+                    <svg class="nav-tab-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                        <polyline points="9 22 9 12 15 12 15 22"/>
+                    </svg>
+                </div>
                 <span class="nav-text">Главная</span>
-            </button>
-            <button class="nav-tab" data-target="inventory">
-                <span class="nav-icon">🎒</span>
+                <div class="active-indicator"></div>
+            </div>
+            
+            <div class="nav-tab" data-target="inventory">
+                <div class="nav-tab-icon-wrapper">
+                    <svg class="nav-tab-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M16 16v1a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h11a2 2 0 0 1 2 2v1"/>
+                        <path d="M18 8h4a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-4"/>
+                        <line x1="16" y1="12" x2="24" y2="12"/>
+                    </svg>
+                </div>
                 <span class="nav-text">Инвентарь</span>
-            </button>
+                <div class="active-indicator"></div>
+            </div>
         </nav>
     </div>
 
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <script src="/js/app.js"></script>
+    <script src="/js/app.js?v=3.0"></script>
 </body>
-</html>
+                    </html>
