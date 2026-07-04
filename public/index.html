@@ -4,8 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>BestGifts</title>
-    <!-- Кэш-бастинг версии 2.1 для мгновенного обновления CSS -->
-    <link rel="stylesheet" href="/css/style.css?v=2.1">
+    <link rel="stylesheet" href="/css/style.css">
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&display=swap" rel="stylesheet">
 </head>
 <body>
@@ -15,48 +14,91 @@
             <header class="header">
                 <div class="brand-title">🎁 BestGifts</div>
                 <div class="user-profile">
-                    <img id="user-avatar" class="user-avatar" src="https://img.icons8.com/color/96/user.png" alt=" ">
+                    <img id="user-avatar" class="user-avatar" src="https://via.placeholder.com/40" alt="Avatar">
                     <div class="user-info">
                         <span id="user-username" class="user-username">Загрузка...</span>
                         <div class="balance-container">
+                            <span class="balance-label">Баланс:</span>
                             <span id="user-balance" class="balance-value">0.000 TON</span>
                         </div>
                     </div>
                 </div>
             </header>
+
             <main class="main-content">
+                <div class="welcome-banner">
+                    <h2>Добро пожаловать в BestGifts!</h2>
+                    <p>Открывай ежедневные кейсы и выигрывай ценные призы в TON!</p>
+                </div>
+
+                <div class="section-divider-title">Ежедневный кейс</div>
+                
                 <div id="daily-case-banner" class="case-banner-card">
-                    <div class="case-banner-badge">DAILY</div>
-                    <img src="https://img.icons8.com/color/144/treasure-chest.png" class="case-banner-img">
+                    <div class="case-banner-badge">БЕСПЛАТНО</div>
+                    <img src="https://img.icons8.com/color/144/treasure-chest.png" alt="Case" class="case-banner-img">
                     <div class="case-banner-info">
                         <h3>Ежедневный кейс</h3>
-                        <p id="home-case-status">Проверка доступности...</p>
+                        <p id="home-case-status">Доступен для открытия!</p>
                     </div>
+                    <div class="case-banner-arrow">→</div>
                 </div>
             </main>
         </section>
 
         <!-- ЭКРАН КЕЙСА -->
         <section id="case-section" class="hidden">
+            <header class="header-nav">
+                <button id="back-to-home-button" class="back-button">
+                    <span class="back-icon">←</span> Назад
+                </button>
+                <div class="nav-title">🎁 BestGifts</div>
+                <div style="width: 70px;"></div> <!-- Заглушка для центрирования -->
+            </header>
+            
             <div class="user-bar-sub">
                 <div class="user-bar-left">
-                    <span class="balance-sub-label">Баланс:</span>
+                    <img id="case-user-avatar" class="user-avatar-small" src="https://via.placeholder.com/40" alt="Avatar">
+                    <span class="balance-sub-label">Ваш баланс:</span>
                     <span id="case-user-balance" class="balance-sub-value">0.000 TON</span>
                 </div>
-                <button id="back-to-home-button" class="back-button">← Назад</button>
             </div>
+
             <main class="main-content">
+                <div class="case-page-header">
+                    <div class="case-title-block">
+                        <span class="case-icon-mini">🎁</span>
+                        <div class="case-text-group">
+                            <span class="case-main-title">Ежедневный кейс</span>
+                            <span class="case-secondary-title">Испытай свою удачу сегодня!</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- РУЛЕТКА -->
                 <div class="roulette-wrapper">
                     <div class="roulette-pointer pointer-top"></div>
+                    <div class="roulette-pointer pointer-bottom"></div>
+                    
                     <div class="roulette-container">
                         <div id="roulette-track" class="roulette-track"></div>
                     </div>
                 </div>
-                <button id="spin-case-button" class="action-button-gradient">Запустить</button>
-                <div id="timer-container" class="timer-card hidden">
-                    <span id="daily-case-timer" class="timer-clock">00:00:00</span>
+
+                <div class="case-control-area">
+                    <button id="spin-case-button" class="action-button-gradient">Запустить</button>
+                    
+                    <div id="timer-container" class="timer-card hidden">
+                        <span class="timer-title">Возвращайтесь через</span>
+                        <div id="daily-case-timer" class="timer-clock">23h 59m 49s</div>
+                    </div>
                 </div>
+
+                <!-- СЕТКА НАГРАД -->
                 <div class="rewards-section">
+                    <div class="rewards-header">
+                        <span class="rewards-header-icon">🏆</span>
+                        <h3>Ежедневные награды</h3>
+                    </div>
                     <div id="rewards-grid" class="rewards-grid"></div>
                 </div>
             </main>
@@ -65,29 +107,43 @@
         <!-- ЭКРАН ИНВЕНТАРЯ -->
         <section id="inventory-section" class="hidden">
             <header class="header">
-                <div class="brand-title">🎒 Мой Инвентарь</div>
+                <div class="brand-title">🎒 Ваш Инвентарь</div>
+                <div class="user-profile">
+                    <img id="inv-user-avatar" class="user-avatar" src="https://via.placeholder.com/40" alt="Avatar">
+                    <div class="user-info">
+                        <span id="inv-user-username" class="user-username">Загрузка...</span>
+                        <div class="balance-container">
+                            <span class="balance-label">Баланс:</span>
+                            <span id="inv-user-balance" class="balance-value">0.000 TON</span>
+                        </div>
+                    </div>
+                </div>
             </header>
+
             <main class="main-content">
-                <p class="inv-hint">Отправьте свои подарки в ТГ</p>
-                <div id="inventory-grid" class="rewards-grid"></div>
+                <div class="inventory-hint">
+                    🎁 Оставляйте подарки себе, чтобы собирать коллекцию и отправлять их друзьям!
+                </div>
+                <div id="inventory-grid" class="inventory-grid">
+                    <!-- Будет заполнено через JS -->
+                </div>
             </main>
         </section>
 
-        <!-- КРАСИВОЕ СОВРЕМЕННОЕ МЕНЮ (Через div-элементы) -->
-        <nav class="bottom-nav">
-            <div class="nav-tab active" data-target="home">
-                <span class="nav-tab-icon">🏠</span>
-                <span>Меню</span>
-            </div>
-            <div class="nav-tab" data-target="inventory">
-                <span class="nav-tab-icon">🎒</span>
-                <span>Инвентарь</span>
-            </div>
+        <!-- НИЖНЕЕ МЕНЮ НАВИГАЦИИ -->
+        <nav id="bottom-navigation" class="bottom-nav">
+            <button class="nav-tab active" data-target="home">
+                <span class="nav-icon">🏠</span>
+                <span class="nav-text">Главная</span>
+            </button>
+            <button class="nav-tab" data-target="inventory">
+                <span class="nav-icon">🎒</span>
+                <span class="nav-text">Инвентарь</span>
+            </button>
         </nav>
     </div>
-    
+
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <!-- Кэш-бастинг версии 2.1 для мгновенного обновления JS -->
-    <script src="/js/app.js?v=2.1"></script>
+    <script src="/js/app.js"></script>
 </body>
 </html>
