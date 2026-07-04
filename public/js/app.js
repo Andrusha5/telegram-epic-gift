@@ -37,7 +37,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         navTabs: document.querySelectorAll('.nav-tab')
     };
 
-    // --- КРАСИВЫЕ КАСТОМНЫЕ УВЕДОМЛЕНИЯ (5 секунд) ---
+    // --- КРАСИВЫЕ КАСТОМНЫЕ УВЕДОМЛЕНИЯ ВВЕРХУ ЭКРАНА ---
     function showNotification(message, icon = '🎁') {
         const container = document.getElementById('toast-container');
         if (!container) return;
@@ -56,6 +56,41 @@ document.addEventListener('DOMContentLoaded', async () => {
             toast.classList.remove('show');
             setTimeout(() => toast.remove(), 400);
         }, 5000);
+    }
+
+    // --- РОСКОШНОЕ КАСТОМНОЕ МОДАЛЬНОЕ ОКНО ПО ЦЕНТРУ ---
+    function showCustomModal({ icon = '🎁', title, message, buttons = [], onClose = null }) {
+        const overlay = document.getElementById('custom-modal');
+        const modalIcon = document.getElementById('modal-icon');
+        const modalTitle = document.getElementById('modal-title');
+        const modalMsg = document.getElementById('modal-message');
+        const actionsContainer = document.getElementById('modal-actions');
+        const closeX = document.getElementById('modal-close-btn');
+
+        modalIcon.innerHTML = icon;
+        modalTitle.innerText = title;
+        modalMsg.innerText = message;
+        actionsContainer.innerHTML = '';
+
+        buttons.forEach(btnConfig => {
+            const btn = document.createElement('button');
+            btn.className = `modal-btn ${btnConfig.primary ? 'modal-btn-primary' : 'modal-btn-secondary'}`;
+            btn.innerText = btnConfig.text;
+            btn.addEventListener('click', () => {
+                overlay.classList.add('hidden');
+                if (btnConfig.onClick) btnConfig.onClick();
+            });
+            actionsContainer.appendChild(btn);
+        });
+
+        const handleClose = () => {
+            overlay.classList.add('hidden');
+            if (onClose) onClose();
+        };
+
+        closeX.onclick = handleClose;
+
+        overlay.classList.remove('hidden');
     }
 
     // --- Переключение страниц ---
@@ -90,7 +125,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('daily-case-banner').addEventListener('click', () => navigateTo('case'));
     document.getElementById('back-to-home-button').addEventListener('click', () => navigateTo('home'));
 
-    // --- Отрисовка наград в два столбика ---
+    // --- Отрисовка наград ---
     function renderRewardsGrid() {
         elements.rewardsGrid.innerHTML = '';
         GIFT_POOL.forEach(gift => {
@@ -108,7 +143,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    // --- Загрузка пользователя (с защитой от зависания и установкой аватаров) ---
+    // --- Загрузка данных пользователя ---
     async function fetchUserData() {
         try {
             const res = await fetch(`${API_BASE_URL}/api/user`, { 
@@ -117,11 +152,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (!res.ok) throw new Error();
             currentUser = await res.json();
         } catch (e) {
-            console.warn("Сеть недоступна. Запуск в офлайн-режиме.");
             currentUser = {
                 balance: 21.980,
-                username: tg.initDataUnsafe?.user?.username || "СВЕРХСЕКРЕТНЫЙ",
-                first_name: tg.initDataUnsafe?.user?.first_name || "СВЕРХСЕКРЕТНЫЙ",
+                username: tg.initDataUnsafe?.user?.username || "Андрей",
+                first_name: tg.initDataUnsafe?.user?.first_name || "Андрей",
                 avatar_url: "https://img.icons8.com/color/96/user.png",
                 is_admin: true
             };
@@ -131,9 +165,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (d) d.innerText = `${parseFloat(currentUser.balance || 0).toFixed(3)} TON`;
         });
 
-        // ПРИНУДИТЕЛЬНО ОБНОВЛЯЕМ АВАТАР ВО ВСЕХ ТРЕХ МЕСТАХ
         const avUrls = currentUser.avatar_url || "https://img.icons8.com/color/96/user.png";
-        
         ['user-avatar', 'case-user-avatar', 'inv-user-avatar'].forEach(id => {
             const img = document.getElementById(id);
             if (img) {
@@ -144,10 +176,73 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         document.getElementById('user-username').innerText = currentUser.username || currentUser.first_name || "Пользователь";
         document.getElementById('inv-user-username').innerText = currentUser.username || currentUser.first_name || "Пользователь";
-        document.getElementById('home-case-status').innerText = "Доступен!";
+        
+        updateDailyCaseTimer();
     }
 
-    // --- Загрузка инвентаря с верными кнопками и ценами ---
+    // --- Таймер кейса ---
+    let dailyCaseTimerInterval;
+    function updateDailyCaseTimer() {
+        clearInterval(dailyCaseTimerInterval); 
+
+        if (currentUser.is_admin) {
+            document.getElementById('home-case-status').innerText = 'Доступно без ограничений (Админ)!';
+            document.getElementById('home-case-status').style.color = 'var(--green-success)';
+            elements.spinBtn.classList.remove('hidden');
+            elements.spinBtn.disabled = false;
+            document.getElementById('timer-container').classList.add('hidden');
+            return;
+        }
+
+        if (!currentUser.last_daily_case_open) {
+            document.getElementById('home-case-status').innerText = 'Доступно!';
+            document.getElementById('home-case-status').style.color = 'var(--green-success)';
+            elements.spinBtn.classList.remove('hidden');
+            elements.spinBtn.disabled = false;
+            document.getElementById('timer-container').classList.add('hidden');
+            return;
+        }
+
+        const lastOpen = new Date(currentUser.last_daily_case_open);
+        const now = new Date();
+        const cooldown = 24 * 60 * 60 * 1000; 
+        const nextOpenTime = new Date(lastOpen.getTime() + cooldown);
+        const timeLeftMs = nextOpenTime.getTime() - now.getTime();
+
+        if (timeLeftMs <= 0) {
+            document.getElementById('home-case-status').innerText = 'Доступно!';
+            document.getElementById('home-case-status').style.color = 'var(--green-success)';
+            elements.spinBtn.classList.remove('hidden');
+            elements.spinBtn.disabled = false;
+            document.getElementById('timer-container').classList.add('hidden');
+        } else {
+            elements.spinBtn.classList.add('hidden');
+            elements.spinBtn.disabled = true;
+            document.getElementById('timer-container').classList.remove('hidden');
+
+            const tick = () => {
+                const nowTick = new Date();
+                const diff = nextOpenTime.getTime() - nowTick.getTime();
+                if (diff <= 0) {
+                    clearInterval(dailyCaseTimerInterval);
+                    updateDailyCaseTimer();
+                    return;
+                }
+                const hours = Math.floor(diff / (1000 * 60 * 60));
+                const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+                const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+                
+                const timerString = `${hours}ч ${minutes}м ${seconds}с`;
+                document.getElementById('daily-case-timer').innerText = timerString;
+                document.getElementById('home-case-status').innerText = `Доступно через: ${timerString}`;
+                document.getElementById('home-case-status').style.color = 'var(--red-alert)';
+            };
+            tick();
+            dailyCaseTimerInterval = setInterval(tick, 1000); 
+        }
+    }
+
+    // --- Загрузка инвентаря ---
     async function fetchInventory() {
         try {
             const res = await fetch(`${API_BASE_URL}/api/inventory`, { 
@@ -167,12 +262,16 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
 
             items.forEach(item => {
+                // Находим правильную картинку из нашего GIFT_POOL, чтобы исключить рассинхроны!
+                const matchedItem = GIFT_POOL.find(g => g.name.toLowerCase() === item.name.toLowerCase()) || {};
+                const imageSrc = matchedItem.icon || item.image_url;
+
                 const card = document.createElement('div');
                 card.className = 'reward-card';
                 card.innerHTML = `
                     <div class="reward-price-top">${parseFloat(item.value).toFixed(2)} TON</div>
                     <div class="item-qty">x${item.quantity}</div>
-                    <img src="${item.image_url}" onerror="this.src='https://img.icons8.com/color/96/gift.png'">
+                    <img src="${imageSrc}" onerror="this.src='https://img.icons8.com/color/96/gift.png'">
                     <div class="reward-name">${item.name}</div>
                     <div class="inv-actions">
                         <button class="inv-btn withdraw-btn">Вывести</button>
@@ -180,59 +279,81 @@ document.addEventListener('DOMContentLoaded', async () => {
                     </div>
                 `;
 
-                // Обработчик вывода предмета
-                card.querySelector('.withdraw-btn').addEventListener('click', async () => {
-                    const confirmAction = confirm(`Вы уверены, что хотите вывести подарок "${item.name}" в Telegram? Он пропадет из вашего инвентаря.`);
-                    if (!confirmAction) return;
+                // Кнопка Вывода
+                card.querySelector('.withdraw-btn').addEventListener('click', () => {
+                    showCustomModal({
+                        icon: `<img src="${imageSrc}" style="width:70px;height:70px;object-fit:contain;">`,
+                        title: 'Вывод подарка',
+                        message: `Отправить "${item.name}" вам в Telegram? Он будет списан из инвентаря.`,
+                        buttons: [
+                            {
+                                text: 'Подтвердить вывод',
+                                primary: true,
+                                onClick: async () => {
+                                    try {
+                                        const withdrawRes = await fetch(`${API_BASE_URL}/api/withdraw_gift`, {
+                                            method: 'POST',
+                                            headers: {
+                                                'Content-Type': 'application/json',
+                                                'X-Telegram-Init-Data': tg.initData || ""
+                                            },
+                                            body: JSON.stringify({ itemId: item.item_id })
+                                        });
 
-                    try {
-                        const withdrawRes = await fetch(`${API_BASE_URL}/api/withdraw_gift`, {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'X-Telegram-Init-Data': tg.initData || ""
+                                        if (withdrawRes.ok) {
+                                            showNotification(`Подарок "${item.name}" в очереди на вывод! Админ свяжется с вами.`, '📥');
+                                            fetchInventory(); 
+                                        } else {
+                                            showNotification('Заявка на вывод отклонена.', '⚠️');
+                                        }
+                                    } catch (err) {
+                                        showNotification('Ошибка сети при выводе.', '⚠️');
+                                    }
+                                }
                             },
-                            body: JSON.stringify({ itemId: item.item_id })
-                        });
-
-                        if (withdrawRes.ok) {
-                            showNotification(`Заявка на вывод подарка "${item.name}" создана! Мы свяжемся с вами в ЛС.`, '📥');
-                            fetchInventory(); // Обновляем инвентарь на экране
-                        } else {
-                            showNotification('Не удалось создать заявку на вывод.', '⚠️');
-                        }
-                    } catch (err) {
-                        showNotification('Ошибка связи с сервером при выводе.', '⚠️');
-                    }
+                            { text: 'Отмена', primary: false }
+                        ]
+                    });
                 });
 
-                // Обработчик продажи предмета
-                card.querySelector('.sell-btn').addEventListener('click', async () => {
-                    const confirmAction = confirm(`Вы уверены, что хотите продать подарок "${item.name}" за ${item.value} TON?`);
-                    if (!confirmAction) return;
+                // Кнопка Продажи
+                card.querySelector('.sell-btn').addEventListener('click', () => {
+                    showCustomModal({
+                        icon: '💰',
+                        title: 'Продажа подарка',
+                        message: `Вы действительно хотите мгновенно продать подарок "${item.name}" за ${item.value} TON?`,
+                        buttons: [
+                            {
+                                text: 'Продать за TON',
+                                primary: true,
+                                onClick: async () => {
+                                    try {
+                                        const sellRes = await fetch(`${API_BASE_URL}/api/sell_gift`, {
+                                            method: 'POST',
+                                            headers: {
+                                                'Content-Type': 'application/json',
+                                                'X-Telegram-Init-Data': tg.initData || ""
+                                            },
+                                            body: JSON.stringify({ itemId: item.item_id, price: item.value })
+                                        });
 
-                    try {
-                        const sellRes = await fetch(`${API_BASE_URL}/api/sell_gift`, {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'X-Telegram-Init-Data': tg.initData || ""
+                                        if (sellRes.ok) {
+                                            const sellData = await sellRes.json();
+                                            currentUser.balance = sellData.newBalance;
+                                            showNotification(`Вы успешно продали "${item.name}" за +${item.value} TON!`, '💰');
+                                            fetchUserData();
+                                            fetchInventory();
+                                        } else {
+                                            showNotification('Не удалось продать подарок.', '⚠️');
+                                        }
+                                    } catch (err) {
+                                        showNotification('Ошибка связи с сервером.', '⚠️');
+                                    }
+                                }
                             },
-                            body: JSON.stringify({ itemId: item.item_id, price: item.value })
-                        });
-
-                        if (sellRes.ok) {
-                            const sellData = await sellRes.json();
-                            currentUser.balance = sellData.newBalance;
-                            showNotification(`Подарок "${item.name}" успешно продан за +${item.value} TON!`, '💰');
-                            fetchUserData();
-                            fetchInventory();
-                        } else {
-                            showNotification('Не удалось продать подарок.', '⚠️');
-                        }
-                    } catch (err) {
-                        showNotification('Ошибка связи с сервером при продаже.', '⚠️');
-                    }
+                            { text: 'Отмена', primary: false }
+                        ]
+                    });
                 });
 
                 elements.inventoryGrid.appendChild(card);
@@ -246,7 +367,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     function initRouletteTrack() {
         elements.rouletteTrack.style.transition = 'none';
         elements.rouletteTrack.style.transform = 'translateX(0px)';
-        
         void elements.rouletteTrack.offsetWidth; 
 
         elements.rouletteTrack.innerHTML = '';
@@ -263,7 +383,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    // МАТЕМАТИЧЕСКИ ТОЧНЫЙ СПИН БЕЗ РАССИНХРОНОВ (ОСТАНАВЛИВАЕТСЯ ТАК, КАК НАПИСАНО)
+    // МАТЕМАТИЧЕСКИ ИДЕАЛЬНЫЙ СПИН (ОСТАНОВКА ТОЧНО В ЦЕНТРЕ НАГРАДЫ)
     function spinRoulette(winningItem, onComplete) {
         const itemWidth = 84; 
         const gap = 8; 
@@ -292,45 +412,57 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // --- Обработка выигрыша ---
-    function processWinning(winningGift, isMock = false, apiNewBalance = null) {
+    function processWinning(winningGift, apiNewBalance = null) {
         if (winningGift.type === "balance" || winningGift.name.toLowerCase().includes("пополнение")) {
-            showNotification(`🎉 Вы выиграли пополнение баланса на +${winningGift.price}!`, '💰');
+            showCustomModal({
+                icon: '💰',
+                title: 'Баланс пополнен!',
+                message: `🎉 Вы успешно выиграли пополнение счета на +${winningGift.price}!`,
+                buttons: [{ text: 'Отлично!', primary: true }]
+            });
             fetchUserData();
             elements.spinBtn.disabled = false;
         } else {
-            tg.showPopup({
-                title: '🎁 Поздравляем!',
-                message: `Вы выиграли подарок: "${winningGift.name}"!\n\nПродать этот подарок за ${winningGift.price} или оставить себе в инвентарь?`,
+            showCustomModal({
+                icon: `<img src="${winningGift.icon}" style="width:70px;height:70px;object-fit:contain;">`,
+                title: 'Вы выиграли подарок!',
+                message: `🎁 Ваша награда: "${winningGift.name}"!\n\nЖелаете мгновенно продать подарок за ${winningGift.price} или сохранить его в Инвентаре?`,
                 buttons: [
-                    { id: 'sell', type: 'default', text: `Продать за ${winningGift.price}` },
-                    { id: 'keep', type: 'ok', text: 'Оставить себе' }
-                ]
-            }, async (buttonId) => {
-                if (buttonId === 'sell') {
-                    try {
-                        const sellRes = await fetch(`${API_BASE_URL}/api/sell_gift`, {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'X-Telegram-Init-Data': tg.initData || ""
-                            },
-                            body: JSON.stringify({ itemId: winningGift.id, price: winningGift.rawPrice })
-                        });
-                        if (sellRes.ok) {
-                            const sellData = await sellRes.json();
-                            currentUser.balance = sellData.newBalance;
-                            showNotification(`💰 Вы успешно продали подарок за +${winningGift.price}!`, '💰');
+                    {
+                        text: `Продать за ${winningGift.price}`,
+                        primary: true,
+                        onClick: async () => {
+                            try {
+                                const sellRes = await fetch(`${API_BASE_URL}/api/sell_gift`, {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json',
+                                        'X-Telegram-Init-Data': tg.initData || ""
+                                    },
+                                    body: JSON.stringify({ itemId: winningGift.id, price: winningGift.rawPrice })
+                                });
+                                if (sellRes.ok) {
+                                    const sellData = await sellRes.json();
+                                    currentUser.balance = sellData.newBalance;
+                                    showNotification(`Подарок успешно продан за +${winningGift.price}!`, '💰');
+                                    fetchUserData();
+                                }
+                            } catch (e) {
+                                showNotification('Ошибка соединения при продаже.', '⚠️');
+                            }
+                        }
+                    },
+                    {
+                        text: 'Оставить себе в инвентарь',
+                        primary: false,
+                        onClick: () => {
+                            showNotification(`📦 Подарок "${winningGift.name}" бережно упакован в ваш Инвентарь!`, '🎒');
                             fetchUserData();
                         }
-                    } catch (e) {
-                        showNotification('Ошибка связи с сервером.', '⚠️');
                     }
-                } else {
-                    showNotification(`📦 Подарок "${winningGift.name}" успешно сохранен в вашем Инвентаре!`, '🎒');
-                    fetchUserData();
-                }
-                elements.spinBtn.disabled = false;
+                ]
             });
+            elements.spinBtn.disabled = false;
         }
     }
 
@@ -355,15 +487,40 @@ document.addEventListener('DOMContentLoaded', async () => {
                     }
 
                     spinRoulette(winningGift, () => {
-                        processWinning(winningGift, false, data.newBalance);
+                        processWinning(winningGift, data.newBalance);
                     });
 
                 } else {
-                    showNotification(data.error || 'Ошибка при открытии кейса.', '⚠️');
-                    elements.spinBtn.disabled = false;
+                    if (data.error && data.error.includes('подписчиком канала')) {
+                        const infoRes = await fetch(`${API_BASE_URL}/api/daily_case_info`, {
+                            headers: { 'X-Telegram-Init-Data': tg.initData || "" }
+                        });
+                        const infoData = await infoRes.json();
+                        const channelUrl = `https://t.me/${infoData.channel_username}`;
+
+                        showCustomModal({
+                            icon: '📢',
+                            title: 'Нужна подписка',
+                            message: 'Пожалуйста, подпишитесь на наш Telegram-канал, чтобы получить возможность открывать бесплатные ежедневные кейсы!',
+                            buttons: [
+                                {
+                                    text: 'Перейти на канал',
+                                    primary: true,
+                                    onClick: () => {
+                                        tg.openLink(channelUrl);
+                                        elements.spinBtn.disabled = false;
+                                    }
+                                }
+                            ],
+                            onClose: () => { elements.spinBtn.disabled = false; }
+                        });
+                    } else {
+                        showNotification(data.error || 'Ошибка при открытии кейса.', '⚠️');
+                        elements.spinBtn.disabled = false;
+                    }
                 }
             } catch (error) {
-                showNotification('Произошла ошибка соединения с базой данных.', '⚠️');
+                showNotification('Ошибка связи с базой данных.', '⚠️');
                 elements.spinBtn.disabled = false;
             }
         }, 50);
