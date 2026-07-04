@@ -4,13 +4,26 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>BestGifts</title>
-    <link rel="stylesheet" href="/css/style.css?v=4.0">
+    <link rel="stylesheet" href="/css/style.css?v=5.0">
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&display=swap" rel="stylesheet">
 </head>
 <body>
     <div id="app">
-        <!-- Контейнер для красивых кастомных уведомлений -->
+        <!-- Контейнер для кастомных уведомлений -->
         <div id="toast-container" class="toast-container"></div>
+
+        <!-- Контейнер для дизайнерских модальных окон (вместо alert/confirm) -->
+        <div id="custom-modal" class="modal-overlay hidden">
+            <div class="modal-card">
+                <button id="modal-close-btn" class="modal-close-x">&times;</button>
+                <div id="modal-icon" class="modal-icon-glow">🎁</div>
+                <h3 id="modal-title">Поздравляем!</h3>
+                <p id="modal-message">Вы выиграли подарок!</p>
+                <div id="modal-actions" class="modal-buttons-layout">
+                    <!-- Кнопки генерируются динамически -->
+                </div>
+            </div>
+        </div>
 
         <!-- ГЛАВНЫЙ ЭКРАН -->
         <section id="home-section">
@@ -125,7 +138,7 @@
 
             <main class="main-content">
                 <div class="inventory-hint">
-                    🎁 Выводите выигранные подарки прямо себе в Telegram или продавайте их за TON!
+                    🎁 Выводите подарки прямо в Telegram или продавайте их за реальные TON!
                 </div>
                 <div id="inventory-grid" class="rewards-grid">
                     <!-- Заполняется из JS -->
@@ -133,8 +146,20 @@
             </main>
         </section>
 
-        <!-- СТИЛЬНОЕ ПАРЯЩЕЕ GLASS-МЕНЮ -->
+        <!-- ПАРЯЩЕЕ GLASS-МЕНЮ (ИНВЕНТАРЬ СЛЕВА, МЕНЮ СПРАВА) -->
         <nav id="bottom-navigation" class="bottom-nav">
+            <div class="nav-tab" data-target="inventory">
+                <div class="nav-tab-icon-wrapper">
+                    <svg class="nav-tab-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+                        <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+                        <line x1="12" y1="22.08" x2="12" y2="12"/>
+                    </svg>
+                </div>
+                <span class="nav-text">Инвентарь</span>
+                <div class="active-indicator"></div>
+            </div>
+
             <div class="nav-tab active" data-target="home">
                 <div class="nav-tab-icon-wrapper">
                     <svg class="nav-tab-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -142,25 +167,13 @@
                         <polyline points="9 22 9 12 15 12 15 22"/>
                     </svg>
                 </div>
-                <span class="nav-text">Главная</span>
-                <div class="active-indicator"></div>
-            </div>
-            
-            <div class="nav-tab" data-target="inventory">
-                <div class="nav-tab-icon-wrapper">
-                    <svg class="nav-tab-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M16 16v1a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h11a2 2 0 0 1 2 2v1"/>
-                        <path d="M18 8h4a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-4"/>
-                        <line x1="16" y1="12" x2="24" y2="12"/>
-                    </svg>
-                </div>
-                <span class="nav-text">Инвентарь</span>
+                <span class="nav-text">Меню</span>
                 <div class="active-indicator"></div>
             </div>
         </nav>
     </div>
 
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <script src="/js/app.js?v=4.0"></script>
+    <script src="/js/app.js?v=5.0"></script>
 </body>
-                </html>
+    </html>
