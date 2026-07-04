@@ -4,7 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>BestGifts</title>
-    <link rel="stylesheet" href="/css/style.css">
+    <!-- Кэш-бастинг версии 2.1 для мгновенного обновления CSS -->
+    <link rel="stylesheet" href="/css/style.css?v=2.1">
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&display=swap" rel="stylesheet">
 </head>
 <body>
@@ -14,10 +15,12 @@
             <header class="header">
                 <div class="brand-title">🎁 BestGifts</div>
                 <div class="user-profile">
-                    <img id="user-avatar" class="user-avatar" src="" alt=" ">
+                    <img id="user-avatar" class="user-avatar" src="https://img.icons8.com/color/96/user.png" alt=" ">
                     <div class="user-info">
-                        <span id="user-username" class="user-username">...</span>
-                        <div class="balance-container"><span id="user-balance" class="balance-value">0.000 TON</span></div>
+                        <span id="user-username" class="user-username">Загрузка...</span>
+                        <div class="balance-container">
+                            <span id="user-balance" class="balance-value">0.000 TON</span>
+                        </div>
                     </div>
                 </div>
             </header>
@@ -27,7 +30,7 @@
                     <img src="https://img.icons8.com/color/144/treasure-chest.png" class="case-banner-img">
                     <div class="case-banner-info">
                         <h3>Ежедневный кейс</h3>
-                        <p id="home-case-status">Доступен!</p>
+                        <p id="home-case-status">Проверка доступности...</p>
                     </div>
                 </div>
             </main>
@@ -45,7 +48,9 @@
             <main class="main-content">
                 <div class="roulette-wrapper">
                     <div class="roulette-pointer pointer-top"></div>
-                    <div class="roulette-container"><div id="roulette-track" class="roulette-track"></div></div>
+                    <div class="roulette-container">
+                        <div id="roulette-track" class="roulette-track"></div>
+                    </div>
                 </div>
                 <button id="spin-case-button" class="action-button-gradient">Запустить</button>
                 <div id="timer-container" class="timer-card hidden">
@@ -59,20 +64,30 @@
 
         <!-- ЭКРАН ИНВЕНТАРЯ -->
         <section id="inventory-section" class="hidden">
-            <header class="header"><div class="brand-title">🎒 Инвентарь</div></header>
+            <header class="header">
+                <div class="brand-title">🎒 Мой Инвентарь</div>
+            </header>
             <main class="main-content">
                 <p class="inv-hint">Отправьте свои подарки в ТГ</p>
                 <div id="inventory-grid" class="rewards-grid"></div>
             </main>
         </section>
 
-        <!-- НИЖНЕЕ МЕНЮ -->
+        <!-- КРАСИВОЕ СОВРЕМЕННОЕ МЕНЮ (Через div-элементы) -->
         <nav class="bottom-nav">
-            <button class="nav-tab active" data-target="home">🏠<span>Меню</span></button>
-            <button class="nav-tab" data-target="inventory">🎒<span>Инвентарь</span></button>
+            <div class="nav-tab active" data-target="home">
+                <span class="nav-tab-icon">🏠</span>
+                <span>Меню</span>
+            </div>
+            <div class="nav-tab" data-target="inventory">
+                <span class="nav-tab-icon">🎒</span>
+                <span>Инвентарь</span>
+            </div>
         </nav>
     </div>
+    
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <script src="/js/app.js"></script>
+    <!-- Кэш-бастинг версии 2.1 для мгновенного обновления JS -->
+    <script src="/js/app.js?v=2.1"></script>
 </body>
 </html>
