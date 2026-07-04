@@ -233,36 +233,43 @@ app.post('/api/sell_gift', async (req, res) => {
     }
 });
 
-// 5. Вывод подарка в Телеграм (с уведомлением админу)
+// 5. Вывод подарка в Телеграм (сверхнадежный асинхронный способ)
 app.post('/api/withdraw_gift', async (req, res) => {
     if (!req.telegramUser || !req.telegramUser.id) return res.status(401).json({ error: 'Unauthorized' });
     const userId = req.telegramUser.id;
     const { itemId } = req.body;
 
+    const parsedItemId = parseInt(itemId, 10);
+    if (isNaN(parsedItemId)) {
+        return res.status(400).json({ error: 'Неверный ID подарка.' });
+    }
+
     const client = await db.pool.connect();
     try {
         await client.query('BEGIN');
-        const inventoryRes = await client.query('SELECT quantity FROM user_inventory WHERE user_id = $1 AND item_id = $2 FOR UPDATE', [userId, itemId]);
+        const inventoryRes = await client.query('SELECT quantity FROM user_inventory WHERE user_id = $1 AND item_id = $2 FOR UPDATE', [userId, parsedItemId]);
         const itemRow = inventoryRes.rows[0];
 
         if (!itemRow || itemRow.quantity < 1) {
             await client.query('ROLLBACK');
-            return res.status(400).json({ error: 'У вас нет этого предмета в инвентаре.' });
+            return res.status(400).json({ error: 'Недостаточно предметов в вашем инвентаре.' });
         }
 
-        // Списываем предмет
-        await client.query('UPDATE user_inventory SET quantity = quantity - 1 WHERE user_id = $1 AND item_id = $2', [userId, itemId]);
+        // Списываем подарок из инвентаря в БД
+        await client.query('UPDATE user_inventory SET quantity = quantity - 1 WHERE user_id = $1 AND item_id = $2', [userId, parsedItemId]);
         
-        // Получаем информацию о подарке
-        const itemDetails = (await client.query('SELECT name, value FROM items WHERE id = $1', [itemId])).rows[0];
+        // Получаем характеристики подарка
+        const itemDetails = (await client.query('SELECT name, value FROM items WHERE id = $1', [parsedItemId])).rows[0];
 
-        // Получаем информацию о пользователе
+        // Получаем никнейм и имя юзера
         const userRes = await client.query('SELECT username, first_name, last_name FROM users WHERE id = $1', [userId]);
         const user = userRes.rows[0];
 
+        // Коммитим транзакцию ДО отправки в Telegram (чтобы сеть не вешала запрос)
         await client.query('COMMIT');
+        client.release();
 
-        // Отправка уведомления админу в Телеграм
+        // Асинхронно уведомляем вас (админа)
         const adminId = process.env.ADMIN_TELEGRAM_ID;
         if (adminId) {
             const userMention = user.username ? `@${user.username}` : `${user.first_name || 'Без имени'}`;
@@ -276,20 +283,24 @@ app.post('/api/withdraw_gift', async (req, res) => {
                             `💬 [Открыть чат с пользователем](${chatLink})\n` +
                             `🔗 [Прямая ссылка t.me](${tmeLink})`;
 
-            // Отправляем админу через bot
-            await bot.sendMessage(adminId, message, { parse_mode: 'Markdown' }).catch(err => {
-                console.error("Не удалось отправить сообщение админу:", err);
+            bot.sendMessage(adminId, message, { parse_mode: 'Markdown' }).catch(err => {
+                console.error("Телеграм-бот не смог доставить сообщение админу:", err);
             });
         }
 
         res.json({ success: true });
+
     } catch (error) {
         await client.query('ROLLBACK');
-        console.error('Ошибка вывода:', error);
-        res.status(500).json({ error: 'Ошибка при выводе предмета.' });
-    } finally {
         client.release();
+        console.error('Ошибка в процессе вывода:', error);
+        res.status(500).json({ error: 'Ошибка сервера при выводе.' });
     }
+});
+
+// Получение информации о канале
+app.get('/api/daily_case_info', (req, res) => {
+    res.json({ channel_username: CHANNEL_USERNAME });
 });
 
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
