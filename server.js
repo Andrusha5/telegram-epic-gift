@@ -96,13 +96,26 @@ app.get('/api/user', async (req, res) => {
     }
 });
 
-// 2. Информация о содержимом кейса
-app.get('/api/daily_case_info', async (req, res) => {
-    if (!req.telegramUser) return res.status(401).json({ error: 'Unauthorized' });
-    res.json({ channel_username: CHANNEL_USERNAME });
+// 2. Получение инвентаря пользователя
+app.get('/api/inventory', async (req, res) => {
+    if (!req.telegramUser || !req.telegramUser.id) {
+        return res.status(401).json({ error: 'Unauthorized' });
+    }
+    try {
+        const inventory = (await db.query(`
+            SELECT ui.item_id, ui.quantity, i.name, i.image_url, i.value, i.type
+            FROM user_inventory ui
+            JOIN items i ON ui.item_id = i.id
+            WHERE ui.user_id = $1 AND ui.quantity > 0
+            ORDER BY i.value DESC
+        `, [req.telegramUser.id])).rows;
+        res.json(inventory);
+    } catch (error) {
+        res.status(500).json({ error: 'Internal server error' });
+    }
 });
 
-// 3. Открытие ежедневного кейса (с обходом таймера для Админа)
+// 3. Открытие кейса (с обходом таймера для Админа)
 app.post('/api/open_daily_case', async (req, res) => {
     if (!req.telegramUser || !req.telegramUser.id) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -132,7 +145,6 @@ app.post('/api/open_daily_case', async (req, res) => {
             const timeElapsed = now.getTime() - lastOpen.getTime();
             const cooldown = 24 * 60 * 60 * 1000;
 
-            // ЕСЛИ АДМИНИСТРАТОР — ТАЙМЕР ИГНОРИРУЕТСЯ
             if (!user.is_admin && timeElapsed < cooldown) {
                 await client.query('ROLLBACK');
                 const timeLeftMs = cooldown - timeElapsed;
@@ -144,11 +156,6 @@ app.post('/api/open_daily_case', async (req, res) => {
                 FROM daily_case_drops dcd
                 JOIN items i ON dcd.item_id = i.id
             `)).rows;
-
-            if (drops.length === 0) {
-                await client.query('ROLLBACK');
-                return res.status(500).json({ error: 'Призы не настроены.' });
-            }
 
             let totalChance = drops.reduce((sum, drop) => sum + parseFloat(drop.chance), 0);
             let rand = Math.random() * totalChance;
