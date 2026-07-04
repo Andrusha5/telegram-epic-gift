@@ -13,7 +13,7 @@ const CHANNEL_USERNAME = process.env.CHANNEL_USERNAME;
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Middleware безопасности (Криптографическая проверка Telegram InitData)
+// Middleware безопасности
 app.use(async (req, res, next) => {
     const initData = req.headers['x-telegram-init-data'] || req.query.initData;
 
@@ -39,7 +39,7 @@ app.use(async (req, res, next) => {
 
         if (calculatedHash !== hash) {
             req.telegramUser = null;
-            return res.status(401).json({ error: 'Unauthorized: Invalid Telegram InitData.' });
+            return res.status(401).json({ error: 'Unauthorized' });
         }
 
         const userJson = params.get('user');
@@ -61,7 +61,7 @@ app.use(async (req, res, next) => {
         }
     } catch (e) {
         req.telegramUser = null;
-        return res.status(401).json({ error: 'Unauthorized: Failed to process Telegram InitData.' });
+        return res.status(401).json({ error: 'Unauthorized' });
     }
     next();
 });
@@ -96,7 +96,7 @@ app.get('/api/user', async (req, res) => {
     }
 });
 
-// 2. Получение инвентаря пользователя
+// 2. Получение инвентаря
 app.get('/api/inventory', async (req, res) => {
     if (!req.telegramUser || !req.telegramUser.id) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -115,7 +115,7 @@ app.get('/api/inventory', async (req, res) => {
     }
 });
 
-// 3. Открытие кейса (с обходом таймера для Админа)
+// 3. Открытие ежедневного кейса
 app.post('/api/open_daily_case', async (req, res) => {
     if (!req.telegramUser || !req.telegramUser.id) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -228,6 +228,65 @@ app.post('/api/sell_gift', async (req, res) => {
     } catch (error) {
         await client.query('ROLLBACK');
         res.status(500).json({ error: 'Ошибка при продаже.' });
+    } finally {
+        client.release();
+    }
+});
+
+// 5. Вывод подарка в Телеграм (с уведомлением админу)
+app.post('/api/withdraw_gift', async (req, res) => {
+    if (!req.telegramUser || !req.telegramUser.id) return res.status(401).json({ error: 'Unauthorized' });
+    const userId = req.telegramUser.id;
+    const { itemId } = req.body;
+
+    const client = await db.pool.connect();
+    try {
+        await client.query('BEGIN');
+        const inventoryRes = await client.query('SELECT quantity FROM user_inventory WHERE user_id = $1 AND item_id = $2 FOR UPDATE', [userId, itemId]);
+        const itemRow = inventoryRes.rows[0];
+
+        if (!itemRow || itemRow.quantity < 1) {
+            await client.query('ROLLBACK');
+            return res.status(400).json({ error: 'У вас нет этого предмета в инвентаре.' });
+        }
+
+        // Списываем предмет
+        await client.query('UPDATE user_inventory SET quantity = quantity - 1 WHERE user_id = $1 AND item_id = $2', [userId, itemId]);
+        
+        // Получаем информацию о подарке
+        const itemDetails = (await client.query('SELECT name, value FROM items WHERE id = $1', [itemId])).rows[0];
+
+        // Получаем информацию о пользователе
+        const userRes = await client.query('SELECT username, first_name, last_name FROM users WHERE id = $1', [userId]);
+        const user = userRes.rows[0];
+
+        await client.query('COMMIT');
+
+        // Отправка уведомления админу в Телеграм
+        const adminId = process.env.ADMIN_TELEGRAM_ID;
+        if (adminId) {
+            const userMention = user.username ? `@${user.username}` : `${user.first_name || 'Без имени'}`;
+            const chatLink = `tg://user?id=${userId}`;
+            const tmeLink = user.username ? `https://t.me/${user.username}` : `https://t.me/user?id=${userId}`;
+
+            const message = `🚨 *Новая заявка на вывод подарка!*\n\n` +
+                            `🎁 *Подарок:* ${itemDetails.name} (${itemDetails.value} TON)\n` +
+                            `👤 *Пользователь:* ${user.first_name || ''} ${user.last_name || ''} (${userMention})\n` +
+                            `🆔 *Telegram ID:* `${userId}`\n\n` +
+                            `💬 [Открыть чат с пользователем](${chatLink})\n` +
+                            `🔗 [Прямая ссылка t.me](${tmeLink})`;
+
+            // Отправляем админу через bot
+            await bot.sendMessage(adminId, message, { parse_mode: 'Markdown' }).catch(err => {
+                console.error("Не удалось отправить сообщение админу:", err);
+            });
+        }
+
+        res.json({ success: true });
+    } catch (error) {
+        await client.query('ROLLBACK');
+        console.error('Ошибка вывода:', error);
+        res.status(500).json({ error: 'Ошибка при выводе предмета.' });
     } finally {
         client.release();
     }
