@@ -3,17 +3,34 @@ const path = require('path');
 const crypto = require('crypto');
 require('dotenv').config();
 
+// Глобальные перехватчики ошибок, чтобы Render никогда не падал при старте
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('⚠️ [Safe Engine] Unhandled Rejection:', reason);
+});
+process.on('uncaughtException', (err) => {
+    console.error('⚠️ [Safe Engine] Uncaught Exception:', err);
+});
+
 const db = require('./db');
-const { bot, checkUserSubscription, getUserAvatarUrl } = require('./bot');
+const botModule = require('./bot');
+
+// Безопасный импорт бота и его функций
+const bot = botModule.bot || botModule;
+const checkUserSubscription = botModule.checkUserSubscription || (async () => true);
+const getUserAvatarUrl = botModule.getUserAvatarUrl || (async () => null);
+
+// Автоматическое определение структуры экспорта пула БД (db или db.pool)
+const pool = db.pool || db;
+const query = (text, params) => pool.query(text, params);
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const CHANNEL_USERNAME = process.env.CHANNEL_USERNAME;
+const CHANNEL_USERNAME = process.env.CHANNEL_USERNAME || "";
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Middleware безопасности
+// Middleware безопасности Telegram
 app.use(async (req, res, next) => {
     const initData = req.headers['x-telegram-init-data'] || req.query.initData;
 
@@ -47,14 +64,18 @@ app.use(async (req, res, next) => {
             req.telegramUser = JSON.parse(userJson);
             if (req.telegramUser.id) {
                 let avatarUrl = req.telegramUser.photo_url || null;
-                if (!avatarUrl) {
-                    avatarUrl = await getUserAvatarUrl(req.telegramUser.id);
+                try {
+                    if (!avatarUrl) {
+                        avatarUrl = await getUserAvatarUrl(req.telegramUser.id);
+                    }
+                    const isAdminUser = req.telegramUser.id.toString() === process.env.ADMIN_TELEGRAM_ID;
+                    await query(
+                        'UPDATE users SET avatar_url = $1, username = $2, first_name = $3, last_name = $4, is_admin = $5 WHERE id = $6',
+                        [avatarUrl, req.telegramUser.username, req.telegramUser.first_name, req.telegramUser.last_name, isAdminUser, req.telegramUser.id]
+                    );
+                } catch (dbErr) {
+                    console.error("Ошибка обновления пользователя в БД:", dbErr);
                 }
-                const isAdminUser = req.telegramUser.id.toString() === process.env.ADMIN_TELEGRAM_ID;
-                await db.query(
-                    'UPDATE users SET avatar_url = $1, username = $2, first_name = $3, last_name = $4, is_admin = $5 WHERE id = $6',
-                    [avatarUrl, req.telegramUser.username, req.telegramUser.first_name, req.telegramUser.last_name, isAdminUser, req.telegramUser.id]
-                );
             }
         } else {
             req.telegramUser = null;
@@ -72,9 +93,11 @@ app.get('/api/user', async (req, res) => {
         return res.status(401).json({ error: 'Unauthorized' });
     }
     try {
-        let user = (await db.query('SELECT id, username, first_name, balance, avatar_url, last_daily_case_open, is_admin FROM users WHERE id = $1', [req.telegramUser.id])).rows[0];
+        let userRes = await query('SELECT id, username, first_name, balance, avatar_url, last_daily_case_open, is_admin FROM users WHERE id = $1', [req.telegramUser.id]);
+        let user = userRes.rows[0];
+        
         if (!user) {
-            const avatarUrl = req.telegramUser.photo_url || (await getUserAvatarUrl(req.telegramUser.id)) || null;
+            const avatarUrl = req.telegramUser.photo_url || null;
             const isAdminUser = req.telegramUser.id.toString() === process.env.ADMIN_TELEGRAM_ID;
             user = {
                 id: req.telegramUser.id,
@@ -85,13 +108,14 @@ app.get('/api/user', async (req, res) => {
                 last_daily_case_open: new Date('2000-01-01'),
                 is_admin: isAdminUser
             };
-            await db.query(
+            await query(
                 'INSERT INTO users (id, username, first_name, last_name, avatar_url, is_admin) VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (id) DO NOTHING',
                 [user.id, user.username, req.telegramUser.first_name, req.telegramUser.last_name, user.avatar_url, user.is_admin]
             );
         }
         res.json(user);
     } catch (error) {
+        console.error("Ошибка в /api/user:", error);
         res.status(500).json({ error: 'Internal server error' });
     }
 });
@@ -102,7 +126,7 @@ app.get('/api/inventory', async (req, res) => {
         return res.status(401).json({ error: 'Unauthorized' });
     }
     try {
-        const inventory = (await db.query(`
+        const inventory = (await query(`
             SELECT ui.item_id, ui.quantity, i.name, i.image_url, i.value, i.type
             FROM user_inventory ui
             JOIN items i ON ui.item_id = i.id
@@ -111,6 +135,7 @@ app.get('/api/inventory', async (req, res) => {
         `, [req.telegramUser.id])).rows;
         res.json(inventory);
     } catch (error) {
+        console.error("Ошибка в /api/inventory:", error);
         res.status(500).json({ error: 'Internal server error' });
     }
 });
@@ -128,7 +153,7 @@ app.post('/api/open_daily_case', async (req, res) => {
             return res.status(403).json({ error: `Для открытия кейса необходимо быть подписчиком канала @${CHANNEL_USERNAME}.` });
         }
 
-        const client = await db.pool.connect();
+        const client = await pool.connect();
         try {
             await client.query('BEGIN');
 
@@ -137,6 +162,7 @@ app.post('/api/open_daily_case', async (req, res) => {
 
             if (!user) {
                 await client.query('ROLLBACK');
+                client.release();
                 return res.status(404).json({ error: 'Пользователь не найден.' });
             }
 
@@ -147,6 +173,7 @@ app.post('/api/open_daily_case', async (req, res) => {
 
             if (!user.is_admin && timeElapsed < cooldown) {
                 await client.query('ROLLBACK');
+                client.release();
                 const timeLeftMs = cooldown - timeElapsed;
                 return res.status(400).json({ error: `Кейс будет доступен позже.`, timeLeftMs });
             }
@@ -186,16 +213,18 @@ app.post('/api/open_daily_case', async (req, res) => {
 
             await client.query('UPDATE users SET last_daily_case_open = NOW() WHERE id = $1', [userId]);
             await client.query('COMMIT');
+            client.release();
 
             res.json({ success: true, wonItem: { id: wonItem.item_id, name: wonItem.name, price: `${wonItem.value} TON` }, newBalance: newBalance });
 
         } catch (error) {
             await client.query('ROLLBACK');
-            res.status(500).json({ error: 'Произошла ошибка при открытии.' });
-        } finally {
             client.release();
+            console.error("Ошибка транзакции кейса:", error);
+            res.status(500).json({ error: 'Произошла ошибка при открытии.' });
         }
     } catch (error) {
+        console.error("Глобальная ошибка /api/open_daily_case:", error);
         res.status(500).json({ error: 'Internal server error.' });
     }
 });
@@ -206,7 +235,7 @@ app.post('/api/sell_gift', async (req, res) => {
     const userId = req.telegramUser.id;
     const { itemId, price } = req.body;
 
-    const client = await db.pool.connect();
+    const client = await pool.connect();
     try {
         await client.query('BEGIN');
         const inventoryRes = await client.query('SELECT quantity FROM user_inventory WHERE user_id = $1 AND item_id = $2 FOR UPDATE', [userId, itemId]);
@@ -214,6 +243,7 @@ app.post('/api/sell_gift', async (req, res) => {
 
         if (!item || item.quantity < 1) {
             await client.query('ROLLBACK');
+            client.release();
             return res.status(400).json({ error: 'У вас нет этого предмета.' });
         }
 
@@ -223,17 +253,18 @@ app.post('/api/sell_gift', async (req, res) => {
 
         await client.query('UPDATE users SET balance = $1 WHERE id = $2', [newBalance, userId]);
         await client.query('COMMIT');
+        client.release();
 
         res.json({ success: true, newBalance: newBalance });
     } catch (error) {
         await client.query('ROLLBACK');
-        res.status(500).json({ error: 'Ошибка при продаже.' });
-    } finally {
         client.release();
+        console.error("Ошибка в /api/sell_gift:", error);
+        res.status(500).json({ error: 'Ошибка при продаже.' });
     }
 });
 
-// 5. Вывод подарка в Телеграм (сверхнадежный асинхронный способ)
+// 5. Вывод подарка (Абсолютно безопасный)
 app.post('/api/withdraw_gift', async (req, res) => {
     if (!req.telegramUser || !req.telegramUser.id) return res.status(401).json({ error: 'Unauthorized' });
     const userId = req.telegramUser.id;
@@ -244,7 +275,7 @@ app.post('/api/withdraw_gift', async (req, res) => {
         return res.status(400).json({ error: 'Неверный ID подарка.' });
     }
 
-    const client = await db.pool.connect();
+    const client = await pool.connect();
     try {
         await client.query('BEGIN');
         const inventoryRes = await client.query('SELECT quantity FROM user_inventory WHERE user_id = $1 AND item_id = $2 FOR UPDATE', [userId, parsedItemId]);
@@ -252,26 +283,22 @@ app.post('/api/withdraw_gift', async (req, res) => {
 
         if (!itemRow || itemRow.quantity < 1) {
             await client.query('ROLLBACK');
+            client.release();
             return res.status(400).json({ error: 'Недостаточно предметов в вашем инвентаре.' });
         }
 
-        // Списываем подарок из инвентаря в БД
         await client.query('UPDATE user_inventory SET quantity = quantity - 1 WHERE user_id = $1 AND item_id = $2', [userId, parsedItemId]);
         
-        // Получаем характеристики подарка
         const itemDetails = (await client.query('SELECT name, value FROM items WHERE id = $1', [parsedItemId])).rows[0];
-
-        // Получаем никнейм и имя юзера
         const userRes = await client.query('SELECT username, first_name, last_name FROM users WHERE id = $1', [userId]);
         const user = userRes.rows[0];
 
-        // Коммитим транзакцию ДО отправки в Telegram (чтобы сеть не вешала запрос)
         await client.query('COMMIT');
         client.release();
 
-        // Асинхронно уведомляем вас (админа)
+        // Асинхронная отправка уведомления админу (не блокирует поток)
         const adminId = process.env.ADMIN_TELEGRAM_ID;
-        if (adminId) {
+        if (adminId && bot && typeof bot.sendMessage === 'function') {
             const userMention = user.username ? `@${user.username}` : `${user.first_name || 'Без имени'}`;
             const chatLink = `tg://user?id=${userId}`;
             const tmeLink = user.username ? `https://t.me/${user.username}` : `https://t.me/user?id=${userId}`;
@@ -280,11 +307,11 @@ app.post('/api/withdraw_gift', async (req, res) => {
                             `🎁 *Подарок:* ${itemDetails.name} (${itemDetails.value} TON)\n` +
                             `👤 *Пользователь:* ${user.first_name || ''} ${user.last_name || ''} (${userMention})\n` +
                             `🆔 *Telegram ID:* `${userId}`\n\n` +
-                            `💬 [Открыть чат с пользователем](${chatLink})\n` +
-                            `🔗 [Прямая ссылка t.me](${tmeLink})`;
+                            `💬 [Открыть чат](${chatLink})\n` +
+                            `🔗 [Ссылка t.me](${tmeLink})`;
 
             bot.sendMessage(adminId, message, { parse_mode: 'Markdown' }).catch(err => {
-                console.error("Телеграм-бот не смог доставить сообщение админу:", err);
+                console.error("Бот не смог отправить сообщение админу:", err.message);
             });
         }
 
@@ -292,15 +319,15 @@ app.post('/api/withdraw_gift', async (req, res) => {
 
     } catch (error) {
         await client.query('ROLLBACK');
-        client.release();
-        console.error('Ошибка в процессе вывода:', error);
+        if (client) client.release();
+        console.error('Ошибка вывода предмета:', error);
         res.status(500).json({ error: 'Ошибка сервера при выводе.' });
     }
 });
 
-// Получение информации о канале
+// 6. Получение информации о канале
 app.get('/api/daily_case_info', (req, res) => {
     res.json({ channel_username: CHANNEL_USERNAME });
 });
 
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+app.listen(PORT, () => console.log(`🚀 Safe Server running on port ${PORT}`));
