@@ -4,11 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>BestGifts</title>
-    <link rel="stylesheet" href="/css/style.css?v=3.0">
+    <link rel="stylesheet" href="/css/style.css?v=4.0">
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&display=swap" rel="stylesheet">
 </head>
 <body>
     <div id="app">
+        <!-- Контейнер для красивых кастомных уведомлений -->
+        <div id="toast-container" class="toast-container"></div>
+
         <!-- ГЛАВНЫЙ ЭКРАН -->
         <section id="home-section">
             <header class="header">
@@ -38,7 +41,7 @@
                     <img src="https://img.icons8.com/color/144/treasure-chest.png" alt="Case" class="case-banner-img">
                     <div class="case-banner-info">
                         <h3>Ежедневный кейс</h3>
-                        <p id="home-case-status">Доступен для открытия!</p>
+                        <p id="home-case-status">Загрузка...</p>
                     </div>
                     <div class="case-banner-arrow">→</div>
                 </div>
@@ -58,7 +61,7 @@
             <div class="user-bar-sub">
                 <div class="user-bar-left">
                     <img id="case-user-avatar" class="user-avatar-small" src="https://img.icons8.com/color/96/user.png" alt="Avatar">
-                    <span class="balance-sub-label">Ваш баланс:</span>
+                    <span class="balance-sub-label">Баланс:</span>
                     <span id="case-user-balance" class="balance-sub-value">0.000 TON</span>
                 </div>
             </div>
@@ -122,15 +125,15 @@
 
             <main class="main-content">
                 <div class="inventory-hint">
-                    🎁 Оставляйте подарки себе, чтобы собирать коллекцию и отправлять их друзьям!
+                    🎁 Выводите выигранные подарки прямо себе в Telegram или продавайте их за TON!
                 </div>
                 <div id="inventory-grid" class="rewards-grid">
-                    <!-- Заполняется динамически -->
+                    <!-- Заполняется из JS -->
                 </div>
             </main>
         </section>
 
-        <!-- ДИЗАЙНЕРСКОЕ НЕОНОВОЕ ПАРЯЩЕЕ МЕНЮ -->
+        <!-- СТИЛЬНОЕ ПАРЯЩЕЕ GLASS-МЕНЮ -->
         <nav id="bottom-navigation" class="bottom-nav">
             <div class="nav-tab active" data-target="home">
                 <div class="nav-tab-icon-wrapper">
@@ -158,6 +161,6 @@
     </div>
 
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <script src="/js/app.js?v=3.0"></script>
+    <script src="/js/app.js?v=4.0"></script>
 </body>
-                    </html>
+                </html>
