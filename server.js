@@ -93,7 +93,7 @@ app.get('/api/user', async (req, res) => {
         return res.status(401).json({ error: 'Unauthorized' });
     }
     try {
-        let userRes = await query('SELECT id, username, first_name, balance, avatar_url, last_daily_case_open, is_admin FROM users WHERE id = $1', [req.telegramUser.id]);
+        let userRes = await query('SELECT id, username, first_name, balance, avatar_url, last_daily_case_open, last_starter_case_open, is_admin FROM users WHERE id = $1', [req.telegramUser.id]);
         let user = userRes.rows[0];
         
         if (!user) {
@@ -106,6 +106,7 @@ app.get('/api/user', async (req, res) => {
                 balance: 0.000,
                 avatar_url: avatarUrl,
                 last_daily_case_open: new Date('2000-01-01'),
+                last_starter_case_open: new Date('2000-01-01'), // Добавлено для нового кейса
                 is_admin: isAdminUser
             };
             await query(
@@ -134,6 +135,7 @@ app.get('/api/inventory', async (req, res) => {
             ORDER BY i.value DESC
         `, [req.telegramUser.id])).rows;
 
+        // Разворачиваем сгруппированные подарки в плоский список
         const inventoryFlat = [];
         for (const row of inventoryRows) {
             for (let i = 0; i < row.quantity; i++) {
@@ -143,7 +145,7 @@ app.get('/api/inventory', async (req, res) => {
                     image_url: row.image_url,
                     value: row.value,
                     type: row.type,
-                    quantity: 1
+                    // quantity: 1 не добавляем, т.к. каждый предмет теперь отдельный
                 });
             }
         }
@@ -154,12 +156,17 @@ app.get('/api/inventory', async (req, res) => {
     }
 });
 
-// 3. Открытие ежедневного кейса
-app.post('/api/open_daily_case', async (req, res) => {
+// 3. Открытие кейса (обновлено для поддержки разных типов кейсов)
+app.post('/api/open_case', async (req, res) => {
     if (!req.telegramUser || !req.telegramUser.id) {
         return res.status(401).json({ error: 'Unauthorized' });
     }
     const userId = req.telegramUser.id;
+    const { caseType } = req.body; // 'daily_case' или 'starter_case'
+
+    if (!['daily_case', 'starter_case'].includes(caseType)) {
+        return res.status(400).json({ error: 'Неверный тип кейса.' });
+    }
 
     try {
         const isSubscribed = await checkUserSubscription(userId);
@@ -171,7 +178,7 @@ app.post('/api/open_daily_case', async (req, res) => {
         try {
             await client.query('BEGIN');
 
-            const userRes = await client.query('SELECT balance, last_daily_case_open, is_admin FROM users WHERE id = $1 FOR UPDATE', [userId]);
+            const userRes = await client.query('SELECT balance, last_daily_case_open, last_starter_case_open, is_admin FROM users WHERE id = $1 FOR UPDATE', [userId]);
             const user = userRes.rows[0];
 
             if (!user) {
@@ -181,22 +188,51 @@ app.post('/api/open_daily_case', async (req, res) => {
             }
 
             const now = new Date();
-            const lastOpen = new Date(user.last_daily_case_open);
-            const timeElapsed = now.getTime() - lastOpen.getTime();
-            const cooldown = 24 * 60 * 60 * 1000;
+            let lastOpenField, lastOpenTime, caseCost = 0;
 
-            if (!user.is_admin && timeElapsed < cooldown) {
+            if (caseType === 'daily_case') {
+                lastOpenField = 'last_daily_case_open';
+                lastOpenTime = new Date(user.last_daily_case_open);
+                caseCost = 0; // Бесплатно
+            } else if (caseType === 'starter_case') {
+                lastOpenField = 'last_starter_case_open';
+                lastOpenTime = new Date(user.last_starter_case_open);
+                caseCost = 0.1; // 0.1 TON
+            }
+
+            const cooldown = 24 * 60 * 60 * 1000;
+            const timeElapsed = now.getTime() - lastOpenTime.getTime();
+
+            // Проверка кулдауна
+            if (!user.is_admin && caseType === 'daily_case' && timeElapsed < cooldown) { // Только для ежедневного кейса
                 await client.query('ROLLBACK');
                 client.release();
                 const timeLeftMs = cooldown - timeElapsed;
                 return res.status(400).json({ error: 'Кейс будет доступен позже.', timeLeftMs });
             }
+            
+            // Проверка баланса для платных кейсов
+            if (caseCost > 0 && parseFloat(user.balance) < caseCost) {
+                await client.query('ROLLBACK');
+                client.release();
+                return res.status(400).json({ error: 'Недостаточно TON для открытия этого кейса.' });
+            }
 
-            const drops = (await client.query(`
-                SELECT dcd.item_id, dcd.chance, i.name, i.type, i.value, i.image_url
-                FROM daily_case_drops dcd
-                JOIN items i ON dcd.item_id = i.id
-            `)).rows;
+            // Списание стоимости кейса
+            let newBalance = parseFloat(user.balance);
+            if (caseCost > 0) {
+                newBalance -= caseCost;
+                await client.query('UPDATE users SET balance = $1 WHERE id = $2', [newBalance, userId]);
+                await client.query('INSERT INTO transactions (user_id, type, item_id, amount, details) VALUES ($1, $2, $3, $4, $5)',
+                    [userId, 'case_open_cost', null, -caseCost, 'Открытие кейса: ' + caseType]);
+            }
+
+            // Выбор предмета из пула
+            const dropsQuery = (caseType === 'daily_case') ? 
+                `SELECT dcd.item_id, dcd.chance, i.name, i.type, i.value, i.image_url FROM daily_case_drops dcd JOIN items i ON dcd.item_id = i.id` :
+                `SELECT scd.item_id, scd.chance, i.name, i.type, i.value, i.image_url FROM starter_case_drops scd JOIN items i ON scd.item_id = i.id`;
+            
+            const drops = (await client.query(dropsQuery)).rows;
 
             let totalChance = drops.reduce((sum, drop) => sum + parseFloat(drop.chance), 0);
             let rand = Math.random() * totalChance;
@@ -209,15 +245,14 @@ app.post('/api/open_daily_case', async (req, res) => {
                     break;
                 }
             }
+            if (!wonItem) wonItem = drops[drops.length - 1]; // Fallback на последний предмет
 
-            if (!wonItem) wonItem = drops[drops.length - 1];
-
-            let newBalance = parseFloat(user.balance);
+            // Начисление выигрыша
             if (wonItem.type === 'balance') {
                 newBalance += parseFloat(wonItem.value);
                 await client.query('UPDATE users SET balance = $1 WHERE id = $2', [newBalance, userId]);
                 await client.query('INSERT INTO transactions (user_id, type, item_id, amount, details) VALUES ($1, $2, $3, $4, $5)',
-                    [userId, 'case_open', wonItem.item_id, wonItem.value, 'Выигрыш из ежедневного кейса: ' + wonItem.name]);
+                    [userId, 'case_win_balance', wonItem.item_id, wonItem.value, 'Выигрыш из ' + caseType + ': ' + wonItem.name]);
             } else {
                 await client.query(
                     'INSERT INTO user_inventory (user_id, item_id, quantity) VALUES ($1, $2, 1) ON CONFLICT (user_id, item_id) DO UPDATE SET quantity = user_inventory.quantity + 1',
@@ -225,7 +260,7 @@ app.post('/api/open_daily_case', async (req, res) => {
                 );
             }
 
-            await client.query('UPDATE users SET last_daily_case_open = NOW() WHERE id = $1', [userId]);
+            await client.query('UPDATE users SET ' + lastOpenField + ' = NOW() WHERE id = $1', [userId]);
             await client.query('COMMIT');
             client.release();
 
@@ -238,7 +273,7 @@ app.post('/api/open_daily_case', async (req, res) => {
             res.status(500).json({ error: 'Произошла ошибка при открытии.' });
         }
     } catch (error) {
-        console.error("Глобальная ошибка /api/open_daily_case:", error);
+        console.error("Глобальная ошибка /api/open_case:", error);
         res.status(500).json({ error: 'Internal server error.' });
     }
 });
@@ -317,7 +352,6 @@ app.post('/api/withdraw_gift', async (req, res) => {
             const chatLink = 'tg://user?id=' + userId;
             const tmeLink = user.username ? 'https://t.me/' + user.username : 'https://t.me/user?id=' + userId;
 
-            // Сборка сообщения через безопасное сложение строк
             const message = "🚨 *Новая заявка на вывод подарка!*\n\n" +
                             "🎁 *Подарок:* " + itemDetails.name + " (" + itemDetails.value + " TON)\n" +
                             "👤 *Пользователь:* " + (user.first_name || "") + " " + (user.last_name || "") + " (" + userMention + ")\n" +
@@ -366,11 +400,10 @@ app.post('/api/deposit_gift_request', async (req, res) => {
             const chatLink = 'tg://user?id=' + userId;
             const tmeLink = user.username ? 'https://t.me/' + user.username : 'https://t.me/user?id=' + userId;
 
-            // Сборка сообщения без использования обратных апострофов
             const message = "📥 *Новая заявка на ВВОД подарка NFT!*\n\n" +
                             "🎁 *Подарок:* " + itemDetails.name + " (" + itemDetails.value + " TON)\n" +
                             "👤 *Отправитель:* " + (user.first_name || "") + " " + (user.last_name || "") + " (" + userMention + ")\n" +
-                            "🆔 *Telegram ID:* `" + userId + "`\n\n" +
+                            "🆔 *Telegram ID:* " + userId + "\n\n" +
                             "💬 [Открыть чат с пользователем](" + chatLink + ")\n" +
                             "🔗 [Прямая ссылка t.me](" + tmeLink + ")\n\n" +
                             "_Проверьте получение подарка на вашем аккаунте @Sintopa и нажмите кнопку ниже:_";
@@ -406,7 +439,7 @@ if (bot && typeof bot.on === 'function') {
         const msg = callbackQuery.message;
         
         if (action.startsWith('dep_app_') || action.startsWith('dep_rej_')) {
-            const parts = action.split('_'); // ['dep', 'app/rej', userId, itemId]
+            const parts = action.split('_'); 
             const isApprove = parts[1] === 'app';
             const targetUserId = parseInt(parts[2], 10);
             const itemId = parseInt(parts[3], 10);
