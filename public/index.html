@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>BestGifts</title>
-    <link rel="stylesheet" href="/css/style.css?v=6.0">
+    <link rel="stylesheet" href="/css/style.css?v=7.0">
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&display=swap" rel="stylesheet">
 </head>
 <body>
@@ -45,71 +45,123 @@
                     <p>Открывай ежедневные кейсы и выигрывай ценные призы в TON!</p>
                 </div>
 
-                <div class="section-divider-title">Ежедневный кейс</div>
+                <div class="section-divider-title">Наши кейсы</div>
                 
-                <div id="daily-case-banner" class="case-banner-card">
-                    <div class="case-banner-badge">БЕСПЛАТНО</div>
-                    <img src="https://img.icons8.com/color/144/treasure-chest.png" alt="Case" class="case-banner-img">
-                    <div class="case-banner-info">
-                        <h3>Ежедневный кейс</h3>
-                        <p id="home-case-status">Загрузка...</p>
+                <div class="cases-grid">
+                    <!-- Ежедневный кейс (старая логика, новый дизайн) -->
+                    <div id="daily-case-banner" class="case-card">
+                        <div class="case-badge-free">БЕСПЛАТНО</div>
+                        <img src="https://unlimbot.hb.ru-msk.vkcloud-storage.ru/uploads/case-daily-chest.png" alt="Ежедневный кейс" class="case-card-img">
+                        <div class="case-card-info">
+                            <h3>Ежедневный кейс</h3>
+                            <p id="home-daily-case-status">Загрузка...</p>
+                        </div>
                     </div>
-                    <div class="case-banner-arrow">→</div>
+
+                    <!-- Кейс новичка (пока неактивен) -->
+                    <div id="starter-case-banner" class="case-card disabled">
+                        <div class="case-badge-price">0.1 TON</div>
+                        <img src="https://unlimbot.hb.ru-msk.vkcloud-storage.ru/uploads/case-starter-chest.png" alt="Кейс новичка" class="case-card-img">
+                        <div class="case-card-info">
+                            <h3>Кейс новичка</h3>
+                            <p>Скоро в продаже!</p>
+                        </div>
+                    </div>
                 </div>
             </main>
         </section>
 
-        <!-- ЭКРАН КЕЙСА -->
-        <section id="case-section" class="hidden">
+        <!-- ЭКРАН ЕЖЕДНЕВНОГО КЕЙСА -->
+        <section id="daily-case-section" class="hidden">
             <header class="header-nav">
                 <button id="back-to-home-button" class="back-button">← Назад</button>
-                <div class="nav-title">🎁 BestGifts</div>
+                <div class="nav-title">Ежедневный кейс</div>
                 <div style="width: 70px;"></div>
             </header>
             
             <div class="user-bar-sub">
                 <div class="user-bar-left">
-                    <img id="case-user-avatar" class="user-avatar-small" src="https://img.icons8.com/color/96/user.png" alt="Avatar">
+                    <img id="daily-case-user-avatar" class="user-avatar-small" src="https://img.icons8.com/color/96/user.png" alt="Avatar">
                     <span class="balance-sub-label">Баланс:</span>
-                    <span id="case-user-balance" class="balance-sub-value">0.000 TON</span>
+                    <span id="daily-case-user-balance" class="balance-sub-value">0.000 TON</span>
                 </div>
             </div>
 
             <main class="main-content">
-                <div class="case-page-header">
-                    <div class="case-title-block">
-                        <span class="case-icon-mini">🎁</span>
-                        <div class="case-text-group">
-                            <span class="case-main-title">Ежедневный кейс</span>
-                            <span class="case-secondary-title">Испытай свою удачу сегодня!</span>
-                        </div>
-                    </div>
-                </div>
-
                 <!-- РУЛЕТКА -->
                 <div class="roulette-wrapper">
                     <div class="roulette-pointer pointer-top"></div>
                     <div class="roulette-pointer pointer-bottom"></div>
                     <div class="roulette-container">
-                        <div id="roulette-track" class="roulette-track"></div>
+                        <div id="daily-roulette-track" class="roulette-track"></div>
                     </div>
                 </div>
 
                 <div class="case-control-area">
-                    <button id="spin-case-button" class="action-button-gradient">Запустить</button>
-                    <div id="timer-container" class="timer-card hidden">
-                        <span class="timer-title">Возвращайтесь через</span>
+                    <button id="spin-daily-case-button" class="action-button-gradient">Запустить</button>
+                    <div id="daily-case-timer-container" class="timer-card hidden">
+                        <span class="timer-title">Следующее открытие через</span>
                         <div id="daily-case-timer" class="timer-clock">23h 59m 49s</div>
                     </div>
                 </div>
 
-                <!-- СЕТКА НАГРАД -->
+                <!-- СПИСОК НАГРАД ЕЖЕДНЕВНОГО КЕЙСА -->
                 <div class="rewards-section">
                     <div class="rewards-header">
                         <span class="rewards-header-icon">🏆</span>
-                        <h3>Ежедневные награды</h3>
+                        <h3>Возможные награды</h3>
                     </div>
-                    <div id="rewards-grid" class="rewards-grid"></div>
+                    <div id="daily-rewards-grid" class="rewards-grid"></div>
+                </div>
+            </main>
+        </section>
+
+        <!-- ЭКРАН КЕЙСА НОВИЧКА (Пока неактивен) -->
+        <section id="starter-case-section" class="hidden">
+            <header class="header-nav">
+                <button id="back-to-home-from-starter-button" class="back-button">← Назад</button>
+                <div class="nav-title">Кейс новичка</div>
+                <div style="width: 70px;"></div>
+            </header>
+            
+            <div class="user-bar-sub">
+                <div class="user-bar-left">
+                    <img id="starter-case-user-avatar" class="user-avatar-small" src="https://img.icons8.com/color/96/user.png" alt="Avatar">
+                    <span class="balance-sub-label">Баланс:</span>
+                    <span id="starter-case-user-balance" class="balance-sub-value">0.000 TON</span>
+                </div>
+            </div>
+
+            <main class="main-content">
+                <div class="case-opener-info">
+                    <img src="https://unlimbot.hb.ru-msk.vkcloud-storage.ru/uploads/case-starter-chest.png" alt="Кейс новичка" class="case-opener-img">
+                    <div class="case-opener-text">
+                        <h3>Кейс новичка</h3>
+                        <p>Цена открытия: <span class="cost-ton">0.1 TON</span></p>
+                        <p>Идеально для старта!</p>
+                    </div>
+                </div>
+
+                <!-- РУЛЕТКА КЕЙСА НОВИЧКА -->
+                <div class="roulette-wrapper">
+                    <div class="roulette-pointer pointer-top"></div>
+                    <div class="roulette-pointer pointer-bottom"></div>
+                    <div class="roulette-container">
+                        <div id="starter-roulette-track" class="roulette-track"></div>
+                    </div>
+                </div>
+
+                <div class="case-control-area">
+                    <button id="spin-starter-case-button" class="action-button-gradient">Открыть за 0.1 TON</button>
+                </div>
+
+                <!-- СПИСОК НАГРАД КЕЙСА НОВИЧКА -->
+                <div class="rewards-section">
+                    <div class="rewards-header">
+                        <span class="rewards-header-icon">🏆</span>
+                        <h3>Возможные награды</h3>
+                    </div>
+                    <div id="starter-rewards-grid" class="rewards-grid"></div>
                 </div>
             </main>
         </section>
@@ -131,7 +183,14 @@
             </header>
 
             <main class="main-content">
-                <!-- ФОРМА ВВОДА ПОДАРКОВ (NFT DEPOSIT PANEL) -->
+                <div class="inventory-hint">
+                    🎁 Выводите подарки прямо в Telegram или продавайте их за реальные TON!
+                </div>
+                <div id="inventory-grid" class="rewards-grid">
+                    <!-- Заполняется из JS -->
+                </div>
+
+                <!-- ФОРМА ВВОДА ПОДАРКОВ (NFT DEPOSIT PANEL) ВНИЗУ -->
                 <div class="deposit-panel">
                     <h3>📥 Ввод подарков NFT</h3>
                     <p class="deposit-desc">1. Отправьте ваш NFT-подарок в Telegram на аккаунт:</p>
@@ -145,17 +204,12 @@
                         <button id="deposit-confirm-button" class="deposit-btn-confirm">Подтвердить передачу</button>
                     </div>
                 </div>
-
-                <div class="section-divider-title" style="margin-top: 15px;">Мои Подарки</div>
-                <div id="inventory-grid" class="rewards-grid">
-                    <!-- Заполняется из JS -->
-                </div>
             </main>
         </section>
 
         <!-- ПАРЯЩЕЕ GLASS-МЕНЮ (ИНВЕНТАРЬ СЛЕВА, МЕНЮ СПРАВА) -->
         <nav id="bottom-navigation" class="bottom-nav">
-            <div class="nav-tab" data-target="inventory">
+            <div class="nav-tab active" data-target="inventory">
                 <div class="nav-tab-icon-wrapper">
                     <svg class="nav-tab-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
@@ -167,7 +221,7 @@
                 <div class="active-indicator"></div>
             </div>
 
-            <div class="nav-tab active" data-target="home">
+            <div class="nav-tab" data-target="home">
                 <div class="nav-tab-icon-wrapper">
                     <svg class="nav-tab-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                         <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
@@ -181,6 +235,6 @@
     </div>
 
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <script src="/js/app.js?v=6.0"></script>
+    <script src="/js/app.js?v=7.0"></script>
 </body>
-                        </html>
+    </html>
