@@ -1,17 +1,388 @@
-:root { --bg-color: #0b0b10; --card-bg-color: #161622; --primary-color: #8a2be2; --text-color: #fff; }
-body { font-family: 'Montserrat', sans-serif; background-color: var(--bg-color); color: var(--text-color); margin: 0; }
-.hidden { display: none !important; }
-.cases-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 15px; }
-.case-card { aspect-ratio: 1/1; background: var(--card-bg-color); border: 1.5px solid #262636; border-radius: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; }
-.case-card-img { width: 60px; height: 60px; margin-bottom: 10px; }
-.bottom-nav { position: fixed; bottom: 0; width: 100%; background: #161622; display: flex; justify-content: space-around; padding: 15px; z-index: 1000; }
-.rewards-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 10px; }
-.reward-card { background: var(--card-bg-color); border-radius: 15px; padding: 10px; text-align: center; }
-.reward-card img { width: 50px; height: 50px; object-fit: contain; }
-.toast-container { position: fixed; bottom: 80px; width: 100%; z-index: 9999; text-align: center; }
-.custom-toast { background: #2a2a3d; padding: 12px; border-radius: 12px; display: inline-flex; align-items: center; gap: 10px; border: 1px solid #444; }
-.deposit-panel { background: #161622; padding: 15px; border-radius: 15px; margin: 20px; }
-.deposit-select { width: 100%; padding: 10px; background: #0b0b10; color: #fff; border: 1px solid #333; border-radius: 8px; }
-.deposit-btn-confirm { width: 100%; padding: 10px; margin-top: 10px; background: var(--primary-color); color: #fff; border: none; border-radius: 8px; font-weight: bold; }
-.modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); display: flex; justify-content: center; align-items: center; z-index: 9999; }
-.modal-card { background: #161622; padding: 25px; border-radius: 20px; text-align: center; width: 80%; }
+/* Базовые сбросы и шрифты под стиль Telegram */
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    -webkit-tap-highlight-color: transparent;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background-color: #0e1621;
+    color: #ffffff;
+    user-select: none;
+    overflow-x: hidden;
+}
+
+.app-container {
+    max-width: 480px;
+    margin: 0 auto;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    min-height: 100vh;
+}
+
+/* Шапка приложения */
+.app-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #17212b;
+    padding: 12px 16px;
+    border-radius: 16px;
+    border: 1px solid #24303f;
+}
+
+.user-profile {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.avatar {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    background: #242f3d;
+}
+
+.user-info {
+    display: flex;
+    flex-direction: column;
+}
+
+.username {
+    font-size: 15px;
+    font-weight: 600;
+}
+
+.status {
+    font-size: 12px;
+    color: #2481cc;
+}
+
+/* Контейнер Баланса */
+.balance-container {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: #202b36;
+    padding: 8px 14px;
+    border-radius: 12px;
+    border: 1px solid #2b394a;
+}
+
+.currency-icon {
+    width: 22px;
+    height: 22px;
+}
+
+#user-balance {
+    font-size: 16px;
+    font-weight: 700;
+    color: #2481cc;
+}
+
+.currency-ticker {
+    font-size: 13px;
+    color: #7f8c99;
+    font-weight: 500;
+}
+
+/* Карточка Кейса */
+.case-card {
+    background: #17212b;
+    border-radius: 24px;
+    padding: 24px;
+    text-align: center;
+    border: 1px solid #24303f;
+    position: relative;
+    overflow: hidden;
+}
+
+.case-banner {
+    position: relative;
+    margin-bottom: 16px;
+    display: inline-block;
+}
+
+.case-image {
+    width: 120px;
+    height: 120px;
+    position: relative;
+    z-index: 2;
+}
+
+.case-glow {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 140px;
+    height: 140px;
+    background: radial-gradient(circle, rgba(36,129,204,0.4) 0%, rgba(0,0,0,0) 70%);
+    z-index: 1;
+}
+
+.case-badge {
+    position: absolute;
+    top: 0;
+    right: -10px;
+    background: #e64d3b;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 4px 8px;
+    border-radius: 8px;
+    z-index: 3;
+}
+
+.case-card h2 {
+    font-size: 20px;
+    margin-bottom: 8px;
+}
+
+.case-description {
+    font-size: 13px;
+    color: #7f8c99;
+    line-height: 1.4;
+    margin-bottom: 20px;
+}
+
+/* Кнопки */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    font-family: inherit;
+    font-weight: 600;
+    border-radius: 14px;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.1s;
+    width: 100%;
+}
+
+.btn:active {
+    transform: scale(0.98);
+}
+
+.btn-primary {
+    background: #2481cc;
+    color: #fff;
+}
+
+.btn-primary:active {
+    background: #1a6fa3;
+}
+
+.btn-lg {
+    padding: 15px;
+    font-size: 16px;
+}
+
+.cooldown-text {
+    font-size: 14px;
+    color: #e64d3b;
+    font-weight: 500;
+    margin-top: 15px;
+}
+
+/* Сетка инвентаря */
+.inventory-section h3 {
+    font-size: 16px;
+    margin-bottom: 12px;
+    color: #7f8c99;
+}
+
+.inventory-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+}
+
+.empty-inventory {
+    grid-column: span 3;
+    text-align: center;
+    padding: 40px 20px;
+    color: #526273;
+    font-size: 14px;
+    background: #17212b;
+    border-radius: 16px;
+    border: 1px dashed #2b394a;
+}
+
+/* Динамические стили для предметов в инвентаре (если генерируются скриптом) */
+.inventory-item {
+    background: #17212b;
+    border: 1px solid #24303f;
+    border-radius: 14px;
+    padding: 12px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+}
+.inventory-item img {
+    width: 50px;
+    height: 50px;
+    object-fit: contain;
+}
+.inventory-item-name {
+    font-size: 11px;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    width: 100%;
+}
+
+/* --- ВСПЛЫВАЮЩИЕ УВЕДОМЛЕНИЯ (ТОСТЫ) --- */
+.toast-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 99999;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    pointer-events: none;
+}
+
+.custom-toast {
+    background: #242f3d;
+    color: #ffffff;
+    padding: 12px 16px;
+    border-radius: 12px;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    transform: translateX(130%);
+    transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    pointer-events: auto;
+}
+
+.custom-toast.show {
+    transform: translateX(0);
+}
+
+.custom-toast-content {
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.custom-toast-close {
+    background: none;
+    border: none;
+    color: #7f8c99;
+    cursor: pointer;
+    font-size: 16px;
+    margin-left: auto;
+}
+
+/* --- МОДАЛЬНЫЕ ОКНА --- */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 99990;
+    transition: opacity 0.25s ease;
+}
+
+.modal-overlay.hidden {
+    display: none;
+}
+
+.modal-window {
+    background: #17212b;
+    border: 1px solid #2b394a;
+    border-radius: 22px;
+    padding: 24px;
+    width: 86%;
+    max-width: 320px;
+    text-align: center;
+    position: relative;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+    animation: modalSlideUp 0.25s ease-out;
+}
+
+@keyframes modalSlideUp {
+    from { transform: translateY(20px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
+.modal-close {
+    position: absolute;
+    top: 12px;
+    right: 16px;
+    background: none;
+    border: none;
+    color: #6c7883;
+    font-size: 24px;
+    cursor: pointer;
+}
+
+.modal-icon {
+    font-size: 48px;
+    margin-bottom: 12px;
+}
+
+.modal-icon img {
+    max-width: 75px;
+    max-height: 75px;
+    object-fit: contain;
+}
+
+.modal-title {
+    margin-bottom: 8px;
+    font-size: 18px;
+    font-weight: 600;
+}
+
+.modal-message {
+    font-size: 14px;
+    color: #7f8c99;
+    margin-bottom: 20px;
+    line-height: 1.4;
+}
+
+.modal-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.modal-btn {
+    padding: 12px;
+    border-radius: 12px;
+    border: none;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    width: 100%;
+}
+
+.modal-btn-primary {
+    background: #2481cc;
+    color: #ffffff;
+}
+
+.modal-btn-secondary {
+    background: #242f3d;
+    color: #2481cc;
+}
+
+.hidden {
+    display: none !important;
+  }
