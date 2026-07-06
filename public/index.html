@@ -3,85 +3,74 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>BestGifts</title>
-    <link rel="stylesheet" href="/css/style.css?v=9.0">
-    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <title>Telegram BestGifts App</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- Подключение Telegram Web Apps SDK -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
 <body>
-    <div id="app">
-        <div id="toast-container" class="toast-container"></div>
-        <div id="custom-modal" class="modal-overlay hidden">
-            <div class="modal-card">
-                <button id="modal-close-btn" class="modal-close-x">&times;</button>
-                <div id="modal-icon" class="modal-icon-glow">🎁</div>
-                <h3 id="modal-title"></h3>
-                <p id="modal-message"></p>
-                <div id="modal-actions" class="modal-buttons-layout"></div>
+
+    <div class="app-container">
+        <!-- Шапка профиля и Баланс -->
+        <header class="app-header">
+            <div class="user-profile">
+                <img id="user-avatar" src="https://img.icons8.com/color/96/user-male-circle.png" alt="Avatar" class="avatar">
+                <div class="user-info">
+                    <span id="user-name" class="username">Загрузка...</span>
+                    <span class="status">Игрок</span>
+                </div>
+            </div>
+            <div class="balance-container">
+                <img src="https://img.icons8.com/color/96/coins.png" alt="TON" class="currency-icon">
+                <span id="user-balance">0.00</span> <span class="currency-ticker">TON</span>
+            </div>
+        </header>
+
+        <!-- Главный контент / Кейс -->
+        <main class="main-content">
+            <div class="case-card">
+                <div class="case-banner">
+                    <div class="case-glow"></div>
+                    <span class="case-badge">Ежедневный</span>
+                    <img src="https://img.icons8.com/color/144/gift-box.png" alt="Daily Case" class="case-image">
+                </div>
+                <h2>Бесплатный Кейс призов</h2>
+                <p class="case-description">Открывайте кейс каждый день и выигрывайте ценные подарки или TON на баланс!</p>
+                
+                <button id="open-case-btn" class="btn btn-primary btn-lg">
+                    <span class="btn-text">Открыть бесплатно</span>
+                </button>
+                <div id="cooldown-timer" class="cooldown-text hidden">Следующее открытие через: <span id="timer-val">24:00:00</span></div>
+            </div>
+
+            <!-- Раздел Инвентаря -->
+            <section class="inventory-section">
+                <h3>Ваш инвентарь</h3>
+                <div id="inventory-grid" class="inventory-grid">
+                    <!-- Предметы будут добавляться динамически через app.js -->
+                    <div class="empty-inventory">Здесь пока ничего нет. Откройте кейс!</div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Новые элементы для всплывающих уведомлений (Тосты) -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- Кастомное интерактивное модальное окно -->
+    <div id="custom-modal" class="modal-overlay hidden">
+        <div class="modal-window">
+            <button id="modal-close-btn" class="modal-close">&times;</button>
+            <div id="modal-icon" class="modal-icon">🎁</div>
+            <h3 id="modal-title" class="modal-title">Поздравляем!</h3>
+            <p id="modal-message" class="modal-message">Вы выиграли предмет.</p>
+            <div id="modal-actions" class="modal-actions">
+                <!-- Кнопки (Продать / Оставить) генерируются в app.js -->
             </div>
         </div>
-
-        <section id="home-section">
-            <header class="header">
-                <div class="brand-title">🎁 BestGifts</div>
-                <div class="user-profile">
-                    <img id="user-avatar" class="user-avatar" src="https://img.icons8.com/color/96/user.png">
-                    <div class="user-info">
-                        <span id="user-username">Загрузка...</span>
-                        <div class="balance-container">Баланс: <span id="user-balance">0.000 TON</span></div>
-                    </div>
-                </div>
-            </header>
-            <main class="main-content">
-                <div class="cases-grid">
-                    <div id="daily-case-banner" class="case-card"><img src="https://img.icons8.com/color/144/treasure-chest.png" class="case-card-img"><h3>Ежедневный</h3></div>
-                    <div id="starter-case-banner" class="case-card"><img src="https://img.icons8.com/color/144/lock.png" class="case-card-img"><h3>Кейс новичка</h3></div>
-                </div>
-            </main>
-        </section>
-
-        <section id="case-section" class="hidden">
-            <header class="header-nav"><button id="back-to-home-button" class="back-button">← Назад</button><div class="nav-title" id="case-title"></div><div></div></header>
-            <main class="main-content">
-                <div class="roulette-wrapper"><div class="roulette-pointer pointer-top"></div><div class="roulette-container"><div id="roulette-track" class="roulette-track"></div></div></div>
-                <button id="spin-case-button" class="action-button-gradient">Запустить</button>
-                <div class="rewards-section"><h3>Награды</h3><div id="rewards-grid" class="rewards-grid"></div></div>
-            </main>
-        </section>
-
-        <section id="inventory-section" class="hidden">
-            <header class="header"><div class="brand-title">🎒 Инвентарь</div></header>
-            <main class="main-content">
-                <div id="inventory-grid" class="rewards-grid"></div>
-                <div class="deposit-panel">
-                    <h3>📥 Ввод подарков NFT</h3>
-                    <a href="https://t.me/Sintopa" class="deposit-telegram-link" target="_blank">✈️ Отправить на @Sintopa</a>
-                    <select id="deposit-item-select" class="deposit-select"></select>
-                    <button id="deposit-confirm-button" class="deposit-btn-confirm">Подтвердить передачу</button>
-                </div>
-            </main>
-        </section>
-
-        <nav id="bottom-navigation" class="bottom-nav">
-            <div class="nav-tab" data-target="inventory"><span class="nav-text">Инвентарь</span></div>
-            <div class="nav-tab active" data-target="home"><span class="nav-text">Меню</span></div>
-        </nav>
     </div>
-    <!-- Контейнер для красивых всплывающих уведомлений (Тостов) -->
-<div id="toast-container" class="toast-container"></div>
 
-<!-- Кастомное модальное окно (Подтверждение продаж, вывода, выигрыша) -->
-<div id="custom-modal" class="modal-overlay hidden">
-    <div class="modal-window">
-        <button id="modal-close-btn" class="modal-close">&times;</button>
-        <div id="modal-icon" class="modal-icon">🎁</div>
-        <h3 id="modal-title" class="modal-title">Заголовок</h3>
-        <p id="modal-message" class="modal-message">Текст сообщения...</p>
-        <div id="modal-actions" class="modal-actions">
-            <!-- Кнопки будут создаваться динамически из JS -->
-        </div>
-    </div>
-        </div>
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <script src="/js/app.js?v=9.0"></script>
+    <!-- Подключение вашей логики приложения -->
+    <script src="app.js"></script>
 </body>
-</html>
+    </html>
