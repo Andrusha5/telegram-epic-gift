@@ -5,7 +5,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     const API_BASE_URL = window.location.origin;
     let currentUser = {};
 
-    const GRAMCOIN_ICON_URL = "https://img.icons8.com/color/96/gram.png"; // Новая иконка для Gramcoin
+    // Картинка алмаза для GRAMcoin
+    const GRAMCOIN_ICON_URL = "https://unlimbot.hb.ru-msk.vkcloud-storage.ru/uploads/40746e02734e4060a3eac7044821f6892743b60bdb1e4817.jpg";
 
     const GIFT_POOL = [
         { id: 1, name: "Статуя птицы серая", icon: "https://unlimbot.hb.ru-msk.vkcloud-storage.ru/uploads/954503c70e7e4d70b330820aa63c3a2664b43859d4fc5932.jpg", price: "20 GRAM", rawPrice: 20.0, isGold: true, type: "gift" },
@@ -36,8 +37,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         bottomNavigation: document.getElementById('bottom-navigation'),
         navTabs: document.querySelectorAll('.nav-tab'),
         dailyCaseBanner: document.getElementById('daily-case-banner'),
-        newbieCaseBanner: document.getElementById('newbie-case-banner') // Новый элемент
+        newbieCaseBanner: document.getElementById('newbie-case-banner')
     };
+
+    // Вспомогательный хелпер для рендеринга иконки алмаза вместо текста GRAM
+    const getGramIconHtml = () => `<img src="${GRAMCOIN_ICON_URL}" class="gram-icon" alt="">`;
 
     // --- КРАСИВЫЕ КЛИЕНТСКИЕ УВЕДОМЛЕНИЯ ВНИЗУ ---
     function showNotification(message, icon = '🎁') {
@@ -68,7 +72,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }, 5000);
     }
 
-    // --- МОДАЛЬНОЕ ОКНО ПО ЦЕНТРУ ---
+    // --- МОДАЛЬНОЕ ОКНО ПО ЦЕНТРУ (ПОДДЕРЖКА HTML) ---
     function showCustomModal({ icon = '🎁', title, message, buttons = [], onClose = null }) {
         const overlay = document.getElementById('custom-modal');
         const modalIcon = document.getElementById('modal-icon');
@@ -79,7 +83,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         modalIcon.innerHTML = icon;
         modalTitle.innerText = title;
-        modalMsg.innerText = message;
+        modalMsg.innerHTML = message; // Изменено на innerHTML для поддержки тегов картинок
         actionsContainer.innerHTML = '';
 
         buttons.forEach(btnConfig => {
@@ -115,11 +119,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             setActiveTab('inventory');
             fetchInventory(); 
             initDepositSelect();
-        } else if (target === 'case') { // Переход к ежедневному кейсу
+        } else if (target === 'case') {
             elements.caseSection.classList.remove('hidden');
             elements.bottomNavigation.classList.add('hidden'); 
             initRouletteTrack();
-            // Убираем вторичный заголовок на странице кейса
             const caseSecondaryTitle = document.querySelector('#case-section .case-secondary-title');
             if (caseSecondaryTitle) {
                 caseSecondaryTitle.remove();
@@ -204,7 +207,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     });
 
-    // --- Отрисовка наград кейса ---
+    // --- Отрисовка наград кейса (В кейсе оставляем подпись "GRAM" согласно скриншоту) ---
     function renderRewardsGrid() {
         elements.rewardsGrid.innerHTML = '';
         GIFT_POOL.forEach(gift => {
@@ -240,8 +243,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             };
         }
 
+        // Вывод баланса с иконкой алмаза вместо текста GRAM
         elements.balanceDisplay.forEach(d => {
-            if (d) d.innerText = `${parseFloat(currentUser.balance || 0).toFixed(3)} GRAM`;
+            if (d) d.innerHTML = `${parseFloat(currentUser.balance || 0).toFixed(3)} ${getGramIconHtml()}`;
         });
 
         const avUrls = currentUser.avatar_url || "https://img.icons8.com/color/96/user.png";
@@ -264,7 +268,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     function updateDailyCaseTimer() {
         clearInterval(dailyCaseTimerInterval); 
 
-        // Для админа теперь просто "Доступно!" без дополнительных фраз
         if (currentUser.is_admin) {
             document.getElementById('home-case-status').innerText = 'Доступно!';
             document.getElementById('home-case-status').style.color = 'var(--green-success)';
@@ -348,7 +351,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const card = document.createElement('div');
                 card.className = 'reward-card';
                 card.innerHTML = `
-                    <div class="reward-price-top">${parseFloat(item.value).toFixed(2)} GRAM</div>
+                    <div class="reward-price-top">${parseFloat(item.value).toFixed(2)} ${getGramIconHtml()}</div>
                     <img src="${imageSrc}" onerror="this.src='https://img.icons8.com/color/96/gift.png'">
                     <div class="reward-name">${item.name}</div>
                     <div class="inv-actions">
@@ -400,10 +403,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                     showCustomModal({
                         icon: '💰',
                         title: 'Продажа подарка',
-                        message: `Вы действительно хотите мгновенно продать подарок "${item.name}" за ${item.value} GRAM?`,
+                        message: `Вы действительно хотите мгновенно продать подарок "${item.name}" за ${item.value} ${getGramIconHtml()}?`,
                         buttons: [
                             {
-                                text: 'Продать за GRAM',
+                                text: 'Продать за валюту',
                                 primary: true,
                                 onClick: async () => {
                                     try {
@@ -463,7 +466,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    // --- Идеальная прокрутка рулетки ---
+    // --- Идеальная прокрутка рулетки (Время анимации сокращено до 3.5 секунд) ---
     function spinRoulette(winningItem, onComplete) {
         const itemWidth = 84; 
         const gap = 8; 
@@ -483,12 +486,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         const centerOffset = (containerWidth / 2) - (itemWidth / 2);
         const totalTranslate = (targetIndex * itemFullWidth) - centerOffset;
 
-        elements.rouletteTrack.style.transition = 'transform 5s cubic-bezier(0.15, 0.85, 0.15, 1)';
+        elements.rouletteTrack.style.transition = 'transform 3.5s cubic-bezier(0.15, 0.85, 0.15, 1)';
         elements.rouletteTrack.style.transform = `translateX(-${totalTranslate}px)`;
 
         setTimeout(() => {
             onComplete();
-        }, 5100);
+        }, 3600);
     }
 
     // --- Обработка выигрыша ---
@@ -502,7 +505,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
             fetchUserData();
             elements.spinBtn.disabled = false;
-        } else { // Выигран подарок
+        } else { 
             showCustomModal({
                 icon: `<img src="${winningGift.icon}" style="width:70px;height:70px;object-fit:contain;">`,
                 title: 'Вы выиграли подарок!',
@@ -549,73 +552,71 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    // --- Логика прокрутки ---
+    // --- Логика мгновенного запуска (БЕЗ искусственных задержек) ---
     elements.spinBtn.addEventListener('click', async () => {
         elements.spinBtn.disabled = true;
         initRouletteTrack();
 
-        setTimeout(async () => {
-            try {
-                const response = await fetch(`${API_BASE_URL}/api/open_daily_case`, {
-                    method: 'POST',
-                    headers: { 'X-Telegram-Init-Data': tg.initData || "" }
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/open_daily_case`, {
+                method: 'POST',
+                headers: { 'X-Telegram-Init-Data': tg.initData || "" }
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                let winningGift = GIFT_POOL.find(g => g.id === data.wonItem.id);
+                if (!winningGift) { 
+                    winningGift = GIFT_POOL.find(g => g.name.toLowerCase() === data.wonItem.name.toLowerCase());
+                }
+
+                if (!winningGift) {
+                    showNotification('Неизвестный предмет выигран.', '❓');
+                    elements.spinBtn.disabled = false;
+                    return;
+                }
+
+                spinRoulette(winningGift, () => {
+                    processWinning(winningGift, data.newBalance);
                 });
 
-                const data = await response.json();
-
-                if (response.ok) {
-                    let winningGift = GIFT_POOL.find(g => g.id === data.wonItem.id);
-                    if (!winningGift) { // Fallback, если id не совпал, ищем по имени
-                        winningGift = GIFT_POOL.find(g => g.name.toLowerCase() === data.wonItem.name.toLowerCase());
-                    }
-
-                    if (!winningGift) { // Если все еще не нашли, что-то пошло не так
-                        showNotification('Неизвестный предмет выигран.', '❓');
-                        elements.spinBtn.disabled = false;
-                        return;
-                    }
-
-                    spinRoulette(winningGift, () => {
-                        processWinning(winningGift, data.newBalance);
+            } else {
+                if (data.error && data.error.includes('подписчиком канала')) {
+                    const infoRes = await fetch(`${API_BASE_URL}/api/daily_case_info`, {
+                        headers: { 'X-Telegram-Init-Data': tg.initData || "" }
                     });
+                    const infoData = await infoRes.json();
+                    const channelUrl = `https://t.me/${infoData.channel_username}`;
 
-                } else {
-                    if (data.error && data.error.includes('подписчиком канала')) {
-                        const infoRes = await fetch(`${API_BASE_URL}/api/daily_case_info`, {
-                            headers: { 'X-Telegram-Init-Data': tg.initData || "" }
-                        });
-                        const infoData = await infoRes.json();
-                        const channelUrl = `https://t.me/${infoData.channel_username}`;
-
-                        showCustomModal({
-                            icon: '📢',
-                            title: 'Нужна подписка',
-                            message: 'Пожалуйста, подпишитесь на наш Telegram-канал, чтобы открыть бесплатный кейс!',
-                            buttons: [
-                                {
-                                    text: 'Перейти на канал',
-                                    primary: true,
-                                    onClick: () => {
-                                        tg.openLink(channelUrl);
-                                        elements.spinBtn.disabled = false;
-                                    }
+                    showCustomModal({
+                        icon: '📢',
+                        title: 'Нужна подписка',
+                        message: 'Пожалуйста, подпишитесь на наш Telegram-канал, чтобы открыть бесплатный кейс!',
+                        buttons: [
+                            {
+                                text: 'Перейти на канал',
+                                primary: true,
+                                onClick: () => {
+                                    tg.openLink(channelUrl);
+                                    elements.spinBtn.disabled = false;
                                 }
-                            ],
-                            onClose: () => { elements.spinBtn.disabled = false; }
-                        });
-                    } else {
-                        showNotification(data.error || 'Ошибка при открытии кейса.', '⚠️');
-                        elements.spinBtn.disabled = false;
-                    }
+                            }
+                        ],
+                        onClose: () => { elements.spinBtn.disabled = false; }
+                    });
+                } else {
+                    showNotification(data.error || 'Ошибка при открытии кейса.', '⚠️');
+                    elements.spinBtn.disabled = false;
                 }
-            } catch (error) {
-                showNotification('Ошибка связи с сервером при открытии кейса.', '⚠️');
-                elements.spinBtn.disabled = false;
             }
-        }, 50);
+        } catch (error) {
+            showNotification('Ошибка связи с сервером при открытии кейса.', '⚠️');
+            elements.spinBtn.disabled = false;
+        }
     });
 
     renderRewardsGrid();
     await fetchUserData(); 
     navigateTo('home'); 
-}); 
+});
