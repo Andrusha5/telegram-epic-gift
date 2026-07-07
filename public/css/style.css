@@ -46,12 +46,12 @@ body {
     display: none !important;
 }
 
-/* ЭЛЕГАНТНОЕ СЛИЯНИЕ КАРТИНОК С ТЕМНЫМ ФОНОМ ПРИЛОЖЕНИЯ */
+/* СЛИЯНИЕ СЕМИНАРНЫХ КАРТИНОК С ТЕМНЫМ ФОНОМ */
 .reward-card img, 
 .roulette-item img, 
 .case-banner-img {
-    mix-blend-mode: screen; /* Очищает серый/светлый задний фон картинок, делая их прозрачными */
-    filter: brightness(1.05) contrast(1.1); /* Смягчает яркость */
+    mix-blend-mode: screen; 
+    filter: brightness(1.05) contrast(1.1); 
 }
 
 /* ИНВЕНТАРЬ: ВЫВОД ЦЕНЫ ТОЛЬКО В ГРАММАХ БЕЗ ИКОНОК */
@@ -70,7 +70,7 @@ body {
     text-shadow: 0 0 8px rgba(0, 230, 118, 0.2);
     display: flex;
     align-items: center;
-    white-space: nowrap; /* Число и алмазик не переносятся */
+    white-space: nowrap; 
 }
 
 .balance-sub-value {
@@ -85,8 +85,8 @@ body {
     width: 18px;
     height: 18px;
     object-fit: contain;
-    margin-left: 8px; /* Гарантированный отступ от числа баланса */
-    flex-shrink: 0; /* Алмаз не будет сжиматься даже при огромном балансе */
+    margin-left: 8px; 
+    flex-shrink: 0; 
     border-radius: 50%;
 }
 
@@ -579,7 +579,7 @@ body {
     text-transform: uppercase;
 }
 
-/* КНОПКИ ДЕЙСТВИЯ В ИНВЕНТАРЕ */
+/* КНОПКИ В ИНВЕНТАРЕ */
 .inv-actions {
     display: flex;
     gap: 6px;
@@ -615,7 +615,7 @@ body {
     box-shadow: 0 2px 8px rgba(40, 167, 69, 0.2);
 }
 
-/* ДИЗАЙН ПАНЕЛИ ВВОДА ПОДАРКОВ (DEPOSIT PANEL) */
+/* ДЕПОЗИТНАЯ ПАНЕЛЬ */
 .deposit-panel {
     background: linear-gradient(135deg, #1c1c2d, #141420);
     border: 1.5px solid rgba(138, 43, 226, 0.4);
@@ -697,7 +697,7 @@ body {
     transform: scale(0.97);
 }
 
-/* iOS/CYBERPUNK BOTTOM DOCK MENU */
+/* BOTTOM NAVIGATION BAR */
 .bottom-nav {
     position: fixed; 
     bottom: 16px; 
@@ -784,7 +784,7 @@ body {
     transform: scale(1);
 }
 
-/* МОДАЛЬНЫЕ ОКНА */
+/* МОДАЛЬНЫЕ ОКНА ПО ЦЕНТРУ */
 .modal-overlay {
     position: fixed;
     top: 0;
@@ -896,7 +896,7 @@ body {
     border: 1px solid var(--border-color);
 }
 
-/* УВЕДОМЛЕНИЯ ВНИЗУ */
+/* ТОСТ-УВЕДОМЛЕНИЯ ВНИЗУ */
 .toast-container {
     position: fixed;
     bottom: 96px; 
@@ -957,7 +957,7 @@ body {
     color: #fff;
 }
 
-/* СТИЛИ ПУСТОГО ИНВЕНТАРЯ */
+/* СТИЛИ ДЛЯ ПУСТОГО ИНВЕНТАРЯ */
 .empty-inventory {
     grid-column: 1 / -1; 
     text-align: center;
