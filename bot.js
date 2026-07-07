@@ -65,10 +65,13 @@ bot.onText(/\/start/, async (msg) => {
         console.error('Error upserting user on /start:', error);
     }
 
-    bot.sendMessage(chatId, 'Добро пожаловать в Epic Gift! Откройте приложение:', {
+    // Обновленное приветственное сообщение
+    bot.sendMessage(chatId, `🎉 Добро пожаловать в мир захватывающих подарков и приключений с BestGifts!
+
+Нажмите кнопку ниже, чтобы начать свою историю и открывать бесплатные кейсы:`, {
         reply_markup: {
             inline_keyboard: [
-                [{ text: '🎁 Открыть приложение', web_app: { url: WEB_APP_URL } }]
+                [{ text: '🎁 Открыть BestGifts', web_app: { url: WEB_APP_URL } }]
             ]
         }
     });
