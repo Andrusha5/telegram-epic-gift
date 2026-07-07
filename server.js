@@ -13,7 +13,7 @@ process.on('uncaughtException', (err) => {
 const db = require('./db');
 const botModule = require('./bot');
 
-const bot = botModule.bot; // Получаем инстанс бота
+const bot = botModule.bot;
 const checkUserSubscription = botModule.checkUserSubscription;
 const getUserAvatarUrl = botModule.getUserAvatarUrl;
 
@@ -23,39 +23,51 @@ const query = (text, params) => pool.query(text, params);
 const app = express();
 const PORT = process.env.PORT || 3000;
 const CHANNEL_USERNAME = process.env.CHANNEL_USERNAME || "";
-const WEB_APP_URL = process.env.WEB_APP_URL; // Добавил WEB_APP_URL для вебхуков
+const WEB_APP_URL = process.env.WEB_APP_URL;
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// ИЗМЕНЕНИЕ: Настройка вебхуков для Telegram Bot
+// ДИАГНОСТИКА: Тест подключения к базе данных Supabase при старте
+console.log('🔄 Пробуем подключиться к базе данных Supabase...');
+pool.query('SELECT NOW()')
+    .then((res) => {
+        console.log('✅ Успешное подключение к базе данных Supabase! Время сервера БД:', res.rows[0].now);
+    })
+    .catch((err) => {
+        console.error('❌ ОШИБКА ПОДКЛЮЧЕНИЯ К БАЗЕ ДАННЫХ SUPABASE:', err.message);
+        console.error('Детали ошибки:', err);
+    });
+
+// ДИАГНОСТИКА: Логирование всех входящих запросов к серверу
+app.use((req, res, next) => {
+    console.log(`[HTTP] Получен запрос: ${req.method} ${req.url}`);
+    next();
+});
+
+// Настройка вебхуков для Telegram Bot
 if (WEB_APP_URL && process.env.TELEGRAM_BOT_TOKEN) {
     const webhookPath = `/bot${process.env.TELEGRAM_BOT_TOKEN}`;
     const webhookUrl = `${WEB_APP_URL}${webhookPath}`;
 
-    // Установка вебхука при старте сервера
     bot.setWebHook(webhookUrl)
         .then(() => console.log('✅ Telegram Webhook установлен на:', webhookUrl))
         .catch(e => console.error('❌ Ошибка установки Telegram Webhook:', e.message));
 
-    // Обработчик для входящих обновлений от Telegram
     app.post(webhookPath, (req, res) => {
         bot.processUpdate(req.body);
-        res.sendStatus(200); // Важно всегда отвечать 200 OK
+        res.sendStatus(200);
     });
 } else {
-    // Если WEB_APP_URL или TELEGRAM_BOT_TOKEN не заданы, сообщаем об этом
-    console.warn('⚠️ WEB_APP_URL или TELEGRAM_BOT_TOKEN не заданы. Вебхуки не будут установлены.');
-    // В этом случае, если бот запущен без polling, он не будет получать обновления.
-    // Для разработки можно временно включить polling в bot.js, но для продакшена нужны вебхуки.
+    console.warn('⚠️ WEB_APP_URL или TELEGRAM_BOT_TOKEN не заданы в Environment!');
 }
-
 
 // Middleware авторизации и защиты данных Telegram
 app.use(async (req, res, next) => {
     const initData = req.headers['x-telegram-init-data'] || req.query.initData;
 
     if (!initData) {
+        console.log('⚠️ Запрос без initData');
         req.telegramUser = null;
         return next();
     }
@@ -76,6 +88,7 @@ app.use(async (req, res, next) => {
         const calculatedHash = crypto.createHmac('sha256', secretKey).update(dataCheckString).digest('hex');
 
         if (calculatedHash !== hash) {
+            console.log('❌ Неверный hash авторизации Telegram');
             req.telegramUser = null;
             return res.status(401).json({ error: 'Unauthorized' });
         }
@@ -90,18 +103,22 @@ app.use(async (req, res, next) => {
                         avatarUrl = await getUserAvatarUrl(req.telegramUser.id);
                     }
                     const isAdminUser = req.telegramUser.id.toString() === process.env.ADMIN_TELEGRAM_ID;
+                    
+                    console.log(`💾 Обновляем данные юзера ${req.telegramUser.id} в БД...`);
                     await query(
                         'UPDATE users SET avatar_url = $1, username = $2, first_name = $3, last_name = $4, is_admin = $5 WHERE id = $6',
                         [avatarUrl, req.telegramUser.username, req.telegramUser.first_name, req.telegramUser.last_name, isAdminUser, req.telegramUser.id]
                     );
+                    console.log(`💾 Данные юзера ${req.telegramUser.id} обновлены.`);
                 } catch (dbErr) {
-                    console.error("Ошибка обновления пользователя в БД:", dbErr);
+                    console.error("❌ Ошибка обновления пользователя в БД:", dbErr.message);
                 }
             }
         } else {
             req.telegramUser = null;
         }
     } catch (e) {
+        console.error('❌ Исключение в middleware авторизации:', e.message);
         req.telegramUser = null;
         return res.status(401).json({ error: 'Unauthorized' });
     }
@@ -111,13 +128,16 @@ app.use(async (req, res, next) => {
 // Получение профиля пользователя
 app.get('/api/user', async (req, res) => {
     if (!req.telegramUser || !req.telegramUser.id) {
+        console.log('❌ /api/user: Пользователь не авторизован');
         return res.status(401).json({ error: 'Unauthorized' });
     }
     try {
+        console.log(`🔍 Запрос профиля для юзера ${req.telegramUser.id}`);
         let userRes = await query('SELECT id, username, first_name, balance, avatar_url, last_daily_case_open, is_admin FROM users WHERE id = $1', [req.telegramUser.id]);
         let user = userRes.rows[0];
         
         if (!user) {
+            console.log(`➕ Пользователь ${req.telegramUser.id} не найден в БД, регистрируем...`);
             const avatarUrl = req.telegramUser.photo_url || null;
             const isAdminUser = req.telegramUser.id.toString() === process.env.ADMIN_TELEGRAM_ID;
             user = {
@@ -133,10 +153,11 @@ app.get('/api/user', async (req, res) => {
                 'INSERT INTO users (id, username, first_name, last_name, avatar_url, is_admin) VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (id) DO NOTHING',
                 [user.id, user.username, req.telegramUser.first_name, req.telegramUser.last_name, user.avatar_url, user.is_admin]
             );
+            console.log(`➕ Регистрация юзера ${req.telegramUser.id} завершена.`);
         }
         res.json(user);
     } catch (error) {
-        console.error("Ошибка в /api/user:", error);
+        console.error("❌ Ошибка в /api/user:", error.message);
         res.status(500).json({ error: 'Internal server error' });
     }
 });
@@ -170,7 +191,7 @@ app.get('/api/inventory', async (req, res) => {
         }
         res.json(inventoryFlat);
     } catch (error) {
-        console.error("Ошибка в /api/inventory:", error);
+        console.error("❌ Ошибка в /api/inventory:", error.message);
         res.status(500).json({ error: 'Internal server error' });
     }
 });
@@ -267,7 +288,7 @@ app.post('/api/open_daily_case', async (req, res) => {
 
     } catch (error) {
         if (client) await client.query('ROLLBACK');
-        console.error("Ошибка открытия ежедневного кейса:", error);
+        console.error("❌ Ошибка открытия ежедневного кейса:", error.message);
         res.status(500).json({ error: 'Произошла ошибка при открытии ежедневного кейса.' });
     } finally {
         if (client) client.release(); 
@@ -358,7 +379,7 @@ app.post('/api/open_newbie_case', async (req, res) => {
 
     } catch (error) {
         if (client) await client.query('ROLLBACK');
-        console.error("Ошибка открытия кейса новичка:", error);
+        console.error("❌ Ошибка открытия кейса новичка:", error.message);
         res.status(500).json({ error: 'Произошла ошибка при открытии кейса новичка.' });
     } finally {
         if (client) client.release();
@@ -410,7 +431,7 @@ app.post('/api/sell_gift', async (req, res) => {
         res.json({ success: true, newBalance: newBalance });
     } catch (error) {
         if (client) await client.query('ROLLBACK');
-        console.error("Ошибка в /api/sell_gift:", error);
+        console.error("❌ Ошибка в /api/sell_gift:", error.message);
         res.status(500).json({ error: 'Ошибка при продаже.' });
     } finally {
         if (client) client.release();
@@ -472,7 +493,7 @@ app.post('/api/withdraw_gift', async (req, res) => {
 
     } catch (error) {
         if (client) await client.query('ROLLBACK');
-        console.error('Ошибка вывода предмета:', error);
+        console.error('❌ Ошибка вывода предмета:', error.message);
         res.status(500).json({ error: 'Ошибка сервера при выводе.' });
     } finally {
         if (client) client.release();
@@ -534,10 +555,10 @@ app.post('/api/deposit_gift_request', async (req, res) => {
 
         res.json({ success: true });
     } catch (error) {
-        console.error('Ошибка отправки заявки на ввод:', error);
+        console.error('❌ Ошибка отправки заявки на ввод:', error.message);
         res.status(500).json({ error: 'Ошибка сервера.' });
     }
-}); // Синтаксическая ошибка была исправлена здесь, как вы упоминали.
+});
 
 // Обработка обратных вызовов для админа в ТГ Боте
 if (bot && typeof bot.on === 'function') {
@@ -607,7 +628,7 @@ app.get('/api/daily_case_info', (req, res) => {
     res.json({ channel_username: CHANNEL_USERNAME });
 });
 
-// ИЗМЕНЕНИЕ: Автоматическая отправка уведомлений о доступности кейса (самовызывающийся setTimeout)
+// Автоматическая отправка уведомлений о доступности кейса (самовызывающийся setTimeout)
 async function scheduleDailyCaseNotifications() {
     try {
         const now = new Date();
@@ -635,7 +656,6 @@ async function scheduleDailyCaseNotifications() {
                 })
                 .catch(err => {
                     console.error(`Не удалось отправить пуш-уведомление пользователю ${user.id}:`, err.message);
-                    // Если бот заблокирован или чат не найден, считаем уведомление отправленным
                     if (err.message.includes('bot was blocked') || err.message.includes('chat not found')) {
                         query('UPDATE users SET daily_case_notified = TRUE WHERE id = $1', [user.id]).catch(e => console.error("Ошибка при обновлении daily_case_notified после неудачной отправки:", e.message));
                     }
@@ -644,12 +664,10 @@ async function scheduleDailyCaseNotifications() {
     } catch (err) {
         console.error('Ошибка в планировщике фоновых уведомлений:', err);
     } finally {
-        // Планируем следующий запуск через 60 секунд после завершения текущего
         setTimeout(scheduleDailyCaseNotifications, 60000);
     }
 }
 
-// Запускаем планировщик при старте сервера
 scheduleDailyCaseNotifications();
 
 app.listen(PORT, () => console.log("🚀 Safe Server running on port " + PORT));
