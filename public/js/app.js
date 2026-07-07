@@ -4,9 +4,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const API_BASE_URL = window.location.origin;
     let currentUser = {};
-    let currentCaseType = 'daily'; // 'daily' или 'newbie'
+    let currentCaseType = 'daily'; 
 
-    // Ссылка на картинку-алмаз
     const GRAMCOIN_ICON_URL = "https://unlimbot.hb.ru-msk.vkcloud-storage.ru/uploads/e50927856ba14322ba6d149e827e3208507ddd89d841feb1.jpg";
 
     // Пул для Ежедневного Бесплатного кейса
@@ -47,7 +46,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         { id: 30, name: "Пополнение 0.005", icon: GRAMCOIN_ICON_URL, price: "0.005", rawPrice: 0.005, isGold: false, type: "balance" }
     ];
 
-    // Объединяем пулы для поиска при рендеринге инвентаря
     const ALL_ITEMS_POOL = [...DAILY_GIFT_POOL, ...NEWBIE_GIFT_POOL];
 
     const elements = {
@@ -65,10 +63,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         newbieCaseBanner: document.getElementById('newbie-case-banner')
     };
 
-    // Генерация иконки алмаза для верстки
     const getGramIconHtml = () => `<img src="${GRAMCOIN_ICON_URL}" class="gram-icon" alt="">`;
 
-    // Показ всплывающего тоста
     function showNotification(message, icon = '🎁') {
         const container = document.getElementById('toast-container');
         if (!container) return;
@@ -97,7 +93,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         }, 5000);
     }
 
-    // Модальное окно (поддержка HTML)
     function showCustomModal({ icon = '🎁', title, message, buttons = [], onClose = null }) {
         const overlay = document.getElementById('custom-modal');
         const modalIcon = document.getElementById('modal-icon');
@@ -131,7 +126,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         overlay.classList.remove('hidden');
     }
 
-    // Маршрутизация экранов
     function navigateTo(target) {
         [elements.homeSection, elements.caseSection, elements.inventorySection].forEach(s => s.classList.add('hidden'));
         elements.bottomNavigation.classList.remove('hidden');
@@ -148,7 +142,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             elements.caseSection.classList.remove('hidden');
             elements.bottomNavigation.classList.add('hidden'); 
             
-            // Динамический рендеринг заголовков в зависимости от кейса
             const titleEl = document.getElementById('case-header-nav-title');
             const mainTitleText = document.getElementById('case-main-title-text');
             const emojiEl = document.getElementById('case-main-emoji');
@@ -191,7 +184,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     document.getElementById('back-to-home-button').addEventListener('click', () => navigateTo('home'));
 
-    // Наполнение депозитарной формы (только подарки Ежедневного пула)
     function initDepositSelect() {
         const select = document.getElementById('deposit-item-select');
         if (!select) return;
@@ -206,7 +198,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    // Подтверждение ввода NFT подарка
     document.getElementById('deposit-confirm-button').addEventListener('click', async () => {
         const select = document.getElementById('deposit-item-select');
         const itemId = select.value;
@@ -247,7 +238,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     });
 
-    // Отрисовка наград выбранного кейса
     function renderRewardsGrid() {
         elements.rewardsGrid.innerHTML = '';
         const activePool = (currentCaseType === 'newbie') ? NEWBIE_GIFT_POOL : DAILY_GIFT_POOL;
@@ -257,7 +247,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             card.className = `reward-card ${gift.isGold ? 'gold-tier' : ''}`;
             const randomBadge = gift.type === 'gift' ? '<div class="reward-random-badge">random</div>' : '';
 
-            // Отображение цен (для подарков текст, для пополнений иконка алмаза + текст)
             let priceHtml = '';
             if (gift.type === 'balance') {
                 priceHtml = `<div class="reward-price-top"><img src="${GRAMCOIN_ICON_URL}" class="reward-coin" alt=""><span>${gift.price}</span></div>`;
@@ -275,7 +264,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    // Загрузка данных юзера
     async function fetchUserData() {
         try {
             const res = await fetch(`${API_BASE_URL}/api/user`, { 
@@ -293,7 +281,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             };
         }
 
-        // Обновление отображения баланса БЕЗ слова GRAM (Только число и иконка)
         elements.balanceDisplay.forEach(d => {
             if (d) d.innerHTML = `${parseFloat(currentUser.balance || 0).toFixed(3)} ${getGramIconHtml()}`;
         });
@@ -313,12 +300,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         updateDailyCaseTimer();
     }
 
-    // Таймер кейса (Работает только для Ежедневного)
     let dailyCaseTimerInterval;
     function updateDailyCaseTimer() {
         clearInterval(dailyCaseTimerInterval); 
 
-        // Если открыт кейс новичка — таймер и кулдауны не нужны, кнопка всегда доступна
         if (currentCaseType === 'newbie') {
             elements.spinBtn.innerHTML = `Запустить за 0.1 ${getGramIconHtml()}`;
             elements.spinBtn.classList.remove('hidden');
@@ -327,7 +312,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             return;
         }
 
-        // Логика таймера для Ежедневного бесплатного кейса
         elements.spinBtn.innerHTML = "Запустить бесплатно";
         if (currentUser.is_admin) {
             document.getElementById('home-case-status').innerText = 'Доступно!';
@@ -386,7 +370,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    // Загрузка инвентаря
     async function fetchInventory() {
         try {
             const res = await fetch(`${API_BASE_URL}/api/inventory`, { 
@@ -412,7 +395,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const card = document.createElement('div');
                 card.className = 'reward-card';
 
-                // В ИНВЕНТАРЕ У ПОДАРКОВ ЦЕНА БЕЗ КАРТИНКИ АЛМАЗА (ПРОСТО ТЕКСТ GRAM)
                 card.innerHTML = `
                     <div class="inventory-price-tag">${parseFloat(item.value).toFixed(2)} GRAM</div>
                     <img src="${imageSrc}" onerror="this.src='https://img.icons8.com/color/96/gift.png'">
@@ -423,7 +405,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                     </div>
                 `;
 
-                // Кнопка Вывода
                 card.querySelector('.withdraw-btn').addEventListener('click', () => {
                     showCustomModal({
                         icon: `<img src="${imageSrc}" style="width:70px;height:70px;object-fit:contain;">`,
@@ -461,7 +442,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                     });
                 });
 
-                // Кнопка Продажи
                 card.querySelector('.sell-btn').addEventListener('click', () => {
                     showCustomModal({
                         icon: '💰',
@@ -509,7 +489,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    // Инициализация трека рулетки (динамически на основе выбранного кейса)
     function initRouletteTrack() {
         elements.rouletteTrack.style.transition = 'none';
         elements.rouletteTrack.style.transform = 'translateX(0px)';
@@ -530,7 +509,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    // Вращение рулетки (время анимации ускорено до 3.2 секунд)
     function spinRoulette(winningItem, onComplete) {
         const itemWidth = 84; 
         const gap = 8; 
@@ -558,7 +536,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         }, 3300);
     }
 
-    // Обработка выигрыша
     function processWinning(winningGift, apiNewBalance = null) {
         if (winningGift.type === "balance" || winningGift.name.toLowerCase().includes("пополнение")) {
             showCustomModal({
@@ -616,7 +593,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    // Запуск вращения кейса (БЕЗ искусственных таймаутов, запрос уходит мгновенно)
     elements.spinBtn.addEventListener('click', async () => {
         elements.spinBtn.disabled = true;
         initRouletteTrack();
