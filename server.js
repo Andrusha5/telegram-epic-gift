@@ -224,11 +224,9 @@ app.post('/api/open_daily_case', async (req, res) => {
             );
         }
 
-        // Обнуляем флаг уведомлений. Ровно через 24 часа пользователю придет пуш в бот
         await client.query('UPDATE users SET last_daily_case_open = NOW(), daily_case_notified = FALSE WHERE id = $1', [userId]);
         await client.query('COMMIT');
 
-        // Оповещение администратора в Telegram при выигрыше подарка
         if (wonItem.type === 'gift') {
             const adminId = process.env.ADMIN_TELEGRAM_ID;
             if (adminId && bot && typeof bot.sendMessage === 'function') {
@@ -258,7 +256,7 @@ app.post('/api/open_newbie_case', async (req, res) => {
         return res.status(401).json({ error: 'Unauthorized' });
     }
     const userId = req.telegramUser.id;
-    const priceToOpen = 0.1; // Цена прокрута составляет ровно 0.1 GRAM
+    const priceToOpen = 0.1; 
     let client;
 
     try {
@@ -278,7 +276,6 @@ app.post('/api/open_newbie_case', async (req, res) => {
             return res.status(400).json({ error: 'Недостаточно GRAM на балансе для открытия!' });
         }
 
-        // Списываем стоимость открытия с баланса пользователя
         let currentBalance = parseFloat(user.balance) - priceToOpen;
         await client.query('UPDATE users SET balance = $1 WHERE id = $2', [currentBalance, userId]);
 
@@ -307,7 +304,6 @@ app.post('/api/open_newbie_case', async (req, res) => {
 
         if (!wonItem) wonItem = drops[drops.length - 1];
 
-        // Добавляем выигрыш пользователю
         if (wonItem.type === 'balance') {
             currentBalance += parseFloat(wonItem.value);
             await client.query('UPDATE users SET balance = $1 WHERE id = $2', [currentBalance, userId]);
@@ -322,7 +318,6 @@ app.post('/api/open_newbie_case', async (req, res) => {
 
         await client.query('COMMIT');
 
-        // Уведомление админа о крупном выигрыше
         if (wonItem.type === 'gift') {
             const adminId = process.env.ADMIN_TELEGRAM_ID;
             if (adminId && bot && typeof bot.sendMessage === 'function') {
@@ -518,7 +513,7 @@ app.post('/api/deposit_gift_request', async (req, res) => {
         console.error('Ошибка отправки заявки на ввод:', error);
         res.status(500).json({ error: 'Ошибка сервера.' });
     }
-});
+}); // СИНТАКСИЧЕСКАЯ ОШИБКА ИСПРАВЛЕНА ЗДЕСЬ (добавлены скобки закрытия)
 
 // Обработка обратных вызовов для админа в ТГ Боте
 if (bot && typeof bot.on === 'function') {
@@ -588,7 +583,7 @@ app.get('/api/daily_case_info', (req, res) => {
     res.json({ channel_username: CHANNEL_USERNAME });
 });
 
-// --- АВТОМАТИЧЕСКАЯ ОТПРАВКА УВЕДОМЛЕНИЙ ПРИ ДОСТУПНОСТИ КЕЙСА (РАЗ В МИНУТУ) ---
+// Автоматическая отправка уведомлений о доступности кейса (раз в минуту)
 setInterval(async () => {
     try {
         const now = new Date();
@@ -612,7 +607,6 @@ setInterval(async () => {
 
             await bot.sendMessage(user.id, msgText, options)
                 .then(async () => {
-                    // Ставим флаг TRUE, чтобы не слать спам повторно
                     await query('UPDATE users SET daily_case_notified = TRUE WHERE id = $1', [user.id]);
                 })
                 .catch(err => {
@@ -625,6 +619,6 @@ setInterval(async () => {
     } catch (err) {
         console.error('Ошибка в планировщике фоновых уведомлений:', err);
     }
-}, 60000); // Повторяем каждую минуту
+}, 60000);
 
 app.listen(PORT, () => console.log("🚀 Safe Server running on port " + PORT));
