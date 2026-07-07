@@ -152,106 +152,104 @@ app.get('/api/inventory', async (req, res) => {
     }
 });
 
-// 3. Открытие кейса (Транзакция оптимизирована, добавлен вызов notifyAdmin)
+// 3. Открытие кейса (Транзакция оптимизирована, добавлен вызов notifyAdmin только для подарков)
 app.post('/api/open_daily_case', async (req, res) => {
     if (!req.telegramUser || !req.telegramUser.id) {
         return res.status(401).json({ error: 'Unauthorized' });
     }
     const userId = req.telegramUser.id;
 
+    let client;
     try {
         const isSubscribed = await checkUserSubscription(userId);
         if (!isSubscribed) {
             return res.status(403).json({ error: "Для открытия кейса необходимо быть подписчиком канала @" + CHANNEL_USERNAME });
         }
 
-        const client = await pool.connect();
-        try {
-            await client.query('BEGIN');
+        client = await pool.connect();
+        await client.query('BEGIN');
 
-            const userRes = await client.query('SELECT username, first_name, last_name, balance, last_daily_case_open, is_admin FROM users WHERE id = $1 FOR UPDATE', [userId]);
-            const user = userRes.rows[0];
+        const userRes = await client.query('SELECT username, first_name, last_name, balance, last_daily_case_open, is_admin FROM users WHERE id = $1 FOR UPDATE', [userId]);
+        const user = userRes.rows[0];
 
-            if (!user) {
-                await client.query('ROLLBACK');
-                return res.status(404).json({ error: 'Пользователь не найден.' });
+        if (!user) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({ error: 'Пользователь не найден.' });
+        }
+
+        const now = new Date();
+        const lastOpen = new Date(user.last_daily_case_open);
+        const timeElapsed = now.getTime() - lastOpen.getTime();
+        const cooldown = 24 * 60 * 60 * 1000;
+
+        if (!user.is_admin && timeElapsed < cooldown) {
+            await client.query('ROLLBACK');
+            const timeLeftMs = cooldown - timeElapsed;
+            return res.status(400).json({ error: 'Кейс будет доступен позже.', timeLeftMs });
+        }
+
+        const drops = (await client.query(`
+            SELECT dcd.item_id, dcd.chance, i.name, i.type, i.value, i.image_url
+            FROM daily_case_drops dcd
+            JOIN items i ON dcd.item_id = i.id
+        `)).rows;
+
+        if (drops.length === 0) {
+            await client.query('ROLLBACK');
+            return res.status(500).json({ error: 'Кейс временно пуст.' });
+        }
+
+        let totalChance = drops.reduce((sum, drop) => sum + parseFloat(drop.chance), 0);
+        let rand = Math.random() * totalChance;
+        let wonItem = null;
+
+        for (const drop of drops) {
+            rand -= parseFloat(drop.chance);
+            if (rand <= 0) {
+                wonItem = drop;
+                break;
             }
+        }
 
-            const now = new Date();
-            const lastOpen = new Date(user.last_daily_case_open);
-            const timeElapsed = now.getTime() - lastOpen.getTime();
-            const cooldown = 24 * 60 * 60 * 1000;
+        if (!wonItem) wonItem = drops[drops.length - 1]; // Fallback to last item if no item selected (shouldn't happen with correct chances)
 
-            if (!user.is_admin && timeElapsed < cooldown) {
-                await client.query('ROLLBACK');
-                const timeLeftMs = cooldown - timeElapsed;
-                return res.status(400).json({ error: 'Кейс будет доступен позже.', timeLeftMs });
-            }
+        let newBalance = parseFloat(user.balance);
+        if (wonItem.type === 'balance') {
+            newBalance += parseFloat(wonItem.value);
+            await client.query('UPDATE users SET balance = $1 WHERE id = $2', [newBalance, userId]);
+            await client.query('INSERT INTO transactions (user_id, type, item_id, amount, details) VALUES ($1, $2, $3, $4, $5)',
+                [userId, 'case_open', wonItem.item_id, wonItem.value, 'Выигрыш из ежедневного кейса: ' + wonItem.name]);
+        } else { // wonItem.type === 'gift'
+            await client.query(
+                'INSERT INTO user_inventory (user_id, item_id, quantity) VALUES ($1, $2, 1) ON CONFLICT (user_id, item_id) DO UPDATE SET quantity = user_inventory.quantity + 1',
+                [userId, wonItem.item_id]
+            );
+        }
 
-            const drops = (await client.query(`
-                SELECT dcd.item_id, dcd.chance, i.name, i.type, i.value, i.image_url
-                FROM daily_case_drops dcd
-                JOIN items i ON dcd.item_id = i.id
-            `)).rows;
+        await client.query('UPDATE users SET last_daily_case_open = NOW() WHERE id = $1', [userId]);
+        await client.query('COMMIT');
 
-            if (drops.length === 0) {
-                await client.query('ROLLBACK');
-                return res.status(500).json({ error: 'Кейс временно пуст.' });
-            }
-
-            let totalChance = drops.reduce((sum, drop) => sum + parseFloat(drop.chance), 0);
-            let rand = Math.random() * totalChance;
-            let wonItem = null;
-
-            for (const drop of drops) {
-                rand -= parseFloat(drop.chance);
-                if (rand <= 0) {
-                    wonItem = drop;
-                    break;
-                }
-            }
-
-            if (!wonItem) wonItem = drops[drops.length - 1];
-
-            let newBalance = parseFloat(user.balance);
-            if (wonItem.type === 'balance') {
-                newBalance += parseFloat(wonItem.value);
-                await client.query('UPDATE users SET balance = $1 WHERE id = $2', [newBalance, userId]);
-                await client.query('INSERT INTO transactions (user_id, type, item_id, amount, details) VALUES ($1, $2, $3, $4, $5)',
-                    [userId, 'case_open', wonItem.item_id, wonItem.value, 'Выигрыш из ежедневного кейса: ' + wonItem.name]);
-            } else {
-                await client.query(
-                    'INSERT INTO user_inventory (user_id, item_id, quantity) VALUES ($1, $2, 1) ON CONFLICT (user_id, item_id) DO UPDATE SET quantity = user_inventory.quantity + 1',
-                    [userId, wonItem.item_id]
-                );
-            }
-
-            await client.query('UPDATE users SET last_daily_case_open = NOW() WHERE id = $1', [userId]);
-            await client.query('COMMIT');
-
-            // Уведомление админа о выигрыше
+        // Уведомление админа о выигрыше ПОДАРКА (только если wonItem.type === 'gift')
+        if (wonItem.type === 'gift') {
             const adminId = process.env.ADMIN_TELEGRAM_ID;
             if (adminId && bot && typeof bot.sendMessage === 'function') {
                 const userMention = user.username ? '@' + user.username : (user.first_name || 'Без имени');
-                const adminMsg = "🎉 *Новый выигрыш в кейсе!*\n\n" +
+                const adminMsg = "🎉 *Новый выигрыш подарка в кейсе!*\n\n" +
                                  "👤 *Пользователь:* " + (user.first_name || "") + " " + (user.last_name || "") + " (" + userMention + ")\n" +
-                                 "🎁 *Выиграл:* " + wonItem.name + " (" + wonItem.value + " TON)\n" +
+                                 "🎁 *Выиграл:* " + wonItem.name + " (" + wonItem.value + " GRAM)\n" +
                                  "🆔 *Telegram ID:* `" + userId + "`";
                 bot.sendMessage(adminId, adminMsg, { parse_mode: 'Markdown' }).catch(() => {});
             }
-
-            res.json({ success: true, wonItem: { id: wonItem.item_id, name: wonItem.name, price: wonItem.value + " TON" }, newBalance: newBalance });
-
-        } catch (error) {
-            await client.query('ROLLBACK');
-            console.error("Ошибка транзакции кейса:", error);
-            res.status(500).json({ error: 'Произошла ошибка при открытии.' });
-        } finally {
-            client.release(); // Обязательный возврат коннекта в пул Render/Supabase
         }
+
+        res.json({ success: true, wonItem: { id: wonItem.item_id, name: wonItem.name, price: wonItem.value + " GRAM", type: wonItem.type }, newBalance: newBalance });
+
     } catch (error) {
-        console.error("Глобальная ошибка /api/open_daily_case:", error);
-        res.status(500).json({ error: 'Internal server error.' });
+        if (client) await client.query('ROLLBACK');
+        console.error("Ошибка транзакции кейса:", error);
+        res.status(500).json({ error: 'Произошла ошибка при открытии.' });
+    } finally {
+        if (client) client.release(); // Обязательный возврат коннекта в пул Render/Supabase
     }
 });
 
@@ -261,8 +259,9 @@ app.post('/api/sell_gift', async (req, res) => {
     const userId = req.telegramUser.id;
     const { itemId, price } = req.body;
 
-    const client = await pool.connect();
+    let client;
     try {
+        client = await pool.connect();
         await client.query('BEGIN');
         const inventoryRes = await client.query('SELECT quantity FROM user_inventory WHERE user_id = $1 AND item_id = $2 FOR UPDATE', [userId, itemId]);
         const item = inventoryRes.rows[0];
@@ -279,29 +278,31 @@ app.post('/api/sell_gift', async (req, res) => {
 
         await client.query('UPDATE users SET balance = $1 WHERE id = $2', [newBalance, userId]);
         
-        const giftDetails = (await client.query('SELECT name FROM items WHERE id = $1', [itemId])).rows[0];
+        const giftDetails = (await client.query('SELECT name, type FROM items WHERE id = $1', [itemId])).rows[0];
         
         await client.query('COMMIT');
 
-        // Уведомление админу о продаже
-        const adminId = process.env.ADMIN_TELEGRAM_ID;
-        if (adminId && bot && typeof bot.sendMessage === 'function') {
-            const userMention = user.username ? '@' + user.username : (user.first_name || 'Без имени');
-            const adminMsg = "💰 *Продажа подарка!*\n\n" +
-                             "👤 *Пользователь:* " + (user.first_name || "") + " " + (user.last_name || "") + " (" + userMention + ")\n" +
-                             "🎁 *Продан предмет:* " + (giftDetails?.name || 'Подарок') + "\n" +
-                             "💵 *Сумма сделки:* " + price + " TON\n" +
-                             "🆔 *Telegram ID:* `" + userId + "`";
-            bot.sendMessage(adminId, adminMsg, { parse_mode: 'Markdown' }).catch(() => {});
+        // Уведомление админу о продаже ПОДАРКА (только если giftDetails.type === 'gift')
+        if (giftDetails && giftDetails.type === 'gift') {
+            const adminId = process.env.ADMIN_TELEGRAM_ID;
+            if (adminId && bot && typeof bot.sendMessage === 'function') {
+                const userMention = user.username ? '@' + user.username : (user.first_name || 'Без имени');
+                const adminMsg = "💰 *Подарок продан!*\n\n" +
+                                 "👤 *Пользователь:* " + (user.first_name || "") + " " + (user.last_name || "") + " (" + userMention + ")\n" +
+                                 "🎁 *Продан предмет:* " + (giftDetails?.name || 'Подарок') + "\n" +
+                                 "💵 *Сумма сделки:* " + price + " GRAM\n" +
+                                 "🆔 *Telegram ID:* `" + userId + "`";
+                bot.sendMessage(adminId, adminMsg, { parse_mode: 'Markdown' }).catch(() => {});
+            }
         }
 
         res.json({ success: true, newBalance: newBalance });
     } catch (error) {
-        await client.query('ROLLBACK');
+        if (client) await client.query('ROLLBACK');
         console.error("Ошибка в /api/sell_gift:", error);
         res.status(500).json({ error: 'Ошибка при продаже.' });
     } finally {
-        client.release();
+        if (client) client.release();
     }
 });
 
@@ -316,8 +317,9 @@ app.post('/api/withdraw_gift', async (req, res) => {
         return res.status(400).json({ error: 'Неверный ID подарка.' });
     }
 
-    const client = await pool.connect();
+    let client;
     try {
+        client = await pool.connect();
         await client.query('BEGIN');
         const inventoryRes = await client.query('SELECT quantity FROM user_inventory WHERE user_id = $1 AND item_id = $2 FOR UPDATE', [userId, parsedItemId]);
         const itemRow = inventoryRes.rows[0];
@@ -329,38 +331,41 @@ app.post('/api/withdraw_gift', async (req, res) => {
 
         await client.query('UPDATE user_inventory SET quantity = quantity - 1 WHERE user_id = $1 AND item_id = $2', [userId, parsedItemId]);
         
-        const itemDetails = (await client.query('SELECT name, value FROM items WHERE id = $1', [parsedItemId])).rows[0];
+        const itemDetails = (await client.query('SELECT name, value, type FROM items WHERE id = $1', [parsedItemId])).rows[0];
         const userRes = await client.query('SELECT username, first_name, last_name FROM users WHERE id = $1', [userId]);
         const user = userRes.rows[0];
 
         await client.query('COMMIT');
 
-        const adminId = process.env.ADMIN_TELEGRAM_ID;
-        if (adminId && bot && typeof bot.sendMessage === 'function') {
-            const userMention = user.username ? '@' + user.username : (user.first_name || 'Без имени');
-            const chatLink = 'tg://user?id=' + userId;
-            const tmeLink = user.username ? 'https://t.me/' + user.username : 'https://t.me/user?id=' + userId;
+        // Уведомление админа о выводе ПОДАРКА (только если itemDetails.type === 'gift')
+        if (itemDetails && itemDetails.type === 'gift') {
+            const adminId = process.env.ADMIN_TELEGRAM_ID;
+            if (adminId && bot && typeof bot.sendMessage === 'function') {
+                const userMention = user.username ? '@' + user.username : (user.first_name || 'Без имени');
+                const chatLink = 'tg://user?id=' + userId;
+                const tmeLink = user.username ? 'https://t.me/' + user.username : 'https://t.me/user?id=' + userId;
 
-            const message = "🚨 *Новая заявка на вывод подарка!*\n\n" +
-                            "🎁 *Подарок:* " + itemDetails.name + " (" + itemDetails.value + " TON)\n" +
-                            "👤 *Пользователь:* " + (user.first_name || "") + " " + (user.last_name || "") + " (" + userMention + ")\n" +
-                            "🆔 *Telegram ID:* " + userId + "\n\n" +
-                            "💬 [Открыть чат](" + chatLink + ")\n" +
-                            "🔗 [Ссылка t.me](" + tmeLink + ")";
+                const message = "🚨 *Новая заявка на вывод подарка!*\n\n" +
+                                "🎁 *Подарок:* " + itemDetails.name + " (" + itemDetails.value + " GRAM)\n" +
+                                "👤 *Пользователь:* " + (user.first_name || "") + " " + (user.last_name || "") + " (" + userMention + ")\n" +
+                                "🆔 *Telegram ID:* " + userId + "\n\n" +
+                                "💬 [Открыть чат](" + chatLink + ")\n" +
+                                "🔗 [Ссылка t.me](" + tmeLink + ")";
 
-            bot.sendMessage(adminId, message, { parse_mode: 'Markdown' }).catch(err => {
-                console.error("Бот не смог отправить сообщение админу:", err.message);
-            });
+                bot.sendMessage(adminId, message, { parse_mode: 'Markdown' }).catch(err => {
+                    console.error("Бот не смог отправить сообщение админу:", err.message);
+                });
+            }
         }
 
         res.json({ success: true });
 
     } catch (error) {
-        await client.query('ROLLBACK');
+        if (client) await client.query('ROLLBACK');
         console.error('Ошибка вывода предмета:', error);
         res.status(500).json({ error: 'Ошибка сервера при выводе.' });
     } finally {
-        client.release();
+        if (client) client.release();
     }
 });
 
@@ -376,43 +381,46 @@ app.post('/api/deposit_gift_request', async (req, res) => {
     }
 
     try {
-        const itemDetails = (await query('SELECT name, value FROM items WHERE id = $1', [parsedItemId])).rows[0];
+        const itemDetails = (await query('SELECT name, value, type FROM items WHERE id = $1', [parsedItemId])).rows[0];
         if (!itemDetails) {
             return res.status(400).json({ error: 'Подарок не найден в системе.' });
         }
 
-        const userRes = await query('SELECT username, first_name, last_name FROM users WHERE id = $1', [userId]);
-        const user = userRes.rows[0];
+        // Уведомление админу о вводе ПОДАРКА (только если itemDetails.type === 'gift')
+        if (itemDetails.type === 'gift') {
+            const userRes = await query('SELECT username, first_name, last_name FROM users WHERE id = $1', [userId]);
+            const user = userRes.rows[0];
 
-        const adminId = process.env.ADMIN_TELEGRAM_ID;
-        if (adminId && bot && typeof bot.sendMessage === 'function') {
-            const userMention = user.username ? '@' + user.username : (user.first_name || 'Без имени');
-            const chatLink = 'tg://user?id=' + userId;
-            const tmeLink = user.username ? 'https://t.me/' + user.username : 'https://t.me/user?id=' + userId;
+            const adminId = process.env.ADMIN_TELEGRAM_ID;
+            if (adminId && bot && typeof bot.sendMessage === 'function') {
+                const userMention = user.username ? '@' + user.username : (user.first_name || 'Без имени');
+                const chatLink = 'tg://user?id=' + userId;
+                const tmeLink = user.username ? 'https://t.me/' + user.username : 'https://t.me/user?id=' + userId;
 
-            const message = "📥 *Новая заявка на ВВОД подарка NFT!*\n\n" +
-                            "🎁 *Подарок:* " + itemDetails.name + " (" + itemDetails.value + " TON)\n" +
-                            "👤 *Отправитель:* " + (user.first_name || "") + " " + (user.last_name || "") + " (" + userMention + ")\n" +
-                            "🆔 *Telegram ID:* `" + userId + "`\n\n" +
-                            "💬 [Открыть чат с пользователем](" + chatLink + ")\n" +
-                            "🔗 [Прямая ссылка t.me](" + tmeLink + ")\n\n" +
-                            "_Проверьте получение подарка на вашем аккаунте @Sintopa и нажмите кнопку ниже:_";
+                const message = "📥 *Новая заявка на ВВОД подарка NFT!*\n\n" +
+                                "🎁 *Подарок:* " + itemDetails.name + " (" + itemDetails.value + " GRAM)\n" +
+                                "👤 *Отправитель:* " + (user.first_name || "") + " " + (user.last_name || "") + " (" + userMention + ")\n" +
+                                "🆔 *Telegram ID:* `" + userId + "`\n\n" +
+                                "💬 [Открыть чат с пользователем](" + chatLink + ")\n" +
+                                "🔗 [Прямая ссылка t.me](" + tmeLink + ")\n\n" +
+                                "_Проверьте получение подарка на вашем аккаунте @Sintopa и нажмите кнопку ниже:_";
 
-            const options = {
-                parse_mode: 'Markdown',
-                reply_markup: {
-                    inline_keyboard: [
-                        [
-                            { text: '✅ Подтвердить', callback_data: 'dep_app_' + userId + '_' + parsedItemId },
-                            { text: '❌ Отклонить', callback_data: 'dep_rej_' + userId + '_' + parsedItemId }
+                const options = {
+                    parse_mode: 'Markdown',
+                    reply_markup: {
+                        inline_keyboard: [
+                            [
+                                { text: '✅ Подтвердить', callback_data: 'dep_app_' + userId + '_' + parsedItemId },
+                                { text: '❌ Отклонить', callback_data: 'dep_rej_' + userId + '_' + parsedItemId }
+                            ]
                         ]
-                    ]
-                }
-            };
+                    }
+                };
 
-            bot.sendMessage(adminId, message, options).catch(err => {
-                console.error("Не удалось отправить заявку ввода админу:", err);
-            });
+                bot.sendMessage(adminId, message, options).catch(err => {
+                    console.error("Не удалось отправить заявку ввода админу:", err);
+                });
+            }
         }
 
         res.json({ success: true });
@@ -428,18 +436,28 @@ if (bot && typeof bot.on === 'function') {
         const action = callbackQuery.data;
         const msg = callbackQuery.message;
         
+        // Проверка, что запрос пришел от админа
+        if (callbackQuery.from.id.toString() !== process.env.ADMIN_TELEGRAM_ID) {
+            bot.answerCallbackQuery(callbackQuery.id, { text: 'Только администратор может использовать эту кнопку.', show_alert: true });
+            return;
+        }
+
         if (action.startsWith('dep_app_') || action.startsWith('dep_rej_')) {
             const parts = action.split('_'); 
             const isApprove = parts[1] === 'app';
             const targetUserId = parseInt(parts[2], 10);
             const itemId = parseInt(parts[3], 10);
 
+            let client;
             try {
-                const itemRes = await query('SELECT name FROM items WHERE id = $1', [itemId]);
+                client = await pool.connect();
+                await client.query('BEGIN');
+
+                const itemRes = await client.query('SELECT name FROM items WHERE id = $1', [itemId]);
                 const itemName = itemRes.rows[0]?.name || 'Подарок';
 
                 if (isApprove) {
-                    await query(
+                    await client.query(
                         'INSERT INTO user_inventory (user_id, item_id, quantity) VALUES ($1, $2, 1) ON CONFLICT (user_id, item_id) DO UPDATE SET quantity = user_inventory.quantity + 1',
                         [targetUserId, itemId]
                     );
@@ -449,7 +467,8 @@ if (bot && typeof bot.on === 'function') {
                     bot.editMessageText("✅ Заявка на ввод подарка *\"" + itemName + "\"* одобрена. Предмет успешно зачислен в инвентарь пользователя!", {
                         chat_id: msg.chat.id,
                         message_id: msg.message_id,
-                        parse_mode: 'Markdown'
+                        parse_mode: 'Markdown',
+                        reply_markup: { inline_keyboard: [] } // Убираем кнопки после обработки
                     }).catch(() => {});
                 } else {
                     bot.sendMessage(targetUserId, "❌ *Ввод подарка отклонен!*\n\nВаша заявка на ввод подарка *\"" + itemName + "\"* была отклонена администратором. Пожалуйста, убедитесь, что вы отправили NFT на аккаунт @Sintopa.", { parse_mode: 'Markdown' }).catch(() => {});
@@ -457,11 +476,17 @@ if (bot && typeof bot.on === 'function') {
                     bot.editMessageText("❌ Заявка на ввод подарка *\"" + itemName + "\"* была отклонена вами.", {
                         chat_id: msg.chat.id,
                         message_id: msg.message_id,
-                        parse_mode: 'Markdown'
+                        parse_mode: 'Markdown',
+                        reply_markup: { inline_keyboard: [] } // Убираем кнопки после обработки
                     }).catch(() => {});
                 }
+                await client.query('COMMIT');
             } catch (err) {
+                if (client) await client.query('ROLLBACK');
                 console.error('Ошибка в callback_query обработчике:', err);
+                bot.sendMessage(msg.chat.id, 'Произошла ошибка при обработке заявки: ' + err.message, { parse_mode: 'Markdown' }).catch(() => {});
+            } finally {
+                if (client) client.release();
             }
         }
 
