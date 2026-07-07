@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>BestGifts</title>
-    <link rel="stylesheet" href="/css/style.css?v=7.0">
+    <link rel="stylesheet" href="/css/style.css?v=7.1">
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&display=swap" rel="stylesheet">
 </head>
 <body>
@@ -33,7 +33,7 @@
                         <span id="user-username" class="user-username">Загрузка...</span>
                         <div class="balance-container">
                             <span class="balance-label">Баланс:</span>
-                            <span id="user-balance" class="balance-value">0.000 TON</span>
+                            <span id="user-balance" class="balance-value">0.000 GRAM</span>
                         </div>
                     </div>
                 </div>
@@ -42,19 +42,33 @@
             <main class="main-content">
                 <div class="welcome-banner">
                     <h2>Добро пожаловать в BestGifts!</h2>
-                    <p>Открывай ежедневные кейсы и выигрывай ценные призы в TON!</p>
+                    <p>Открывай ежедневные кейсы и выигрывай ценные призы в GRAM!</p>
                 </div>
 
-                <div class="section-divider-title">Ежедневный кейс</div>
+                <div class="section-divider-title">Кейсы</div>
                 
-                <div id="daily-case-banner" class="case-banner-card">
-                    <div class="case-banner-badge">БЕСПЛАТНО</div>
-                    <img src="https://img.icons8.com/color/144/treasure-chest.png" alt="Case" class="case-banner-img">
-                    <div class="case-banner-info">
-                        <h3>Ежедневный кейс</h3>
-                        <p id="home-case-status">Загрузка...</p>
+                <div class="cases-layout">
+                    <!-- Ежедневный кейс (слева) -->
+                    <div id="daily-case-banner" class="case-banner-card">
+                        <div class="case-banner-badge">БЕСПЛАТНО</div>
+                        <img src="https://img.icons8.com/color/144/treasure-chest.png" alt="Case" class="case-banner-img">
+                        <div class="case-banner-info">
+                            <h3>Ежедневный кейс</h3>
+                            <p id="home-case-status">Загрузка...</p>
+                        </div>
+                        <div class="case-banner-arrow">→</div>
                     </div>
-                    <div class="case-banner-arrow">→</div>
+
+                    <!-- Кейс новичка (справа) -->
+                    <div id="newbie-case-banner" class="case-banner-card newbie-case">
+                        <div class="case-banner-badge">НОВЫЙ</div>
+                        <img src="https://img.icons8.com/color/144/gift-box.png" alt="Newbie Case" class="case-banner-img">
+                        <div class="case-banner-info">
+                            <h3>Кейс новичка</h3>
+                            <p>Первый спин бесплатно!</p>
+                        </div>
+                        <div class="case-banner-arrow">→</div>
+                    </div>
                 </div>
             </main>
         </section>
@@ -71,7 +85,7 @@
                 <div class="user-bar-left">
                     <img id="case-user-avatar" class="user-avatar-small" src="https://img.icons8.com/color/96/user.png" alt="Avatar">
                     <span class="balance-sub-label">Баланс:</span>
-                    <span id="case-user-balance" class="balance-sub-value">0.000 TON</span>
+                    <span id="case-user-balance" class="balance-sub-value">0.000 GRAM</span>
                 </div>
             </div>
 
@@ -81,7 +95,7 @@
                         <span class="case-icon-mini">🎁</span>
                         <div class="case-text-group">
                             <span class="case-main-title">Ежедневный кейс</span>
-                            <span class="case-secondary-title">Испытай свою удачу сегодня!</span>
+                            <!-- <span class="case-secondary-title">Испытай свою удачу сегодня!</span> Убрано по запросу -->
                         </div>
                     </div>
                 </div>
@@ -124,7 +138,7 @@
                         <span id="inv-user-username" class="user-username">Загрузка...</span>
                         <div class="balance-container">
                             <span class="balance-label">Баланс:</span>
-                            <span id="inv-user-balance" class="balance-value">0.000 TON</span>
+                            <span id="inv-user-balance" class="balance-value">0.000 GRAM</span>
                         </div>
                     </div>
                 </div>
@@ -182,6 +196,6 @@
     </div>
 
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <script src="/js/app.js?v=7.0"></script>
+    <script src="/js/app.js?v=7.1"></script>
 </body>
-                            </html>
+                    </html>
