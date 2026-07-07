@@ -207,18 +207,31 @@ body {
     margin-bottom: 12px;
 }
 
+/* СЕТКА КЕЙСОВ */
+.cases-layout {
+    display: flex;
+    gap: 12px; /* Расстояние между кейсами */
+    margin-bottom: 20px;
+}
+
 .case-banner-card {
+    flex: 1; /* Каждый кейс занимает равное пространство */
     background: linear-gradient(135deg, #1c1c2d, #141420);
     border: 1px solid var(--border-color);
-    border-radius: 16px;
-    padding: 20px;
+    border-radius: 16px; /* Скругленные углы */
+    padding: 15px; /* Уменьшил паддинг, чтобы сделать более квадратным */
     display: flex;
+    flex-direction: column; /* Вертикальное расположение контента */
     align-items: center;
-    gap: 16px;
+    gap: 10px; /* Расстояние между элементами внутри карточки */
     position: relative;
     cursor: pointer;
     box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
     transition: transform 0.2s ease, border-color 0.2s;
+    text-align: center; /* Центрируем текст */
+    min-width: 120px; /* Минимальная ширина, чтобы не схлопывалось */
+    height: 140px; /* Фиксированная высота для квадратного вида */
+    justify-content: center; /* Центрируем контент по вертикали */
 }
 
 .case-banner-card:active {
@@ -227,40 +240,87 @@ body {
 
 .case-banner-badge {
     position: absolute;
-    top: 12px;
-    right: 12px;
+    top: 8px; /* Немного выше */
+    right: 8px; /* Немного правее */
     background: var(--secondary-color);
     color: #000;
-    font-size: 0.65rem;
+    font-size: 0.6rem; /* Чуть меньше шрифт */
     font-weight: 800;
-    padding: 3px 8px;
+    padding: 3px 6px; /* Меньше паддинг */
     border-radius: 6px;
+    white-space: nowrap; /* Не переносим текст */
+}
+
+.case-banner-card.newbie-case .case-banner-badge {
+    background: var(--primary-color);
+    color: #fff;
+    text-shadow: 0 0 5px rgba(255, 255, 255, 0.3);
 }
 
 .case-banner-img {
-    width: 64px;
-    height: 64px;
+    width: 50px; /* Уменьшил размер иконок */
+    height: 50px;
+    object-fit: contain;
+    margin: 0; /* Убрал лишние отступы */
 }
 
 .case-banner-info h3 {
-    margin: 0 0 6px 0;
-    font-size: 1.05rem;
+    margin: 0; /* Убрал лишние отступы */
+    font-size: 0.95rem; /* Чуть меньше шрифт */
     font-weight: 700;
     color: #fff;
 }
 
 .case-banner-info p {
     margin: 0;
-    font-size: 0.8rem;
-    color: var(--green-success);
+    font-size: 0.75rem; /* Чуть меньше шрифт */
+    color: var(--light-text-color);
     font-weight: 600;
+    line-height: 1.2;
 }
 
 .case-banner-arrow {
-    font-size: 1.4rem;
+    font-size: 1.2rem; /* Чуть меньше стрелка */
     color: var(--light-text-color);
     font-weight: 700;
+    position: absolute; /* Позиционируем внизу по центру */
+    bottom: 8px;
+    right: 8px;
 }
+
+/* СТРАНИЦА КЕЙСА */
+.case-page-header {
+    margin-bottom: 20px; /* Отступ от рулетки */
+}
+
+.case-title-block {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.case-icon-mini {
+    font-size: 1.8rem;
+    line-height: 1;
+}
+
+.case-text-group {
+    display: flex;
+    flex-direction: column;
+}
+
+.case-main-title {
+    font-size: 1.15rem;
+    font-weight: 800;
+    color: #fff;
+}
+
+/* .case-secondary-title {
+    font-size: 0.85rem;
+    color: var(--light-text-color);
+    margin-top: 4px;
+} */ /* Убрано по запросу */
+
 
 /* РУЛЕТКА */
 .roulette-wrapper {
@@ -859,4 +919,19 @@ body {
 
 .custom-toast-close:hover {
     color: #fff;
+}
+
+/* СТИЛИ ПУСТОГО ИНВЕНТАРЯ */
+.empty-inventory {
+    grid-column: 1 / -1; /* Занимает всю ширину сетки */
+    text-align: center;
+    color: var(--light-text-color);
+    padding: 40px 20px;
+    font-weight: 600;
+    font-size: 0.9rem;
+    line-height: 1.5;
+    background-color: var(--card-bg-color);
+    border-radius: 16px;
+    margin-top: 15px;
+    border: 1px solid var(--border-color);
     }
