@@ -13,9 +13,9 @@ process.on('uncaughtException', (err) => {
 const db = require('./db');
 const botModule = require('./bot');
 
-const bot = botModule.bot || botModule;
-const checkUserSubscription = botModule.checkUserSubscription || (async () => true);
-const getUserAvatarUrl = botModule.getUserAvatarUrl || (async () => null);
+const bot = botModule.bot; // Получаем инстанс бота
+const checkUserSubscription = botModule.checkUserSubscription;
+const getUserAvatarUrl = botModule.getUserAvatarUrl;
 
 const pool = db.pool || db;
 const query = (text, params) => pool.query(text, params);
@@ -23,9 +23,33 @@ const query = (text, params) => pool.query(text, params);
 const app = express();
 const PORT = process.env.PORT || 3000;
 const CHANNEL_USERNAME = process.env.CHANNEL_USERNAME || "";
+const WEB_APP_URL = process.env.WEB_APP_URL; // Добавил WEB_APP_URL для вебхуков
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
+
+// ИЗМЕНЕНИЕ: Настройка вебхуков для Telegram Bot
+if (WEB_APP_URL && process.env.TELEGRAM_BOT_TOKEN) {
+    const webhookPath = `/bot${process.env.TELEGRAM_BOT_TOKEN}`;
+    const webhookUrl = `${WEB_APP_URL}${webhookPath}`;
+
+    // Установка вебхука при старте сервера
+    bot.setWebHook(webhookUrl)
+        .then(() => console.log('✅ Telegram Webhook установлен на:', webhookUrl))
+        .catch(e => console.error('❌ Ошибка установки Telegram Webhook:', e.message));
+
+    // Обработчик для входящих обновлений от Telegram
+    app.post(webhookPath, (req, res) => {
+        bot.processUpdate(req.body);
+        res.sendStatus(200); // Важно всегда отвечать 200 OK
+    });
+} else {
+    // Если WEB_APP_URL или TELEGRAM_BOT_TOKEN не заданы, сообщаем об этом
+    console.warn('⚠️ WEB_APP_URL или TELEGRAM_BOT_TOKEN не заданы. Вебхуки не будут установлены.');
+    // В этом случае, если бот запущен без polling, он не будет получать обновления.
+    // Для разработки можно временно включить polling в bot.js, но для продакшена нужны вебхуки.
+}
+
 
 // Middleware авторизации и защиты данных Telegram
 app.use(async (req, res, next) => {
@@ -513,7 +537,7 @@ app.post('/api/deposit_gift_request', async (req, res) => {
         console.error('Ошибка отправки заявки на ввод:', error);
         res.status(500).json({ error: 'Ошибка сервера.' });
     }
-}); // СИНТАКСИЧЕСКАЯ ОШИБКА ИСПРАВЛЕНА ЗДЕСЬ (добавлены скобки закрытия)
+}); // Синтаксическая ошибка была исправлена здесь, как вы упоминали.
 
 // Обработка обратных вызовов для админа в ТГ Боте
 if (bot && typeof bot.on === 'function') {
@@ -546,35 +570,35 @@ if (bot && typeof bot.on === 'function') {
                         [targetUserId, itemId]
                     );
 
-                    bot.sendMessage(targetUserId, "🎉 *Подарок зачислен!*\n\nАдминистратор проверил вашу транзакцию. Подарок *\"" + itemName + "\"* успешно зачислен в ваш инвентарь!", { parse_mode: 'Markdown' }).catch(() => {});
+                    bot.sendMessage(targetUserId, "🎉 *Подарок зачислен!*\n\nАдминистратор проверил вашу транзакцию. Подарок *\"" + itemName + "\"* успешно зачислен в ваш инвентарь!", { parse_mode: 'Markdown' }).catch(e => console.error("Ошибка отправки сообщения пользователю об одобрении:", e.message));
 
                     bot.editMessageText("✅ Заявка на ввод подарка *\"" + itemName + "\"* одобрена. Предмет успешно зачислен в инвентарь пользователя!", {
                         chat_id: msg.chat.id,
                         message_id: msg.message_id,
                         parse_mode: 'Markdown',
                         reply_markup: { inline_keyboard: [] } 
-                    }).catch(() => {});
+                    }).catch(e => console.error("Ошибка редактирования сообщения админа об одобрении:", e.message));
                 } else {
-                    bot.sendMessage(targetUserId, "❌ *Ввод подарка отклонен!*\n\nВаша заявка на ввод подарка *\"" + itemName + "\"* была отклонена администратором.", { parse_mode: 'Markdown' }).catch(() => {});
+                    bot.sendMessage(targetUserId, "❌ *Ввод подарка отклонен!*\n\nВаша заявка на ввод подарка *\"" + itemName + "\"* была отклонена администратором.", { parse_mode: 'Markdown' }).catch(e => console.error("Ошибка отправки сообщения пользователю об отклонении:", e.message));
 
                     bot.editMessageText("❌ Заявка на ввод подарка *\"" + itemName + "\"* была отклонена вами.", {
                         chat_id: msg.chat.id,
                         message_id: msg.message_id,
                         parse_mode: 'Markdown',
                         reply_markup: { inline_keyboard: [] } 
-                    }).catch(() => {});
+                    }).catch(e => console.error("Ошибка редактирования сообщения админа об отклонении:", e.message));
                 }
                 await client.query('COMMIT');
             } catch (err) {
                 if (client) await client.query('ROLLBACK');
                 console.error('Ошибка в callback_query обработчике:', err);
-                bot.sendMessage(msg.chat.id, 'Произошла ошибка при обработке заявки: ' + err.message, { parse_mode: 'Markdown' }).catch(() => {});
+                bot.sendMessage(msg.chat.id, 'Произошла ошибка при обработке заявки: ' + err.message, { parse_mode: 'Markdown' }).catch(e => console.error("Ошибка отправки сообщения админу об ошибке:", e.message));
             } finally {
                 if (client) client.release();
             }
         }
 
-        bot.answerCallbackQuery(callbackQuery.id).catch(() => {});
+        bot.answerCallbackQuery(callbackQuery.id).catch(e => console.error("Ошибка ответа на callbackQuery:", e.message));
     });
 }
 
@@ -583,8 +607,8 @@ app.get('/api/daily_case_info', (req, res) => {
     res.json({ channel_username: CHANNEL_USERNAME });
 });
 
-// Автоматическая отправка уведомлений о доступности кейса (раз в минуту)
-setInterval(async () => {
+// ИЗМЕНЕНИЕ: Автоматическая отправка уведомлений о доступности кейса (самовызывающийся setTimeout)
+async function scheduleDailyCaseNotifications() {
     try {
         const now = new Date();
         const pendingNotifications = await query(
@@ -611,14 +635,21 @@ setInterval(async () => {
                 })
                 .catch(err => {
                     console.error(`Не удалось отправить пуш-уведомление пользователю ${user.id}:`, err.message);
+                    // Если бот заблокирован или чат не найден, считаем уведомление отправленным
                     if (err.message.includes('bot was blocked') || err.message.includes('chat not found')) {
-                        query('UPDATE users SET daily_case_notified = TRUE WHERE id = $1', [user.id]).catch(() => {});
+                        query('UPDATE users SET daily_case_notified = TRUE WHERE id = $1', [user.id]).catch(e => console.error("Ошибка при обновлении daily_case_notified после неудачной отправки:", e.message));
                     }
                 });
         }
     } catch (err) {
         console.error('Ошибка в планировщике фоновых уведомлений:', err);
+    } finally {
+        // Планируем следующий запуск через 60 секунд после завершения текущего
+        setTimeout(scheduleDailyCaseNotifications, 60000);
     }
-}, 60000);
+}
+
+// Запускаем планировщик при старте сервера
+scheduleDailyCaseNotifications();
 
 app.listen(PORT, () => console.log("🚀 Safe Server running on port " + PORT));
