@@ -2,7 +2,8 @@ const TelegramBot = require('node-telegram-bot-api');
 require('dotenv').config();
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
-const bot = new TelegramBot(token, { polling: true });
+// ИЗМЕНЕНИЕ: Убрал { polling: true } для использования вебхуков
+const bot = new TelegramBot(token); 
 const WEB_APP_URL = process.env.WEB_APP_URL;
 const CHANNEL_USERNAME = process.env.CHANNEL_USERNAME;
 const ADMIN_TELEGRAM_ID = process.env.ADMIN_TELEGRAM_ID;
