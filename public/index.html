@@ -4,14 +4,13 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
     <title>BestGifts</title>
-    <link rel="stylesheet" href="/css/style.css?v=7.5">
-    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&amp;display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/style.css?v=1.2">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&display=swap" rel="stylesheet">
 </head>
 <body>
     <div id="app">
         <div id="toast-container" class="toast-container"></div>
 
-        <!-- Центральное модальное окно -->
         <div id="custom-modal" class="modal-overlay hidden">
             <div class="modal-card">
                 <button id="modal-close-btn" class="modal-close-x">&times;</button>
@@ -22,7 +21,6 @@
             </div>
         </div>
 
-        <!-- ГЛАВНЫЙ ЭКРАН -->
         <section id="home-section">
             <header class="header">
                 <div class="brand-title">🎁 BestGifts</div>
@@ -41,13 +39,12 @@
             <main class="main-content">
                 <div class="welcome-banner">
                     <h2>Добро пожаловать в BestGifts!</h2>
-                    <p>Открывай кейсы и выигрывай ценные призы!</p>
+                    <p>Открывай ежедневные кейсы и выигрывай ценные призы!</p>
                 </div>
 
                 <div class="section-divider-title">Кейсы</div>
 
                 <div class="cases-layout">
-                    <!-- Ежедневный бесплатный кейс -->
                     <div id="daily-case-banner" class="case-banner-card">
                         <div class="case-banner-badge">БЕСПЛАТНО</div>
                         <img src="https://img.icons8.com/color/144/treasure-chest.png" class="case-banner-img" alt="">
@@ -58,13 +55,12 @@
                         <div class="case-banner-arrow">→</div>
                     </div>
 
-                    <!-- Платный кейс новичка -->
                     <div id="newbie-case-banner" class="case-banner-card newbie-case">
-                        <div class="case-banner-badge" style="background:#8a2be2;color:#fff;">0.1 💎</div>
+                        <div class="case-banner-badge">НОВЫЙ</div>
                         <img src="https://img.icons8.com/color/144/gift-box.png" class="case-banner-img" alt="">
                         <div class="case-banner-info">
                             <h3>Кейс новичка</h3>
-                            <p>Стоимость: 0.1 GRAM</p>
+                            <p>Первый спин бесплатно!</p>
                         </div>
                         <div class="case-banner-arrow">→</div>
                     </div>
@@ -72,11 +68,10 @@
             </main>
         </section>
 
-        <!-- ЭКРАН КЕЙСА -->
         <section id="case-section" class="hidden">
             <header class="header-nav">
                 <button id="back-to-home-button" class="back-button">← Назад</button>
-                <div class="nav-title" id="case-header-nav-title">🎁 Ежедневный кейс</div>
+                <div class="nav-title">🎁 BestGifts</div>
                 <div style="width:70px"></div>
             </header>
 
@@ -91,14 +86,13 @@
             <main class="main-content">
                 <div class="case-page-header">
                     <div class="case-title-block">
-                        <span class="case-icon-mini" id="case-main-emoji">🎁</span>
+                        <span class="case-icon-mini">🎁</span>
                         <div class="case-text-group">
-                            <span class="case-main-title" id="case-main-title-text">Ежедневный кейс</span>
+                            <span class="case-main-title">Ежедневный кейс</span>
                         </div>
                     </div>
                 </div>
 
-                <!-- РУЛЕТКА -->
                 <div class="roulette-wrapper">
                     <div class="roulette-pointer pointer-top"></div>
                     <div class="roulette-pointer pointer-bottom"></div>
@@ -118,14 +112,13 @@
                 <div class="rewards-section">
                     <div class="rewards-header">
                         <span class="rewards-header-icon">🏆</span>
-                        <h3 id="case-rewards-title">Содержимое кейса</h3>
+                        <h3>Ежедневные награды</h3>
                     </div>
                     <div id="rewards-grid" class="rewards-grid"></div>
                 </div>
             </main>
         </section>
 
-        <!-- ЭКРАН ИНВЕНТАРЯ -->
         <section id="inventory-section" class="hidden">
             <header class="header">
                 <div class="brand-title">🎒 Ваш Инвентарь</div>
@@ -158,26 +151,16 @@
             </main>
         </section>
 
-        <!-- НАВИГАЦИОННОЕ МЕНЮ -->
         <nav id="bottom-navigation" class="bottom-nav">
             <div class="nav-tab" data-target="inventory">
                 <div class="nav-tab-icon-wrapper">
-                    <svg class="nav-tab-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
-                        <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
-                        <line x1="12" y1="22.08" x2="12" y2="12"/>
-                    </svg>
+                    <!-- svg -->
                 </div>
                 <span class="nav-text">Инвентарь</span>
                 <div class="active-indicator"></div>
             </div>
             <div class="nav-tab active" data-target="home">
-                <div class="nav-tab-icon-wrapper">
-                    <svg class="nav-tab-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
-                        <polyline points="9 22 9 12 15 12 15 22"/>
-                    </svg>
-                </div>
+                <div class="nav-tab-icon-wrapper"></div>
                 <span class="nav-text">Меню</span>
                 <div class="active-indicator"></div>
             </div>
@@ -185,6 +168,6 @@
     </div>
 
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <script src="/js/app.js?v=7.5"></script>
+    <script src="/js/app.js?v=1.2"></script>
 </body>
     </html>
