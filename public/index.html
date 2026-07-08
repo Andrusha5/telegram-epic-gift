@@ -11,6 +11,7 @@
     <div id="app">
         <div id="toast-container" class="toast-container"></div>
 
+        <!-- Модальное окно -->
         <div id="custom-modal" class="modal-overlay hidden">
             <div class="modal-card">
                 <button id="modal-close-btn" class="modal-close-x">&times;</button>
@@ -21,6 +22,7 @@
             </div>
         </div>
 
+        <!-- 1. Главный экран -->
         <section id="home-section">
             <header class="header">
                 <div class="brand-title">🎁 BestGifts</div>
@@ -60,7 +62,7 @@
                         <img src="https://img.icons8.com/color/144/gift-box.png" class="case-banner-img" alt="">
                         <div class="case-banner-info">
                             <h3>Кейс новичка</h3>
-                            <p>Первый спин бесплатно!</p>
+                            <p>Стоимость: 0.1 GRAM</p>
                         </div>
                         <div class="case-banner-arrow">→</div>
                     </div>
@@ -68,6 +70,7 @@
             </main>
         </section>
 
+        <!-- 2. Экран кейса (рулетка) -->
         <section id="case-section" class="hidden">
             <header class="header-nav">
                 <button id="back-to-home-button" class="back-button">← Назад</button>
@@ -119,6 +122,7 @@
             </main>
         </section>
 
+        <!-- 3. Экран инвентаря -->
         <section id="inventory-section" class="hidden">
             <header class="header">
                 <div class="brand-title">🎒 Ваш Инвентарь</div>
@@ -151,16 +155,26 @@
             </main>
         </section>
 
+        <!-- Нижнее меню навигации -->
         <nav id="bottom-navigation" class="bottom-nav">
             <div class="nav-tab" data-target="inventory">
                 <div class="nav-tab-icon-wrapper">
-                    <!-- svg -->
+                    <svg class="nav-tab-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                        <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                        <line x1="12" y1="22.08" x2="12" y2="12"></line>
+                    </svg>
                 </div>
                 <span class="nav-text">Инвентарь</span>
                 <div class="active-indicator"></div>
             </div>
             <div class="nav-tab active" data-target="home">
-                <div class="nav-tab-icon-wrapper"></div>
+                <div class="nav-tab-icon-wrapper">
+                    <svg class="nav-tab-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                        <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                    </svg>
+                </div>
                 <span class="nav-text">Меню</span>
                 <div class="active-indicator"></div>
             </div>
@@ -170,4 +184,4 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="/js/app.js?v=1.2"></script>
 </body>
-    </html>
+                        </html>
