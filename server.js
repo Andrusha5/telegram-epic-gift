@@ -64,7 +64,7 @@ app.use(async (req, res, next) => {
                 try {
                     const isAdminUser = req.telegramUser.id.toString() === process.env.ADMIN_TELEGRAM_ID;
                     
-                    // БЕЗОПАСНЫЙ ИМПОРТ: Сначала быстро обновляем или создаем пользователя
+                    // БЫСТРОЕ СОЗДАНИЕ/ОБНОВЛЕНИЕ ПОЛЬЗОВАТЕЛЯ БЕЗ ЗАВИСАНИЙ
                     await query(
                         `INSERT INTO users (id, username, first_name, last_name, avatar_url, is_admin)
                          VALUES ($1, $2, $3, $4, $5, $6)
@@ -73,13 +73,13 @@ app.use(async (req, res, next) => {
                         [req.telegramUser.id, req.telegramUser.username, req.telegramUser.first_name, req.telegramUser.last_name, avatarUrl, isAdminUser]
                     );
 
-                    // АСИНХРОННО загружаем аватар в фоне, чтобы не вешать загрузку страницы!
+                    // АСИНХРОННАЯ ЗАГРУЗКА АВАТАРА (Предотвращает бесконечную загрузку при сбоях API Telegram)
                     if (!avatarUrl) {
                         getUserAvatarUrl(req.telegramUser.id).then(async (url) => {
                             if (url) {
                                 await query('UPDATE users SET avatar_url = $1 WHERE id = $2', [url, req.telegramUser.id]);
                             }
-                        }).catch(err => console.error("Асинхронная ошибка загрузки аватара:", err.message));
+                        }).catch(err => console.error("Ошибка загрузки аватара в фоне:", err.message));
                     }
                 } catch (dbErr) {
                     console.error("Ошибка обновления пользователя в БД:", dbErr);
