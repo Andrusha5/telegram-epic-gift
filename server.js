@@ -13,9 +13,9 @@ process.on('uncaughtException', (err) => {
 const db = require('./db');
 const botModule = require('./bot');
 
-const bot = botModule.bot;
-const checkUserSubscription = botModule.checkUserSubscription;
-const getUserAvatarUrl = botModule.getUserAvatarUrl;
+const bot = botModule.bot || botModule;
+const checkUserSubscription = botModule.checkUserSubscription || (async () => true);
+const getUserAvatarUrl = botModule.getUserAvatarUrl || (async () => null);
 
 const pool = db.pool || db;
 const query = (text, params) => pool.query(text, params);
@@ -23,51 +23,15 @@ const query = (text, params) => pool.query(text, params);
 const app = express();
 const PORT = process.env.PORT || 3000;
 const CHANNEL_USERNAME = process.env.CHANNEL_USERNAME || "";
-const WEB_APP_URL = process.env.WEB_APP_URL;
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
-
-// ДИАГНОСТИКА: Тест подключения к базе данных Supabase при старте
-console.log('🔄 Пробуем подключиться к базе данных Supabase...');
-pool.query('SELECT NOW()')
-    .then((res) => {
-        console.log('✅ Успешное подключение к базе данных Supabase! Время сервера БД:', res.rows[0].now);
-    })
-    .catch((err) => {
-        console.error('❌ ОШИБКА ПОДКЛЮЧЕНИЯ К БАЗЕ ДАННЫХ SUPABASE:', err.message);
-        console.error('Детали ошибки:', err);
-    });
-
-// ДИАГНОСТИКА: Логирование всех входящих запросов к серверу
-app.use((req, res, next) => {
-    console.log(`[HTTP] Получен запрос: ${req.method} ${req.url}`);
-    next();
-});
-
-// Настройка вебхуков для Telegram Bot
-if (WEB_APP_URL && process.env.TELEGRAM_BOT_TOKEN) {
-    const webhookPath = `/bot${process.env.TELEGRAM_BOT_TOKEN}`;
-    const webhookUrl = `${WEB_APP_URL}${webhookPath}`;
-
-    bot.setWebHook(webhookUrl)
-        .then(() => console.log('✅ Telegram Webhook установлен на:', webhookUrl))
-        .catch(e => console.error('❌ Ошибка установки Telegram Webhook:', e.message));
-
-    app.post(webhookPath, (req, res) => {
-        bot.processUpdate(req.body);
-        res.sendStatus(200);
-    });
-} else {
-    console.warn('⚠️ WEB_APP_URL или TELEGRAM_BOT_TOKEN не заданы в Environment!');
-}
 
 // Middleware авторизации и защиты данных Telegram
 app.use(async (req, res, next) => {
     const initData = req.headers['x-telegram-init-data'] || req.query.initData;
 
     if (!initData) {
-        console.log('⚠️ Запрос без initData');
         req.telegramUser = null;
         return next();
     }
@@ -88,7 +52,6 @@ app.use(async (req, res, next) => {
         const calculatedHash = crypto.createHmac('sha256', secretKey).update(dataCheckString).digest('hex');
 
         if (calculatedHash !== hash) {
-            console.log('❌ Неверный hash авторизации Telegram');
             req.telegramUser = null;
             return res.status(401).json({ error: 'Unauthorized' });
         }
@@ -99,26 +62,33 @@ app.use(async (req, res, next) => {
             if (req.telegramUser.id) {
                 let avatarUrl = req.telegramUser.photo_url || null;
                 try {
-                    if (!avatarUrl) {
-                        avatarUrl = await getUserAvatarUrl(req.telegramUser.id);
-                    }
                     const isAdminUser = req.telegramUser.id.toString() === process.env.ADMIN_TELEGRAM_ID;
                     
-                    console.log(`💾 Обновляем данные юзера ${req.telegramUser.id} в БД...`);
+                    // БЕЗОПАСНЫЙ ИМПОРТ: Сначала быстро обновляем или создаем пользователя
                     await query(
-                        'UPDATE users SET avatar_url = $1, username = $2, first_name = $3, last_name = $4, is_admin = $5 WHERE id = $6',
-                        [avatarUrl, req.telegramUser.username, req.telegramUser.first_name, req.telegramUser.last_name, isAdminUser, req.telegramUser.id]
+                        `INSERT INTO users (id, username, first_name, last_name, avatar_url, is_admin)
+                         VALUES ($1, $2, $3, $4, $5, $6)
+                         ON CONFLICT (id) DO UPDATE 
+                         SET username = EXCLUDED.username, first_name = EXCLUDED.first_name, last_name = EXCLUDED.last_name, is_admin = EXCLUDED.is_admin`,
+                        [req.telegramUser.id, req.telegramUser.username, req.telegramUser.first_name, req.telegramUser.last_name, avatarUrl, isAdminUser]
                     );
-                    console.log(`💾 Данные юзера ${req.telegramUser.id} обновлены.`);
+
+                    // АСИНХРОННО загружаем аватар в фоне, чтобы не вешать загрузку страницы!
+                    if (!avatarUrl) {
+                        getUserAvatarUrl(req.telegramUser.id).then(async (url) => {
+                            if (url) {
+                                await query('UPDATE users SET avatar_url = $1 WHERE id = $2', [url, req.telegramUser.id]);
+                            }
+                        }).catch(err => console.error("Асинхронная ошибка загрузки аватара:", err.message));
+                    }
                 } catch (dbErr) {
-                    console.error("❌ Ошибка обновления пользователя в БД:", dbErr.message);
+                    console.error("Ошибка обновления пользователя в БД:", dbErr);
                 }
             }
         } else {
             req.telegramUser = null;
         }
     } catch (e) {
-        console.error('❌ Исключение в middleware авторизации:', e.message);
         req.telegramUser = null;
         return res.status(401).json({ error: 'Unauthorized' });
     }
@@ -128,16 +98,13 @@ app.use(async (req, res, next) => {
 // Получение профиля пользователя
 app.get('/api/user', async (req, res) => {
     if (!req.telegramUser || !req.telegramUser.id) {
-        console.log('❌ /api/user: Пользователь не авторизован');
         return res.status(401).json({ error: 'Unauthorized' });
     }
     try {
-        console.log(`🔍 Запрос профиля для юзера ${req.telegramUser.id}`);
         let userRes = await query('SELECT id, username, first_name, balance, avatar_url, last_daily_case_open, is_admin FROM users WHERE id = $1', [req.telegramUser.id]);
         let user = userRes.rows[0];
         
         if (!user) {
-            console.log(`➕ Пользователь ${req.telegramUser.id} не найден в БД, регистрируем...`);
             const avatarUrl = req.telegramUser.photo_url || null;
             const isAdminUser = req.telegramUser.id.toString() === process.env.ADMIN_TELEGRAM_ID;
             user = {
@@ -153,11 +120,10 @@ app.get('/api/user', async (req, res) => {
                 'INSERT INTO users (id, username, first_name, last_name, avatar_url, is_admin) VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (id) DO NOTHING',
                 [user.id, user.username, req.telegramUser.first_name, req.telegramUser.last_name, user.avatar_url, user.is_admin]
             );
-            console.log(`➕ Регистрация юзера ${req.telegramUser.id} завершена.`);
         }
         res.json(user);
     } catch (error) {
-        console.error("❌ Ошибка в /api/user:", error.message);
+        console.error("Ошибка в /api/user:", error);
         res.status(500).json({ error: 'Internal server error' });
     }
 });
@@ -191,7 +157,7 @@ app.get('/api/inventory', async (req, res) => {
         }
         res.json(inventoryFlat);
     } catch (error) {
-        console.error("❌ Ошибка в /api/inventory:", error.message);
+        console.error("Ошибка в /api/inventory:", error);
         res.status(500).json({ error: 'Internal server error' });
     }
 });
@@ -288,7 +254,7 @@ app.post('/api/open_daily_case', async (req, res) => {
 
     } catch (error) {
         if (client) await client.query('ROLLBACK');
-        console.error("❌ Ошибка открытия ежедневного кейса:", error.message);
+        console.error("Ошибка открытия ежедневного кейса:", error);
         res.status(500).json({ error: 'Произошла ошибка при открытии ежедневного кейса.' });
     } finally {
         if (client) client.release(); 
@@ -379,7 +345,7 @@ app.post('/api/open_newbie_case', async (req, res) => {
 
     } catch (error) {
         if (client) await client.query('ROLLBACK');
-        console.error("❌ Ошибка открытия кейса новичка:", error.message);
+        console.error("Ошибка открытия кейса новичка:", error);
         res.status(500).json({ error: 'Произошла ошибка при открытии кейса новичка.' });
     } finally {
         if (client) client.release();
@@ -431,7 +397,7 @@ app.post('/api/sell_gift', async (req, res) => {
         res.json({ success: true, newBalance: newBalance });
     } catch (error) {
         if (client) await client.query('ROLLBACK');
-        console.error("❌ Ошибка в /api/sell_gift:", error.message);
+        console.error("Ошибка в /api/sell_gift:", error);
         res.status(500).json({ error: 'Ошибка при продаже.' });
     } finally {
         if (client) client.release();
@@ -493,7 +459,7 @@ app.post('/api/withdraw_gift', async (req, res) => {
 
     } catch (error) {
         if (client) await client.query('ROLLBACK');
-        console.error('❌ Ошибка вывода предмета:', error.message);
+        console.error('Ошибка вывода предмета:', error);
         res.status(500).json({ error: 'Ошибка сервера при выводе.' });
     } finally {
         if (client) client.release();
@@ -555,7 +521,7 @@ app.post('/api/deposit_gift_request', async (req, res) => {
 
         res.json({ success: true });
     } catch (error) {
-        console.error('❌ Ошибка отправки заявки на ввод:', error.message);
+        console.error('Ошибка отправки заявки на ввод:', error);
         res.status(500).json({ error: 'Ошибка сервера.' });
     }
 });
@@ -591,35 +557,35 @@ if (bot && typeof bot.on === 'function') {
                         [targetUserId, itemId]
                     );
 
-                    bot.sendMessage(targetUserId, "🎉 *Подарок зачислен!*\n\nАдминистратор проверил вашу транзакцию. Подарок *\"" + itemName + "\"* успешно зачислен в ваш инвентарь!", { parse_mode: 'Markdown' }).catch(e => console.error("Ошибка отправки сообщения пользователю об одобрении:", e.message));
+                    bot.sendMessage(targetUserId, "🎉 *Подарок зачислен!*\n\nАдминистратор проверил вашу транзакцию. Подарок *\"" + itemName + "\"* успешно зачислен в ваш инвентарь!", { parse_mode: 'Markdown' }).catch(() => {});
 
                     bot.editMessageText("✅ Заявка на ввод подарка *\"" + itemName + "\"* одобрена. Предмет успешно зачислен в инвентарь пользователя!", {
                         chat_id: msg.chat.id,
                         message_id: msg.message_id,
                         parse_mode: 'Markdown',
                         reply_markup: { inline_keyboard: [] } 
-                    }).catch(e => console.error("Ошибка редактирования сообщения админа об одобрении:", e.message));
+                    }).catch(() => {});
                 } else {
-                    bot.sendMessage(targetUserId, "❌ *Ввод подарка отклонен!*\n\nВаша заявка на ввод подарка *\"" + itemName + "\"* была отклонена администратором.", { parse_mode: 'Markdown' }).catch(e => console.error("Ошибка отправки сообщения пользователю об отклонении:", e.message));
+                    bot.sendMessage(targetUserId, "❌ *Ввод подарка отклонен!*\n\nВаша заявка на ввод подарка *\"" + itemName + "\"* была отклонена администратором.", { parse_mode: 'Markdown' }).catch(() => {});
 
                     bot.editMessageText("❌ Заявка на ввод подарка *\"" + itemName + "\"* была отклонена вами.", {
                         chat_id: msg.chat.id,
                         message_id: msg.message_id,
                         parse_mode: 'Markdown',
                         reply_markup: { inline_keyboard: [] } 
-                    }).catch(e => console.error("Ошибка редактирования сообщения админа об отклонении:", e.message));
+                    }).catch(() => {});
                 }
                 await client.query('COMMIT');
             } catch (err) {
                 if (client) await client.query('ROLLBACK');
                 console.error('Ошибка в callback_query обработчике:', err);
-                bot.sendMessage(msg.chat.id, 'Произошла ошибка при обработке заявки: ' + err.message, { parse_mode: 'Markdown' }).catch(e => console.error("Ошибка отправки сообщения админу об ошибке:", e.message));
+                bot.sendMessage(msg.chat.id, 'Произошла ошибка при обработке заявки: ' + err.message, { parse_mode: 'Markdown' }).catch(() => {});
             } finally {
                 if (client) client.release();
             }
         }
 
-        bot.answerCallbackQuery(callbackQuery.id).catch(e => console.error("Ошибка ответа на callbackQuery:", e.message));
+        bot.answerCallbackQuery(callbackQuery.id).catch(() => {});
     });
 }
 
@@ -628,8 +594,8 @@ app.get('/api/daily_case_info', (req, res) => {
     res.json({ channel_username: CHANNEL_USERNAME });
 });
 
-// Автоматическая отправка уведомлений о доступности кейса (самовызывающийся setTimeout)
-async function scheduleDailyCaseNotifications() {
+// Автоматическая отправка уведомлений о доступности кейса (раз в минуту)
+setInterval(async () => {
     try {
         const now = new Date();
         const pendingNotifications = await query(
@@ -657,17 +623,13 @@ async function scheduleDailyCaseNotifications() {
                 .catch(err => {
                     console.error(`Не удалось отправить пуш-уведомление пользователю ${user.id}:`, err.message);
                     if (err.message.includes('bot was blocked') || err.message.includes('chat not found')) {
-                        query('UPDATE users SET daily_case_notified = TRUE WHERE id = $1', [user.id]).catch(e => console.error("Ошибка при обновлении daily_case_notified после неудачной отправки:", e.message));
+                        query('UPDATE users SET daily_case_notified = TRUE WHERE id = $1', [user.id]).catch(() => {});
                     }
                 });
         }
     } catch (err) {
         console.error('Ошибка в планировщике фоновых уведомлений:', err);
-    } finally {
-        setTimeout(scheduleDailyCaseNotifications, 60000);
     }
-}
-
-scheduleDailyCaseNotifications();
+}, 60000);
 
 app.listen(PORT, () => console.log("🚀 Safe Server running on port " + PORT));
