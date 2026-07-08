@@ -2,29 +2,36 @@ const TelegramBot = require('node-telegram-bot-api');
 require('dotenv').config();
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
-
-// Инициализируем без немедленного запуска polling, чтобы сначала очистить вебхук
-const bot = new TelegramBot(token, { polling: false });
-
 const WEB_APP_URL = process.env.WEB_APP_URL;
 const CHANNEL_USERNAME = process.env.CHANNEL_USERNAME;
 const ADMIN_TELEGRAM_ID = process.env.ADMIN_TELEGRAM_ID;
 
 const db = require('./db');
 
-// Безопасный запуск бота со сбросом вебхуков для предотвращения 409 Conflict
-async function startBot() {
+// Инициализируем бота с автоматическим Polling
+const bot = new TelegramBot(token, { polling: true });
+
+// Предотвращаем падение сервера при ошибках соединения с Telegram (например, 409 Conflict)
+bot.on('polling_error', (error) => {
+    console.warn('⚠️ [Telegram Bot Polling Error]:', error.message);
+});
+
+// Безопасный сброс вебхуков при старте
+async function clearWebhook() {
     try {
-        await bot.deleteWebhook();
-        console.log('🧹 Старый Webhook успешно удален для предотвращения конфликтов.');
-        bot.startPolling();
-        console.log('✅ Telegram Bot успешно запущен в режиме Polling!');
+        if (typeof bot.deleteWebHook === 'function') {
+            await bot.deleteWebHook();
+            console.log('🧹 Старые соединения Telegram успешно сброшены (deleteWebHook).');
+        } else if (typeof bot.deleteWebhook === 'function') {
+            await bot.deleteWebhook();
+            console.log('🧹 Старые соединения Telegram успешно сброшены (deleteWebhook).');
+        }
     } catch (err) {
-        console.error('❌ Ошибка при инициализации Polling бота:', err.message);
+        console.warn('⚠️ Предупреждение при очистке Webhook:', err.message);
     }
 }
 
-startBot();
+clearWebhook();
 
 // Получение URL аватарки пользователя
 async function getUserAvatarUrl(userId) {
@@ -82,7 +89,6 @@ bot.onText(/\/start/, async (msg) => {
         console.error('Error upserting user on /start:', error);
     }
 
-    // Приветственное сообщение
     bot.sendMessage(chatId, `🎉 Добро пожаловать в мир захватывающих подарков и приключений с BestGifts!
 
 Нажмите кнопку ниже, чтобы начать свою историю и открывать бесплатные кейсы:`, {
@@ -104,5 +110,7 @@ async function notifyAdmin(message, reply_markup = {}) {
         }
     }
 }
+
+console.log('Telegram Bot успешно инициализирован.');
 
 module.exports = { bot, checkUserSubscription, getUserAvatarUrl, notifyAdmin };
