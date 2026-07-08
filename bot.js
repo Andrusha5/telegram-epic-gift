@@ -2,23 +2,11 @@ const TelegramBot = require('node-telegram-bot-api');
 require('dotenv').config();
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
+const bot = new TelegramBot(token, { polling: true });
 const WEB_APP_URL = process.env.WEB_APP_URL;
-const RENDER_URL = process.env.RENDER_URL; // Ссылка на ваш Render сервис
-const CHANNEL_USERNAME = process.env.CHANNEL_USERNAME;
 const ADMIN_TELEGRAM_ID = process.env.ADMIN_TELEGRAM_ID;
 
 const db = require('./db');
-
-// Инициализируем бота БЕЗ Polling (используем webhook)
-const bot = new TelegramBot(token, { polling: false });
-
-// Настраиваем адрес, куда Telegram будет присылать сообщения
-if (RENDER_URL) {
-    const webhookUrl = `${RENDER_URL}/bot${token}`;
-    bot.setWebHook(webhookUrl)
-        .then(() => console.log(`🚀 Webhook успешно установлен на: ${webhookUrl}`))
-        .catch(err => console.error('❌ Ошибка установки Webhook:', err.message));
-}
 
 // Получение URL аватарки пользователя
 async function getUserAvatarUrl(userId) {
@@ -30,26 +18,12 @@ async function getUserAvatarUrl(userId) {
             return `https://api.telegram.org/file/bot${token}/${file.file_path}`;
         }
     } catch (e) {
-        console.error(`Error fetching avatar for user ${userId}:`, e.message);
+        console.error(`Ошибка при получении аватарки для ID ${userId}:`, e.message);
     }
     return null;
 }
 
-// Проверка подписки на канал
-async function checkUserSubscription(userId) {
-    if (!CHANNEL_USERNAME) {
-        return true; 
-    }
-    try {
-        const chatMember = await bot.getChatMember(`@${CHANNEL_USERNAME}`, userId);
-        return ['member', 'administrator', 'creator'].includes(chatMember.status);
-    } catch (e) {
-        console.error(`Ошибка при проверке подписки для пользователя ${userId}:`, e.message);
-        return false;
-    }
-}
-
-// Обработка /start
+// Обработка команды /start
 bot.onText(/\/start/, async (msg) => {
     const chatId = msg.chat.id;
     const user = msg.from;
@@ -73,12 +47,10 @@ bot.onText(/\/start/, async (msg) => {
             [user.id, user.username, user.first_name, user.last_name, avatarUrl, is_admin]
         );
     } catch (error) {
-        console.error('Error upserting user on /start:', error);
+        console.error('Ошибка при добавлении пользователя в БД:', error);
     }
 
-    bot.sendMessage(chatId, `🎉 Добро пожаловать в BestGifts!
-
-Нажмите кнопку ниже, чтобы начать:`, {
+    bot.sendMessage(chatId, `🎉 Добро пожаловать в мир подарков BestGifts!\n\nНажмите кнопку ниже, чтобы начать:`, {
         reply_markup: {
             inline_keyboard: [
                 [{ text: '🎁 Открыть BestGifts', web_app: { url: WEB_APP_URL } }]
@@ -93,9 +65,11 @@ async function notifyAdmin(message, reply_markup = {}) {
         try {
             await bot.sendMessage(ADMIN_TELEGRAM_ID, message, { parse_mode: 'Markdown', reply_markup });
         } catch (e) {
-            console.error('Error sending admin notification:', e.message);
+            console.error('Ошибка при отправке сообщения админу:', e.message);
         }
     }
 }
 
-module.exports = { bot, checkUserSubscription, getUserAvatarUrl, notifyAdmin };
+console.log('🤖 Бот Telegram успешно запущен...');
+
+module.exports = { bot, notifyAdmin };
