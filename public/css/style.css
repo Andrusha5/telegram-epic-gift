@@ -12,10 +12,6 @@
     --glow-color: rgba(138, 43, 226, 0.4);
 }
 
-* {
-    box-sizing: border-box;
-}
-
 body {
     font-family: 'Montserrat', sans-serif;
     margin: 0;
@@ -46,47 +42,14 @@ body {
     display: none !important;
 }
 
-/* СЛИЯНИЕ СЕМИНАРНЫХ КАРТИНОК С ТЕМНЫМ ФОНОМ (ИСПРАВЛЕНО!) */
-.reward-card img, 
-.roulette-item img, 
-.case-banner-img {
-    mix-blend-mode: screen; 
-    filter: brightness(1.05) contrast(1.1); 
-}
-
-/* ИНВЕНТАРЬ: ВЫВОД ЦЕНЫ ТОЛЬКО В ГРАММАХ БЕЗ ИКОНОК */
-.inventory-price-tag {
-    font-size: 0.82rem;
-    font-weight: 800;
-    color: var(--secondary-color);
-    margin-bottom: 6px;
-    text-shadow: 0 0 5px rgba(255, 215, 0, 0.2);
-}
-
-/* СТИЛИЗАЦИЯ ИКОНКИ АЛМАЗА В БАЛАНСАХ */
-.balance-value {
-    font-weight: 800;
-    color: var(--green-success);
-    text-shadow: 0 0 8px rgba(0, 230, 118, 0.2);
-    display: flex;
-    align-items: center;
-    white-space: nowrap; 
-}
-
-.balance-sub-value {
-    font-weight: 800;
-    color: var(--green-success);
-    display: flex;
-    align-items: center;
-    white-space: nowrap;
-}
-
+/* ШТИЛЬНАЯ ИКОНКА АЛМАЗА ВМЕСТО GRAM */
 .gram-icon {
-    width: 18px;
-    height: 18px;
+    width: 16px;
+    height: 16px;
     object-fit: contain;
-    margin-left: 8px; 
-    flex-shrink: 0; 
+    vertical-align: middle;
+    margin-left: 4px;
+    display: inline-block;
     border-radius: 50%;
 }
 
@@ -147,6 +110,14 @@ body {
     color: var(--light-text-color);
 }
 
+.balance-value {
+    font-weight: 800;
+    color: var(--green-success);
+    text-shadow: 0 0 8px rgba(0, 230, 118, 0.2);
+    display: flex;
+    align-items: center;
+}
+
 .header-nav {
     display: flex;
     justify-content: space-between;
@@ -200,6 +171,14 @@ body {
 .balance-sub-label {
     font-size: 0.8rem;
     color: var(--light-text-color);
+}
+
+.balance-sub-value {
+    font-size: 0.95rem;
+    font-weight: 800;
+    color: var(--green-success);
+    display: flex;
+    align-items: center;
 }
 
 .main-content {
@@ -285,6 +264,12 @@ body {
     padding: 3px 6px; 
     border-radius: 6px;
     white-space: nowrap; 
+}
+
+.case-banner-card.newbie-case .case-banner-badge {
+    background: var(--primary-color);
+    color: #fff;
+    text-shadow: 0 0 5px rgba(255, 255, 255, 0.3);
 }
 
 .case-banner-img {
@@ -443,10 +428,6 @@ body {
     cursor: pointer;
     box-shadow: 0 4px 15px rgba(138, 43, 226, 0.4);
     transition: transform 0.1s;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
 }
 
 .action-button-gradient:active {
@@ -540,13 +521,6 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 4px;
-}
-
-.reward-coin {
-    width: 14px;
-    height: 14px;
-    object-fit: contain;
 }
 
 .reward-card img {
@@ -579,7 +553,7 @@ body {
     text-transform: uppercase;
 }
 
-/* КНОПКИ В ИНВЕНТАРЕ */
+/* КНОПКИ ДЕЙСТВИЯ В ИНВЕНТАРЕ */
 .inv-actions {
     display: flex;
     gap: 6px;
@@ -615,7 +589,7 @@ body {
     box-shadow: 0 2px 8px rgba(40, 167, 69, 0.2);
 }
 
-/* ДЕПОЗИТНАЯ ПАНЕЛЬ */
+/* ДИЗАЙН ПАНЕЛИ ВВОДА ПОДАРКОВ */
 .deposit-panel {
     background: linear-gradient(135deg, #1c1c2d, #141420);
     border: 1.5px solid rgba(138, 43, 226, 0.4);
@@ -697,7 +671,7 @@ body {
     transform: scale(0.97);
 }
 
-/* BOTTOM NAVIGATION BAR */
+/* BOTTOM DOCK MENU */
 .bottom-nav {
     position: fixed; 
     bottom: 16px; 
@@ -896,7 +870,7 @@ body {
     border: 1px solid var(--border-color);
 }
 
-/* ТОСТ-УВЕДОМЛЕНИЯ ВНИЗУ */
+/* УВЕДОМЛЕНИЯ ВНИЗУ */
 .toast-container {
     position: fixed;
     bottom: 96px; 
@@ -957,7 +931,7 @@ body {
     color: #fff;
 }
 
-/* СТИЛИ ДЛЯ ПУСТОГО ИНВЕНТАРЯ */
+/* СТИЛИ ПУСТОГО ИНВЕНТАРЯ */
 .empty-inventory {
     grid-column: 1 / -1; 
     text-align: center;
