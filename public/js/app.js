@@ -203,11 +203,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         const itemId = select.value;
         const selectedGift = ALL_ITEMS_POOL.find(g => g.id == itemId);
 
-        if (!selectedGift) {
-            showNotification('Пожалуйста, выберите подарок для отправки.', '⚠️');
-            return;
-        }
-
         showCustomModal({
             icon: `<img src="${selectedGift.icon}" style="width:70px;height:70px;object-fit:contain;">`,
             title: 'Подтвердить передачу?',
@@ -234,7 +229,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                                 showNotification(errorData.error || 'Не удалось отправить заявку.', '⚠️');
                             }
                         } catch (err) {
-                            console.error('Ошибка при отправке заявки на ввод:', err);
                             showNotification('Ошибка связи с сервером.', '⚠️');
                         }
                     }
@@ -275,10 +269,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             const res = await fetch(`${API_BASE_URL}/api/user`, { 
                 headers: { 'X-Telegram-Init-Data': tg.initData || "" }
             });
-            if (!res.ok) throw new Error("Failed to fetch user data.");
+            if (!res.ok) throw new Error();
             currentUser = await res.json();
         } catch (e) {
-            console.error("Error fetching user data:", e);
             currentUser = {
                 balance: 0.000,
                 username: tg.initDataUnsafe?.user?.username || "Пользователь",
@@ -286,7 +279,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 avatar_url: "https://img.icons8.com/color/96/user.png",
                 is_admin: false
             };
-            showNotification('Не удалось загрузить данные пользователя. Проверьте подключение.', '⚠️');
         }
 
         elements.balanceDisplay.forEach(d => {
@@ -383,7 +375,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const res = await fetch(`${API_BASE_URL}/api/inventory`, { 
                 headers: { 'X-Telegram-Init-Data': tg.initData || "" }
             });
-            if (!res.ok) throw new Error("Failed to fetch inventory.");
+            if (!res.ok) throw new Error();
             const items = await res.json();
 
             elements.inventoryGrid.innerHTML = '';
@@ -403,6 +395,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const card = document.createElement('div');
                 card.className = 'reward-card';
 
+                // ЦЕНА ОТОБРАЖАЕТСЯ СТРОГО ТЕКСТОМ, КАК ВЫ ПРОСИЛИ
                 card.innerHTML = `
                     <div class="inventory-price-tag">${parseFloat(item.value).toFixed(2)} GRAM</div>
                     <img src="${imageSrc}" onerror="this.src='https://img.icons8.com/color/96/gift.png'">
@@ -441,7 +434,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                                             showNotification(errorData.error || 'Заявка отклонена.', '⚠️');
                                         }
                                     } catch (err) {
-                                        console.error('Ошибка сети при выводе:', err);
                                         showNotification('Ошибка сети при выводе.', '⚠️');
                                     }
                                 }
@@ -482,7 +474,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                                             showNotification(errorData.error || 'Не удалось продать подарок.', '⚠️');
                                         }
                                     } catch (err) {
-                                        console.error('Ошибка связи с сервером при продаже:', err);
                                         showNotification('Ошибка связи с сервером.', '⚠️');
                                     }
                                 }
@@ -495,7 +486,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 elements.inventoryGrid.appendChild(card);
             });
         } catch (error) {
-            console.error("Error fetching inventory:", error);
             elements.inventoryGrid.innerHTML = '<div class="empty-inventory" style="color: var(--red-alert);">Ошибка загрузки инвентаря.</div>';
         }
     }
@@ -586,7 +576,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                                     showNotification(errorData.error || 'Ошибка соединения при продаже.', '⚠️');
                                 }
                             } catch (e) {
-                                console.error('Ошибка связи с сервером при продаже:', e);
                                 showNotification('Ошибка связи с сервером при продаже.', '⚠️');
                             }
                         }
@@ -623,7 +612,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (response.ok) {
                 let winningGift = activePool.find(g => g.id === data.wonItem.id);
                 if (!winningGift) { 
-                    // Fallback in case ID mismatch, try by name
                     winningGift = activePool.find(g => g.name.toLowerCase() === data.wonItem.name.toLowerCase());
                 }
 
@@ -667,17 +655,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
             }
         } catch (error) {
-            console.error('Ошибка связи с сервером при открытии кейса:', error);
             showNotification('Ошибка связи с сервером при открытии кейса.', '⚠️');
             elements.spinBtn.disabled = false;
         }
     });
 
-    // Добавлена проверка на готовность WebApp перед fetchUserData
-    if (tg.ready) {
-        tg.ready(); // Уведомляем Telegram, что WebApp готова
-    }
-    
     await fetchUserData(); 
     navigateTo('home'); 
 });
