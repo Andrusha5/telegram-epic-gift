@@ -46,7 +46,7 @@ body {
     display: none !important;
 }
 
-/* СЛИЯНИЕ СЕМИНАРНЫХ КАРТИНОК С ТЕМНЫМ ФОНОМ */
+/* СЛИЯНИЕ СЕМИНАРНЫХ КАРТИНОК С ТЕМНЫМ ФОНОМ (ИСПРАВЛЕНО!) */
 .reward-card img, 
 .roulette-item img, 
 .case-banner-img {
