@@ -265,41 +265,32 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     async function fetchUserData() {
-        try {
-            const res = await fetch(`${API_BASE_URL}/api/user`, { 
-                headers: { 'X-Telegram-Init-Data': tg.initData || "" }
-            });
-            if (!res.ok) throw new Error();
-            currentUser = await res.json();
-        } catch (e) {
-            currentUser = {
-                balance: 0.000,
-                username: tg.initDataUnsafe?.user?.username || "Пользователь",
-                first_name: tg.initDataUnsafe?.user?.first_name || "Пользователь",
-                avatar_url: "https://img.icons8.com/color/96/user.png",
-                is_admin: false
-            };
+    async function fetchUserData() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/user`, { 
+            headers: { 'X-Telegram-Init-Data': tg.initData || "" }
+        });
+        
+        if (!response.ok) {
+            console.error("Ошибка API:", response.status);
+            // Если ошибка 401, пробуем все равно показать профиль, чтобы не было вечной загрузки
+            currentUser = { balance: 0, username: "Игрок", first_name: "Игрок" };
+        } else {
+            currentUser = await response.json();
         }
-
-        elements.balanceDisplay.forEach(d => {
-            if (d) d.innerHTML = `${parseFloat(currentUser.balance || 0).toFixed(3)} ${getGramIconHtml()}`;
-        });
-
-        const avUrls = currentUser.avatar_url || "https://img.icons8.com/color/96/user.png";
-        ['user-avatar', 'case-user-avatar', 'inv-user-avatar'].forEach(id => {
-            const img = document.getElementById(id);
-            if (img) {
-                img.src = avUrls;
-                img.onerror = () => { img.src = "https://img.icons8.com/color/96/user.png"; };
-            }
-        });
-        
-        document.getElementById('user-username').innerText = currentUser.username || currentUser.first_name || "Пользователь";
-        document.getElementById('inv-user-username').innerText = currentUser.username || currentUser.first_name || "Пользователь";
-        
-        updateDailyCaseTimer();
+    } catch (e) {
+        console.error("Критическая ошибка fetchUserData:", e);
+        currentUser = { balance: 0, username: "Игрок", first_name: "Игрок" };
     }
 
+    // Обновляем интерфейс в любом случае, даже если пользователь "гость"
+    document.getElementById('user-username').innerText = currentUser.username || "Игрок";
+    document.getElementById('user-balance').innerHTML = `${parseFloat(currentUser.balance || 0).toFixed(3)} GRAM`;
+    
+    // Скрываем "Загрузка..." и показываем контент
+    document.getElementById('home-section').classList.remove('hidden');
+    updateDailyCaseTimer();
+        }
     let dailyCaseTimerInterval;
     function updateDailyCaseTimer() {
         clearInterval(dailyCaseTimerInterval); 
