@@ -432,3 +432,20 @@ function showLoader(show) {
         document.getElementById('inv-user-username').innerText = 'Загрузка...';
     }
         }
+// ... (остальной код функции без изменений)
+function renderRewardsGrid() {
+    const grid = document.getElementById('rewards-grid');
+    grid.innerHTML = '';
+    state.rewards.forEach(item => {
+        const card = document.createElement('div');
+        card.className = 'reward-card';
+        card.innerHTML = `
+            <div class="reward-price-top">${item.value} GRAM</div>
+            <img src="${item.image_url}" alt="${item.name}">
+            <div class="reward-name">${item.name}</div>
+            <div class="reward-random-badge">RANDOM</div>
+        `;
+        grid.appendChild(card);
+    });
+}
+// ...
