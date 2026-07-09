@@ -52,7 +52,7 @@ async function fetchUser() {
             showToast('⚠️ Ошибка авторизации. Запустите через Telegram.', 'red');
         }
     } catch (e) {
-        console.error(e);
+        console.error("Ошибка загрузки пользователя:", e);
         showToast('📡 Ошибка сети с сервером', 'red');
     }
 }
@@ -61,11 +61,18 @@ async function fetchUser() {
 async function fetchRewards() {
     try {
         const res = await fetch('/api/case/rewards');
-        state.rewards = await res.json();
-        renderRewardsGrid();
-        renderDepositSelect();
+        const data = await res.json();
+        if (data && !data.error && data.length > 0) {
+            state.rewards = data;
+            renderRewardsGrid();
+            renderDepositSelect();
+        } else {
+            console.error("Сервер не прислал награды или получил ошибку:", data.error || "Нет данных");
+            showToast('Не удалось загрузить награды кейса.', 'red');
+        }
     } catch (e) {
-        console.error(e);
+        console.error("Ошибка при получении наград:", e);
+        showToast('Ошибка сети при загрузке наград.', 'red');
     }
 }
 
@@ -73,10 +80,17 @@ async function fetchRewards() {
 async function fetchInventory() {
     try {
         const res = await fetch('/api/inventory', { headers: getHeaders() });
-        state.inventory = await res.json();
-        renderInventoryGrid();
+        const data = await res.json();
+        if (data && !data.error) {
+            state.inventory = data;
+            renderInventoryGrid();
+        } else {
+            console.error("Не удалось загрузить инвентарь:", data.error || "Нет данных");
+            showToast('Не удалось загрузить инвентарь.', 'red');
+        }
     } catch (e) {
-        console.error(e);
+        console.error("Ошибка при получении инвентаря:", e);
+        showToast('Ошибка сети при загрузке инвентаря.', 'red');
     }
 }
 
@@ -160,14 +174,14 @@ function renderRewardsGrid() {
     const grid = document.getElementById('rewards-grid');
     grid.innerHTML = '';
     state.rewards.forEach(item => {
-        const isGold = parseFloat(item.chance) < 1.0;
         const card = document.createElement('div');
-        card.className = `reward-card ${isGold ? 'gold-tier' : ''}`;
+        card.className = 'reward-card';
+        // Используем onerror для замены картинки, если путь неверен
         card.innerHTML = `
             <div class="reward-price-top">${item.value} GRAM</div>
-            <img src="${item.image_url}" alt="${item.name}">
+            <img src="${item.image_url}" onerror="this.onerror=null;this.src='https://img.icons8.com/color/96/gift.png';" alt="${item.name}">
             <div class="reward-name">${item.name}</div>
-            <div class="reward-random-badge">${item.chance}%</div>
+            <div class="reward-random-badge">RANDOM</div>
         `;
         grid.appendChild(card);
     });
@@ -177,7 +191,18 @@ function renderRewardsGrid() {
 function renderDepositSelect() {
     const select = document.getElementById('deposit-item-select');
     select.innerHTML = '';
-    state.rewards.filter(i => i.type === 'gift').forEach(item => {
+    const giftItems = state.rewards.filter(i => i.type === 'gift');
+    if (giftItems.length === 0) {
+        select.innerHTML = `<option value="">Нет подарков для депозита</option>`;
+        select.disabled = true;
+        document.getElementById('deposit-confirm-button').disabled = true;
+        return;
+    } else {
+        select.disabled = false;
+        document.getElementById('deposit-confirm-button').disabled = false;
+    }
+
+    giftItems.forEach(item => {
         const option = document.createElement('option');
         option.value = item.id;
         option.innerText = item.name;
@@ -200,7 +225,7 @@ function renderInventoryGrid() {
         card.className = 'reward-card';
         card.innerHTML = `
             <div class="reward-price-top">${item.value} GRAM</div>
-            <img src="${item.image_url}" alt="${item.name}">
+            <img src="${item.image_url}" onerror="this.onerror=null;this.src='https://img.icons8.com/color/96/gift.png';" alt="${item.name}">
             <div class="reward-name">${item.name} (x${item.quantity})</div>
             <div class="inv-actions">
                 <button class="inv-btn sell-btn" onclick="sellItem(${item.id})">Продать</button>
@@ -215,7 +240,10 @@ function renderInventoryGrid() {
 async function confirmDeposit() {
     const select = document.getElementById('deposit-item-select');
     const itemId = select.value;
-    if (!itemId) return;
+    if (!itemId) {
+        showToast('Выберите предмет для депозита.', 'red');
+        return;
+    }
 
     try {
         const res = await fetch('/api/deposit/confirm', {
@@ -230,7 +258,8 @@ async function confirmDeposit() {
             showToast(data.error || 'Ошибка при отправке', 'red');
         }
     } catch (e) {
-        showToast('Ошибка сети', 'red');
+        console.error("Ошибка при подтверждении депозита:", e);
+        showToast('Ошибка сети при отправке заявки.', 'red');
     }
 }
 
@@ -245,12 +274,13 @@ window.sellItem = async function(itemId) {
         const data = await res.json();
         if (data.success) {
             showToast('💰 Предмет успешно продан!', 'green');
-            await loadAllData();
+            await loadAllData(); // Обновляем баланс и инвентарь
         } else {
             showToast(data.error || 'Ошибка при продаже', 'red');
         }
     } catch (e) {
-        showToast('Ошибка сети', 'red');
+        console.error("Ошибка при продаже предмета:", e);
+        showToast('Ошибка сети при продаже.', 'red');
     }
 };
 
@@ -277,6 +307,10 @@ async function startSpin() {
             showToast(data.error, 'red');
             state.isSpinning = false;
             spinBtn.disabled = false;
+            if (data.timeLeft) {
+                state.user.last_daily_case_open = new Date().getTime() - (24 * 60 * 60 * 1000 - data.timeLeft); // Обновляем время, чтобы таймер правильно начал отсчет
+                updateTimer();
+            }
             return;
         }
 
@@ -288,9 +322,9 @@ async function startSpin() {
         track.style.transform = 'translateX(0)';
         track.innerHTML = '';
 
-        const itemWidth = 92; // 84px ширина + 8px gap
+        const itemWidth = 92; // 84px ширина + 8px gap (из CSS)
         const totalItems = 60; // Количество элементов в ленте
-        const targetIndex = 48; // Элемент на котором остановится рулетка
+        const targetIndex = 48; // Элемент, на котором остановится рулетка
 
         let trackHTML = '';
         for (let i = 0; i < totalItems; i++) {
@@ -302,7 +336,7 @@ async function startSpin() {
             }
             trackHTML += `
                 <div class="roulette-item">
-                    <img src="${item.image_url}" alt="">
+                    <img src="${item.image_url}" onerror="this.onerror=null;this.src='https://img.icons8.com/color/96/gift.png';" alt="${item.name}">
                     <span>${item.value} GRAM</span>
                 </div>
             `;
@@ -327,12 +361,12 @@ async function startSpin() {
                 `Вы выиграли приз: <b>${wonItem.name}</b> (ценность: ${wonItem.value} GRAM)`,
                 '🎁'
             );
-            await loadAllData();
+            await loadAllData(); // Обновляем баланс, инвентарь и таймер
         }, 5100);
 
     } catch (e) {
-        console.error(e);
-        showToast('Ошибка при открытии кейса', 'red');
+        console.error("Ошибка при открытии кейса:", e);
+        showToast('Ошибка при открытии кейса. Попробуйте еще раз.', 'red');
         state.isSpinning = false;
         spinBtn.disabled = false;
     }
@@ -354,7 +388,7 @@ function initNavigation() {
         switchTab('case');
     });
     document.getElementById('newbie-case-banner').addEventListener('click', () => {
-        showToast('🔒 Этот кейс сейчас недоступен.', 'red');
+        showToast('🔒 Кейс новичка пока недоступен.', 'red');
     });
 }
 
@@ -362,11 +396,12 @@ function switchTab(tabName) {
     if (state.isSpinning) return;
     state.activeTab = tabName;
 
-    // Экраны
+    // Скрываем все секции
     document.getElementById('home-section').classList.add('hidden');
     document.getElementById('case-section').classList.add('hidden');
     document.getElementById('inventory-section').classList.add('hidden');
 
+    // Показываем нужную
     if (tabName === 'home') {
         document.getElementById('home-section').classList.remove('hidden');
     } else if (tabName === 'case') {
@@ -375,12 +410,13 @@ function switchTab(tabName) {
         document.getElementById('inventory-section').classList.remove('hidden');
     }
 
-    // Активные табы в меню
+    // Обновляем активные табы в нижнем меню
     const tabs = document.querySelectorAll('.nav-tab');
     tabs.forEach(t => t.classList.remove('active'));
     
-    const activeTab = document.querySelector(`.nav-tab[data-target="${tabName === 'case' ? 'home' : tabName}"]`);
-    if (activeTab) activeTab.classList.add('active');
+    // Активной вкладкой для "case" будет "home" в нижнем меню
+    const activeTabElement = document.querySelector(`.nav-tab[data-target="${tabName === 'case' ? 'home' : tabName}"]`);
+    if (activeTabElement) activeTabElement.classList.add('active');
 }
 
 // Всплывающие Уведомления (Toasts)
@@ -391,7 +427,7 @@ function showToast(text, color = 'purple') {
     toast.style.borderColor = color === 'red' ? 'var(--red-alert)' : (color === 'green' ? 'var(--green-success)' : 'var(--primary-color)');
     
     toast.innerHTML = `
-        <span class="custom-toast-icon">${color === 'red' ? '❌' : '🔔'}</span>
+        <span class="custom-toast-icon">${color === 'red' ? '❌' : (color === 'green' ? '✅' : '🔔')}</span>
         <div class="custom-toast-content">${text}</div>
         <button class="custom-toast-close">&times;</button>
     `;
@@ -427,25 +463,11 @@ function showModal(title, text, icon = '🎁') {
 
 // Показ/скрытие прелоадера загрузки
 function showLoader(show) {
-    if (show) {
-        document.getElementById('user-username').innerText = 'Загрузка...';
-        document.getElementById('inv-user-username').innerText = 'Загрузка...';
-    }
-        }
-// ... (остальной код функции без изменений)
-function renderRewardsGrid() {
-    const grid = document.getElementById('rewards-grid');
-    grid.innerHTML = '';
-    state.rewards.forEach(item => {
-        const card = document.createElement('div');
-        card.className = 'reward-card';
-        card.innerHTML = `
-            <div class="reward-price-top">${item.value} GRAM</div>
-            <img src="${item.image_url}" alt="${item.name}">
-            <div class="reward-name">${item.name}</div>
-            <div class="reward-random-badge">RANDOM</div>
-        `;
-        grid.appendChild(card);
+    const usernameElements = [
+        document.getElementById('user-username'),
+        document.getElementById('inv-user-username')
+    ];
+    usernameElements.forEach(el => {
+        if (el) el.innerText = show ? 'Загрузка...' : (state.user?.username || 'Пользователь');
     });
-}
-// ...
+        }
