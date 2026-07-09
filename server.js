@@ -28,6 +28,17 @@ const CHANNEL_USERNAME = process.env.CHANNEL_USERNAME || "";
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Автоматическое добавление новой колонки для таймера уведомлений (если её ещё нет)
+async function initDbUpdates() {
+    try {
+        await query("ALTER TABLE users ADD COLUMN IF NOT EXISTS daily_case_notified BOOLEAN DEFAULT TRUE;");
+        console.log("💾 [DB] Структура базы данных успешно проверена и готова к работе.");
+    } catch (e) {
+        console.error("⚠️ Ошибка автоматической миграции базы данных:", e.message);
+    }
+}
+initDbUpdates();
+
 // Middleware безопасности Telegram
 app.use(async (req, res, next) => {
     const initData = req.headers['x-telegram-init-data'] || req.query.initData;
@@ -152,7 +163,7 @@ app.get('/api/inventory', async (req, res) => {
     }
 });
 
-// 3. Открытие кейса (Транзакция оптимизирована, добавлен вызов notifyAdmin только для подарков)
+// 3. Открытие кейса (Только подарки шлют уведомления администратору)
 app.post('/api/open_daily_case', async (req, res) => {
     if (!req.telegramUser || !req.telegramUser.id) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -211,7 +222,7 @@ app.post('/api/open_daily_case', async (req, res) => {
             }
         }
 
-        if (!wonItem) wonItem = drops[drops.length - 1]; // Fallback to last item if no item selected (shouldn't happen with correct chances)
+        if (!wonItem) wonItem = drops[drops.length - 1];
 
         let newBalance = parseFloat(user.balance);
         if (wonItem.type === 'balance') {
@@ -219,14 +230,15 @@ app.post('/api/open_daily_case', async (req, res) => {
             await client.query('UPDATE users SET balance = $1 WHERE id = $2', [newBalance, userId]);
             await client.query('INSERT INTO transactions (user_id, type, item_id, amount, details) VALUES ($1, $2, $3, $4, $5)',
                 [userId, 'case_open', wonItem.item_id, wonItem.value, 'Выигрыш из ежедневного кейса: ' + wonItem.name]);
-        } else { // wonItem.type === 'gift'
+        } else { 
             await client.query(
                 'INSERT INTO user_inventory (user_id, item_id, quantity) VALUES ($1, $2, 1) ON CONFLICT (user_id, item_id) DO UPDATE SET quantity = user_inventory.quantity + 1',
                 [userId, wonItem.item_id]
             );
         }
 
-        await client.query('UPDATE users SET last_daily_case_open = NOW() WHERE id = $1', [userId]);
+        // При открытии кейса сбрасываем статус уведомления, чтобы через 24 часа бот снова напомнил пользователю
+        await client.query('UPDATE users SET last_daily_case_open = NOW(), daily_case_notified = false WHERE id = $1', [userId]);
         await client.query('COMMIT');
 
         // Уведомление админа о выигрыше ПОДАРКА (только если wonItem.type === 'gift')
@@ -249,7 +261,7 @@ app.post('/api/open_daily_case', async (req, res) => {
         console.error("Ошибка транзакции кейса:", error);
         res.status(500).json({ error: 'Произошла ошибка при открытии.' });
     } finally {
-        if (client) client.release(); // Обязательный возврат коннекта в пул Render/Supabase
+        if (client) client.release(); 
     }
 });
 
@@ -306,7 +318,7 @@ app.post('/api/sell_gift', async (req, res) => {
     }
 });
 
-// 5. Вывод подарка (С классическими строками уведомлений и прямой ссылкой на чат)
+// 5. Вывод подарка 
 app.post('/api/withdraw_gift', async (req, res) => {
     if (!req.telegramUser || !req.telegramUser.id) return res.status(401).json({ error: 'Unauthorized' });
     const userId = req.telegramUser.id;
@@ -369,7 +381,7 @@ app.post('/api/withdraw_gift', async (req, res) => {
     }
 });
 
-// 6. Заявка на Ввод подарка (NFT DEPOSIT REQUEST с интерактивными Callback-кнопками проверки)
+// 6. Заявка на Ввод подарка (NFT DEPOSIT REQUEST)
 app.post('/api/deposit_gift_request', async (req, res) => {
     if (!req.telegramUser || !req.telegramUser.id) return res.status(401).json({ error: 'Unauthorized' });
     const userId = req.telegramUser.id;
@@ -436,7 +448,6 @@ if (bot && typeof bot.on === 'function') {
         const action = callbackQuery.data;
         const msg = callbackQuery.message;
         
-        // Проверка, что запрос пришел от админа
         if (callbackQuery.from.id.toString() !== process.env.ADMIN_TELEGRAM_ID) {
             bot.answerCallbackQuery(callbackQuery.id, { text: 'Только администратор может использовать эту кнопку.', show_alert: true });
             return;
@@ -468,7 +479,7 @@ if (bot && typeof bot.on === 'function') {
                         chat_id: msg.chat.id,
                         message_id: msg.message_id,
                         parse_mode: 'Markdown',
-                        reply_markup: { inline_keyboard: [] } // Убираем кнопки после обработки
+                        reply_markup: { inline_keyboard: [] } 
                     }).catch(() => {});
                 } else {
                     bot.sendMessage(targetUserId, "❌ *Ввод подарка отклонен!*\n\nВаша заявка на ввод подарка *\"" + itemName + "\"* была отклонена администратором. Пожалуйста, убедитесь, что вы отправили NFT на аккаунт @Sintopa.", { parse_mode: 'Markdown' }).catch(() => {});
@@ -477,7 +488,7 @@ if (bot && typeof bot.on === 'function') {
                         chat_id: msg.chat.id,
                         message_id: msg.message_id,
                         parse_mode: 'Markdown',
-                        reply_markup: { inline_keyboard: [] } // Убираем кнопки после обработки
+                        reply_markup: { inline_keyboard: [] } 
                     }).catch(() => {});
                 }
                 await client.query('COMMIT');
@@ -498,5 +509,50 @@ if (bot && typeof bot.on === 'function') {
 app.get('/api/daily_case_info', (req, res) => {
     res.json({ channel_username: CHANNEL_USERNAME });
 });
+
+// =========================================================================
+// ПЛАНИРОВЩИК: Проверка таймеров 24 часа и отправка уведомления пользователям
+// =========================================================================
+async function checkAndNotifyDailyCases() {
+    try {
+        // Ищем всех пользователей, у которых с последнего открытия кейса прошло ровно 24 часа
+        // и которые еще не получили уведомление об этом (daily_case_notified = false)
+        const res = await query(`
+            SELECT id, username, first_name 
+            FROM users 
+            WHERE last_daily_case_open <= NOW() - INTERVAL '24 hours' 
+              AND daily_case_notified = false
+        `);
+        
+        for (const user of res.rows) {
+            try {
+                // Отправляем пользователю сообщение в личные сообщения через бота
+                await bot.sendMessage(user.id, `🎁 *Ваш ежедневный кейс готов к открытию!*\n\nПрошло 24 часа, и вы снова можете испытать свою удачу и выиграть ценные призы!`, {
+                    parse_mode: 'Markdown',
+                    reply_markup: {
+                        inline_keyboard: [
+                            [{ text: '🎁 Открыть BestGifts', web_app: { url: process.env.WEB_APP_URL } }]
+                        ]
+                    }
+                });
+                
+                // Помечаем, что уведомление за этот цикл успешно отправлено
+                await query('UPDATE users SET daily_case_notified = true WHERE id = $1', [user.id]);
+                console.log(`✉️ Отправлено напоминание о кейсе пользователю ${user.id}`);
+            } catch (err) {
+                console.error(`Не удалось отправить уведомление пользователю ${user.id}:`, err.message);
+                // Отмечаем его как уведомленного в случае ошибки (например, если он заблокировал бота), 
+                // чтобы избежать бесконечного спама логов при следующей проверке
+                await query('UPDATE users SET daily_case_notified = true WHERE id = $1', [user.id]);
+            }
+        }
+    } catch (error) {
+        console.error("Ошибка в работе планировщика ежедневных кейсов:", error);
+    }
+}
+
+// Запускаем планировщик проверки каждые 60 секунд
+setInterval(checkAndNotifyDailyCases, 60000);
+
 
 app.listen(PORT, () => console.log("🚀 Safe Server running on port " + PORT));
