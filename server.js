@@ -1,8 +1,8 @@
 const express = require('express');
 const path = require('path');
 const crypto = require('crypto');
-const db = require('./db'); // Ваш модуль для работы с БД
-const TelegramBot = require('node-telegram-bot-api'); // Импортируем Bot API прямо здесь
+const db = require('./db');
+const TelegramBot = require('node-telegram-bot-api');
 require('dotenv').config();
 
 const app = express();
@@ -12,7 +12,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const WEB_APP_URL = process.env.WEB_APP_URL;
 const ADMIN_TELEGRAM_ID = process.env.ADMIN_TELEGRAM_ID;
-const bot = new TelegramBot(BOT_TOKEN, { polling: true }); // Инициализируем бота здесь
+const bot = new TelegramBot(BOT_TOKEN, { polling: true });
 
 // Функция валидации данных от Telegram Web App
 function verifyTelegramWebAppData(initDataRaw) {
@@ -118,7 +118,7 @@ bot.onText(/\/start/, async (msg) => {
                  last_name = EXCLUDED.last_name, 
                  avatar_url = EXCLUDED.avatar_url,
                  is_admin = EXCLUDED.is_admin,
-                 updated_at = CURRENT_TIMESTAMP`, // Обновляем updated_at
+                 updated_at = CURRENT_TIMESTAMP`,
             [user.id, user.username, user.first_name, user.last_name, avatarUrl, is_admin]
         );
     } catch (error) {
@@ -343,11 +343,8 @@ app.post('/api/deposit/confirm', authMiddleware, async (req, res) => {
         const itemName = itemRes.rows[0].name;
 
         // Отправка уведомления администратору бота для подтверждения передачи
-        // Исправлено: многострочная строка для избежания SyntaxError
-        const adminMessage = `📥 *Заявка на депозит подарка!*\n\n` +
-                             `Пользователь: @${req.tgUser?.username || 'Без юзернейма'} (ID: `${req.userId}`)\n` +
-                             `Предмет: *${itemName}* (ID: ${itemId})\n\n` +
-                             `Ожидайте получения подарка на аккаунт @Sintopa.`;
+        // Исправлено: проблема с переносом строки
+        const adminMessage = `📥 *Заявка на депозит подарка!* \n\nПользователь: @${req.tgUser?.username || 'Без юзернейма'} (ID: `${req.userId}`) \nПредмет: *${itemName}* (ID: ${itemId}) \n\nОжидайте получения подарка на аккаунт @Sintopa.`;
         await notifyAdmin(adminMessage);
 
         res.json({ success: true, message: 'Заявка отправлена администратору на проверку!' });
