@@ -42,17 +42,6 @@ body {
     display: none !important;
 }
 
-/* ШТИЛЬНАЯ ИКОНКА АЛМАЗА ВМЕСТО GRAM */
-.gram-icon {
-    width: 16px;
-    height: 16px;
-    object-fit: contain;
-    vertical-align: middle;
-    margin-left: 4px;
-    display: inline-block;
-    border-radius: 50%;
-}
-
 /* ШАПКА */
 .header {
     padding: 16px;
@@ -114,8 +103,6 @@ body {
     font-weight: 800;
     color: var(--green-success);
     text-shadow: 0 0 8px rgba(0, 230, 118, 0.2);
-    display: flex;
-    align-items: center;
 }
 
 .header-nav {
@@ -177,13 +164,11 @@ body {
     font-size: 0.95rem;
     font-weight: 800;
     color: var(--green-success);
-    display: flex;
-    align-items: center;
 }
 
 .main-content {
     flex-grow: 1;
-    padding: 16px 16px 140px 16px; 
+    padding: 16px 16px 140px 16px; /* Дополнительный нижний отступ для прокрутки под меню */
     display: flex;
     flex-direction: column;
     box-sizing: border-box;
@@ -225,28 +210,28 @@ body {
 /* СЕТКА КЕЙСОВ */
 .cases-layout {
     display: flex;
-    gap: 12px; 
+    gap: 12px; /* Расстояние между кейсами */
     margin-bottom: 20px;
 }
 
 .case-banner-card {
-    flex: 1; 
+    flex: 1; /* Каждый кейс занимает равное пространство */
     background: linear-gradient(135deg, #1c1c2d, #141420);
     border: 1px solid var(--border-color);
-    border-radius: 16px; 
-    padding: 15px; 
+    border-radius: 16px; /* Скругленные углы */
+    padding: 15px; /* Уменьшил паддинг, чтобы сделать более квадратным */
     display: flex;
-    flex-direction: column; 
+    flex-direction: column; /* Вертикальное расположение контента */
     align-items: center;
-    gap: 10px; 
+    gap: 10px; /* Расстояние между элементами внутри карточки */
     position: relative;
     cursor: pointer;
     box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
     transition: transform 0.2s ease, border-color 0.2s;
-    text-align: center; 
-    min-width: 120px; 
-    height: 140px; 
-    justify-content: center; 
+    text-align: center; /* Центрируем текст */
+    min-width: 120px; /* Минимальная ширина, чтобы не схлопывалось */
+    height: 140px; /* Фиксированная высота для квадратного вида */
+    justify-content: center; /* Центрируем контент по вертикали */
 }
 
 .case-banner-card:active {
@@ -255,15 +240,15 @@ body {
 
 .case-banner-badge {
     position: absolute;
-    top: 8px; 
-    right: 8px; 
+    top: 8px; /* Немного выше */
+    right: 8px; /* Немного правее */
     background: var(--secondary-color);
     color: #000;
-    font-size: 0.6rem; 
+    font-size: 0.6rem; /* Чуть меньше шрифт */
     font-weight: 800;
-    padding: 3px 6px; 
+    padding: 3px 6px; /* Меньше паддинг */
     border-radius: 6px;
-    white-space: nowrap; 
+    white-space: nowrap; /* Не переносим текст */
 }
 
 .case-banner-card.newbie-case .case-banner-badge {
@@ -273,39 +258,39 @@ body {
 }
 
 .case-banner-img {
-    width: 50px; 
+    width: 50px; /* Уменьшил размер иконок */
     height: 50px;
     object-fit: contain;
-    margin: 0; 
+    margin: 0; /* Убрал лишние отступы */
 }
 
 .case-banner-info h3 {
-    margin: 0; 
-    font-size: 0.95rem; 
+    margin: 0; /* Убрал лишние отступы */
+    font-size: 0.95rem; /* Чуть меньше шрифт */
     font-weight: 700;
     color: #fff;
 }
 
 .case-banner-info p {
     margin: 0;
-    font-size: 0.75rem; 
+    font-size: 0.75rem; /* Чуть меньше шрифт */
     color: var(--light-text-color);
     font-weight: 600;
     line-height: 1.2;
 }
 
 .case-banner-arrow {
-    font-size: 1.2rem; 
+    font-size: 1.2rem; /* Чуть меньше стрелка */
     color: var(--light-text-color);
     font-weight: 700;
-    position: absolute; 
+    position: absolute; /* Позиционируем внизу по центру */
     bottom: 8px;
     right: 8px;
 }
 
 /* СТРАНИЦА КЕЙСА */
 .case-page-header {
-    margin-bottom: 20px; 
+    margin-bottom: 20px; /* Отступ от рулетки */
 }
 
 .case-title-block {
@@ -329,6 +314,13 @@ body {
     font-weight: 800;
     color: #fff;
 }
+
+/* .case-secondary-title {
+    font-size: 0.85rem;
+    color: var(--light-text-color);
+    margin-top: 4px;
+} */ /* Убрано по запросу */
+
 
 /* РУЛЕТКА */
 .roulette-wrapper {
@@ -377,7 +369,7 @@ body {
     gap: 8px;
     padding: 0;
     margin: 0;
-    will-change: transform; 
+    will-change: transform; /* Оптимизация плавности */
 }
 
 .roulette-item {
@@ -518,9 +510,6 @@ body {
     color: var(--secondary-color);
     margin-bottom: 6px;
     text-shadow: 0 0 5px rgba(255, 215, 0, 0.2);
-    display: flex;
-    align-items: center;
-    justify-content: center;
 }
 
 .reward-card img {
@@ -589,14 +578,14 @@ body {
     box-shadow: 0 2px 8px rgba(40, 167, 69, 0.2);
 }
 
-/* ДИЗАЙН ПАНЕЛИ ВВОДА ПОДАРКОВ */
+/* ДИЗАЙН ПАНЕЛИ ВВОДА ПОДАРКОВ (DEPOSIT PANEL) */
 .deposit-panel {
     background: linear-gradient(135deg, #1c1c2d, #141420);
     border: 1.5px solid rgba(138, 43, 226, 0.4);
     box-shadow: 0 0 15px rgba(138, 43, 226, 0.15);
     border-radius: 18px;
     padding: 16px;
-    margin-top: 15px; 
+    margin-top: 15px; /* Мягкий отступ от сетки наград сверху */
     margin-bottom: 10px;
     box-sizing: border-box;
 }
@@ -671,7 +660,7 @@ body {
     transform: scale(0.97);
 }
 
-/* BOTTOM DOCK MENU */
+/* СТИЛЬНЫЙ iOS/CYBERPUNK BOTTOM DOCK MENU */
 .bottom-nav {
     position: fixed; 
     bottom: 16px; 
@@ -873,7 +862,7 @@ body {
 /* УВЕДОМЛЕНИЯ ВНИЗУ */
 .toast-container {
     position: fixed;
-    bottom: 96px; 
+    bottom: 96px; /* Расположены аккуратно НАД парящим меню */
     left: 50%;
     transform: translateX(-50%);
     z-index: 9999;
@@ -882,7 +871,7 @@ body {
     display: flex;
     flex-direction: column;
     gap: 10px;
-    pointer-events: none; 
+    pointer-events: none; /* Пропускают нажатия сквозь пустую зону */
 }
 
 .custom-toast {
@@ -898,7 +887,7 @@ body {
     transform: translateY(20px);
     opacity: 0;
     transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-    pointer-events: auto; 
+    pointer-events: auto; /* Нажатие работает только на само сообщение */
 }
 
 .custom-toast.show {
@@ -917,6 +906,7 @@ body {
     line-height: 1.3;
 }
 
+/* Кнопка закрытия внутри тоста */
 .custom-toast-close {
     background: none;
     border: none;
@@ -933,7 +923,7 @@ body {
 
 /* СТИЛИ ПУСТОГО ИНВЕНТАРЯ */
 .empty-inventory {
-    grid-column: 1 / -1; 
+    grid-column: 1 / -1; /* Занимает всю ширину сетки */
     text-align: center;
     color: var(--light-text-color);
     padding: 40px 20px;
