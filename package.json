@@ -1,6 +1,6 @@
 {
-  "name": "telegram-best-gifts",
-  "version": "1.3.0",
+  "name": "telegram-epic-gift",
+  "version": "1.0.0",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"

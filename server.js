@@ -1,365 +1,502 @@
 const express = require('express');
 const path = require('path');
 const crypto = require('crypto');
-const db = require('./db');
-const TelegramBot = require('node-telegram-bot-api');
 require('dotenv').config();
 
+// Глобальные перехватчики ошибок, чтобы Render никогда не падал при старте
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('⚠️ [Safe Engine] Unhandled Rejection:', reason);
+});
+process.on('uncaughtException', (err) => {
+    console.error('⚠️ [Safe Engine] Uncaught Exception:', err);
+});
+
+const db = require('./db');
+const botModule = require('./bot');
+
+const bot = botModule.bot || botModule;
+const checkUserSubscription = botModule.checkUserSubscription || (async () => true);
+const getUserAvatarUrl = botModule.getUserAvatarUrl || (async () => null);
+
+const pool = db.pool || db;
+const query = (text, params) => pool.query(text, params);
+
 const app = express();
+const PORT = process.env.PORT || 3000;
+const CHANNEL_USERNAME = process.env.CHANNEL_USERNAME || "";
+
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-const WEB_APP_URL = process.env.WEB_APP_URL;
-const ADMIN_TELEGRAM_ID = process.env.ADMIN_TELEGRAM_ID;
-const bot = new TelegramBot(BOT_TOKEN, { polling: true });
+// Middleware безопасности Telegram
+app.use(async (req, res, next) => {
+    const initData = req.headers['x-telegram-init-data'] || req.query.initData;
 
-// Функция валидации данных от Telegram Web App
-function verifyTelegramWebAppData(initDataRaw) {
-    if (!initDataRaw) return false;
-    try {
-        const params = new URLSearchParams(initDataRaw);
-        const hash = params.get('hash');
-        params.delete('hash');
-        
-        const sortedParams = Array.from(params.entries())
-            .map(([key, value]) => `${key}=${value}`)
-            .sort()
-            .join('\n');
-            
-        const secretKey = crypto.createHmac('sha256', 'WebAppData').update(BOT_TOKEN).digest();
-        const computedHash = crypto.createHmac('sha256', secretKey).update(sortedParams).digest('hex');
-        
-        return computedHash === hash;
-    } catch (e) {
-        console.error('Ошибка верификации Telegram:', e);
-        return false;
-    }
-}
-
-// Middleware для авторизации пользователей
-async function authMiddleware(req, res, next) {
-    const initDataRaw = req.headers['x-telegram-init-data'];
-    
-    // Для тестирования в обычном браузере (только локально, в продакшене будет fail)
-    if (!initDataRaw && process.env.NODE_ENV !== 'production') {
-        req.userId = 123456789; // Тестовый ID пользователя
-        req.tgUser = { id: req.userId, username: 'testuser', first_name: 'Test', last_name: 'User' };
+    if (!initData) {
+        req.telegramUser = null;
         return next();
     }
 
-    if (!verifyTelegramWebAppData(initDataRaw)) {
-        console.warn('Неавторизованный запрос: Неверные initData');
-        return res.status(401).json({ error: 'Неавторизованный запрос' });
-    }
-
-    const params = new URLSearchParams(initDataRaw);
-    const userStr = params.get('user');
-    if (!userStr) {
-        console.warn('Неавторизованный запрос: Пользователь не найден в initData');
-        return res.status(400).json({ error: 'Пользователь не найден в initData' });
-    }
-
     try {
-        req.tgUser = JSON.parse(userStr);
-        req.userId = req.tgUser.id;
-        next();
-    } catch (e) {
-        console.error('Ошибка парсинга пользователя из initData:', e);
-        return res.status(400).json({ error: 'Ошибка парсинга пользователя' });
-    }
-}
+        const params = new URLSearchParams(initData);
+        const hash = params.get('hash');
+        params.delete('hash');
+        params.sort();
 
-// =======================================================
-// ЛОГИКА ТЕЛЕГРАМ БОТА
-// =======================================================
+        let dataCheckString = '';
+        for (const [key, value] of params.entries()) {
+            dataCheckString += key + '=' + value + '\n';
+        }
+        dataCheckString = dataCheckString.trim();
 
-// Получение URL аватарки пользователя
-async function getUserAvatarUrl(userId) {
-    try {
-        const photos = await bot.getUserProfilePhotos(userId, 0, 1);
-        if (photos.total_count > 0) {
-            const fileId = photos.photos[0][0].file_id;
-            const file = await bot.getFile(fileId);
-            return `https://api.telegram.org/file/bot${BOT_TOKEN}/${file.file_path}`;
+        const secretKey = crypto.createHmac('sha256', 'WebAppData').update(process.env.TELEGRAM_BOT_TOKEN).digest();
+        const calculatedHash = crypto.createHmac('sha256', secretKey).update(dataCheckString).digest('hex');
+
+        if (calculatedHash !== hash) {
+            req.telegramUser = null;
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
+
+        const userJson = params.get('user');
+        if (userJson) {
+            req.telegramUser = JSON.parse(userJson);
+            if (req.telegramUser.id) {
+                let avatarUrl = req.telegramUser.photo_url || null;
+                try {
+                    if (!avatarUrl) {
+                        avatarUrl = await getUserAvatarUrl(req.telegramUser.id);
+                    }
+                    const isAdminUser = req.telegramUser.id.toString() === process.env.ADMIN_TELEGRAM_ID;
+                    await query(
+                        'UPDATE users SET avatar_url = $1, username = $2, first_name = $3, last_name = $4, is_admin = $5 WHERE id = $6',
+                        [avatarUrl, req.telegramUser.username, req.telegramUser.first_name, req.telegramUser.last_name, isAdminUser, req.telegramUser.id]
+                    );
+                } catch (dbErr) {
+                    console.error("Ошибка обновления пользователя в БД:", dbErr);
+                }
+            }
+        } else {
+            req.telegramUser = null;
         }
     } catch (e) {
-        console.error(`Ошибка при получении аватарки для ID ${userId}:`, e.message);
+        req.telegramUser = null;
+        return res.status(401).json({ error: 'Unauthorized' });
     }
-    return null;
-}
-
-// Функция отправки уведомлений администратору
-async function notifyAdmin(message, reply_markup = {}) {
-    if (ADMIN_TELEGRAM_ID) {
-        try {
-            await bot.sendMessage(ADMIN_TELEGRAM_ID, message, { parse_mode: 'Markdown', reply_markup });
-        } catch (e) {
-            console.error('Ошибка при отправке сообщения админу:', e.message);
-        }
-    }
-}
-
-// Обработка команды /start
-bot.onText(/\/start/, async (msg) => {
-    const chatId = msg.chat.id;
-    const user = msg.from;
-    const is_admin = user.id.toString() === ADMIN_TELEGRAM_ID;
-
-    let avatarUrl = await getUserAvatarUrl(user.id);
-
-    try {
-        await db.query(
-            `INSERT INTO users (id, username, first_name, last_name, avatar_url, is_admin)
-             VALUES ($1, $2, $3, $4, $5, $6)
-             ON CONFLICT (id) DO UPDATE
-             SET username = EXCLUDED.username, 
-                 first_name = EXCLUDED.first_name, 
-                 last_name = EXCLUDED.last_name, 
-                 avatar_url = EXCLUDED.avatar_url,
-                 is_admin = EXCLUDED.is_admin,
-                 updated_at = CURRENT_TIMESTAMP`,
-            [user.id, user.username, user.first_name, user.last_name, avatarUrl, is_admin]
-        );
-    } catch (error) {
-        console.error('Ошибка при добавлении/обновлении пользователя в БД:', error);
-    }
-
-    bot.sendMessage(chatId, `🎉 Добро пожаловать в мир подарков BestGifts!\n\nНажмите кнопку ниже, чтобы начать:`, {
-        reply_markup: {
-            inline_keyboard: [
-                [{ text: '🎁 Открыть BestGifts', web_app: { url: WEB_APP_URL } }]
-            ]
-        }
-    });
+    next();
 });
 
-console.log('🤖 Бот Telegram запущен и готов к работе...');
-
-// =======================================================
-// API ЭНДПОИНТЫ ДЛЯ WEB APP
-// =======================================================
-
-// 1. Получение информации о пользователе
-app.get('/api/user/me', authMiddleware, async (req, res) => {
+// 1. Получение данных пользователя
+app.get('/api/user', async (req, res) => {
+    if (!req.telegramUser || !req.telegramUser.id) {
+        return res.status(401).json({ error: 'Unauthorized' });
+    }
     try {
-        let userResult = await db.query('SELECT * FROM users WHERE id = $1', [req.userId]);
+        let userRes = await query('SELECT id, username, first_name, balance, avatar_url, last_daily_case_open, is_admin FROM users WHERE id = $1', [req.telegramUser.id]);
+        let user = userRes.rows[0];
         
-        // Если пользователя нет (не запустил /start), создаем его
-        if (userResult.rows.length === 0) {
-            const username = req.tgUser?.username || `user_${req.userId}`;
-            const first_name = req.tgUser?.first_name || '';
-            const last_name = req.tgUser?.last_name || '';
-            const is_admin = req.userId.toString() === ADMIN_TELEGRAM_ID;
-
-            await db.query(
-                `INSERT INTO users (id, username, first_name, last_name, is_admin)
-                 VALUES ($1, $2, $3, $4, $5)`,
-                [req.userId, username, first_name, last_name, is_admin]
+        if (!user) {
+            const avatarUrl = req.telegramUser.photo_url || null;
+            const isAdminUser = req.telegramUser.id.toString() === process.env.ADMIN_TELEGRAM_ID;
+            user = {
+                id: req.telegramUser.id,
+                username: req.telegramUser.username,
+                first_name: req.telegramUser.first_name,
+                balance: 0.000,
+                avatar_url: avatarUrl,
+                last_daily_case_open: new Date('2000-01-01'),
+                is_admin: isAdminUser
+            };
+            await query(
+                'INSERT INTO users (id, username, first_name, last_name, avatar_url, is_admin) VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (id) DO NOTHING',
+                [user.id, user.username, req.telegramUser.first_name, req.telegramUser.last_name, user.avatar_url, user.is_admin]
             );
-            userResult = await db.query('SELECT * FROM users WHERE id = $1', [req.userId]);
+        }
+        res.json(user);
+    } catch (error) {
+        console.error("Ошибка в /api/user:", error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// 2. Получение инвентаря
+app.get('/api/inventory', async (req, res) => {
+    if (!req.telegramUser || !req.telegramUser.id) {
+        return res.status(401).json({ error: 'Unauthorized' });
+    }
+    try {
+        const inventoryRows = (await query(`
+            SELECT ui.item_id, ui.quantity, i.name, i.image_url, i.value, i.type
+            FROM user_inventory ui
+            JOIN items i ON ui.item_id = i.id
+            WHERE ui.user_id = $1 AND ui.quantity > 0
+            ORDER BY i.value DESC
+        `, [req.telegramUser.id])).rows;
+
+        const inventoryFlat = [];
+        for (const row of inventoryRows) {
+            for (let i = 0; i < row.quantity; i++) {
+                inventoryFlat.push({
+                    item_id: row.item_id,
+                    name: row.name,
+                    image_url: row.image_url,
+                    value: row.value,
+                    type: row.type,
+                    quantity: 1
+                });
+            }
+        }
+        res.json(inventoryFlat);
+    } catch (error) {
+        console.error("Ошибка в /api/inventory:", error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// 3. Открытие кейса (Транзакция оптимизирована, добавлен вызов notifyAdmin только для подарков)
+app.post('/api/open_daily_case', async (req, res) => {
+    if (!req.telegramUser || !req.telegramUser.id) {
+        return res.status(401).json({ error: 'Unauthorized' });
+    }
+    const userId = req.telegramUser.id;
+
+    let client;
+    try {
+        const isSubscribed = await checkUserSubscription(userId);
+        if (!isSubscribed) {
+            return res.status(403).json({ error: "Для открытия кейса необходимо быть подписчиком канала @" + CHANNEL_USERNAME });
         }
 
-        res.json(userResult.rows[0]);
-    } catch (error) {
-        console.error('Ошибка сервера при получении пользователя:', error);
-        res.status(500).json({ error: 'Ошибка сервера при получении пользователя' });
-    }
-});
-
-// 2. Получение списка возможных наград в кейсе
-app.get('/api/case/rewards', async (req, res) => {
-    try {
-        const query = `
-            SELECT i.id, i.name, i.image_url, i.type, i.value, d.chance 
-            FROM items i 
-            JOIN daily_case_drops d ON i.id = d.item_id
-            ORDER BY d.chance ASC
-        `;
-        const result = await db.query(query);
-        res.json(result.rows);
-    } catch (error) {
-        console.error('Ошибка сервера при получении наград:', error);
-        res.status(500).json({ error: 'Ошибка при получении наград' });
-    }
-});
-
-// 3. Открытие кейса (Крутить спин)
-app.post('/api/case/spin', authMiddleware, async (req, res) => {
-    const client = await db.pool.connect();
-    try {
+        client = await pool.connect();
         await client.query('BEGIN');
 
-        // Проверка времени последнего открытия
-        const userRes = await client.query('SELECT last_daily_case_open, balance FROM users WHERE id = $1 FOR UPDATE', [req.userId]);
+        const userRes = await client.query('SELECT username, first_name, last_name, balance, last_daily_case_open, is_admin FROM users WHERE id = $1 FOR UPDATE', [userId]);
         const user = userRes.rows[0];
-        const lastOpen = new Date(user.last_daily_case_open);
-        const now = new Date();
-        const cooldown = 24 * 60 * 60 * 1000; // 24 часа
 
-        if (now - lastOpen < cooldown) {
-            const timeLeft = cooldown - (now - lastOpen);
+        if (!user) {
             await client.query('ROLLBACK');
-            return res.status(400).json({ error: 'Кейс еще недоступен', timeLeft });
+            return res.status(404).json({ error: 'Пользователь не найден.' });
         }
 
-        // Получаем все призы и их шансы
-        const dropsRes = await client.query(`
-            SELECT i.*, d.chance FROM items i
-            JOIN daily_case_drops d ON i.id = d.item_id
-        `);
-        const drops = dropsRes.rows;
+        const now = new Date();
+        const lastOpen = new Date(user.last_daily_case_open);
+        const timeElapsed = now.getTime() - lastOpen.getTime();
+        const cooldown = 24 * 60 * 60 * 1000;
 
-        // Алгоритм выбора приза на сервере (рулетка)
-        const totalChance = drops.reduce((sum, item) => sum + parseFloat(item.chance), 0);
-        let random = Math.random() * totalChance;
+        if (!user.is_admin && timeElapsed < cooldown) {
+            await client.query('ROLLBACK');
+            const timeLeftMs = cooldown - timeElapsed;
+            return res.status(400).json({ error: 'Кейс будет доступен позже.', timeLeftMs });
+        }
+
+        const drops = (await client.query(`
+            SELECT dcd.item_id, dcd.chance, i.name, i.type, i.value, i.image_url
+            FROM daily_case_drops dcd
+            JOIN items i ON dcd.item_id = i.id
+        `)).rows;
+
+        if (drops.length === 0) {
+            await client.query('ROLLBACK');
+            return res.status(500).json({ error: 'Кейс временно пуст.' });
+        }
+
+        let totalChance = drops.reduce((sum, drop) => sum + parseFloat(drop.chance), 0);
+        let rand = Math.random() * totalChance;
         let wonItem = null;
 
-        for (const item of drops) {
-            random -= parseFloat(item.chance);
-            if (random <= 0) {
-                wonItem = item;
+        for (const drop of drops) {
+            rand -= parseFloat(drop.chance);
+            if (rand <= 0) {
+                wonItem = drop;
                 break;
             }
         }
-        if (!wonItem) wonItem = drops[drops.length - 1]; // Fallback на последний, если что-то пошло не так
 
-        // Начисление выигрыша
+        if (!wonItem) wonItem = drops[drops.length - 1]; // Fallback to last item if no item selected (shouldn't happen with correct chances)
+
+        let newBalance = parseFloat(user.balance);
         if (wonItem.type === 'balance') {
+            newBalance += parseFloat(wonItem.value);
+            await client.query('UPDATE users SET balance = $1 WHERE id = $2', [newBalance, userId]);
+            await client.query('INSERT INTO transactions (user_id, type, item_id, amount, details) VALUES ($1, $2, $3, $4, $5)',
+                [userId, 'case_open', wonItem.item_id, wonItem.value, 'Выигрыш из ежедневного кейса: ' + wonItem.name]);
+        } else { // wonItem.type === 'gift'
             await client.query(
-                'UPDATE users SET balance = balance + $1, last_daily_case_open = $2 WHERE id = $3',
-                [parseFloat(wonItem.value), now, req.userId]
-            );
-        } else {
-            // Добавляем в инвентарь
-            await client.query(
-                `INSERT INTO user_inventory (user_id, item_id, quantity)
-                 VALUES ($1, $2, 1)
-                 ON CONFLICT (user_id, item_id)
-                 DO UPDATE SET quantity = user_inventory.quantity + 1`,
-                [req.userId, wonItem.id]
-            );
-            await client.query(
-                'UPDATE users SET last_daily_case_open = $1 WHERE id = $2',
-                [now, req.userId]
+                'INSERT INTO user_inventory (user_id, item_id, quantity) VALUES ($1, $2, 1) ON CONFLICT (user_id, item_id) DO UPDATE SET quantity = user_inventory.quantity + 1',
+                [userId, wonItem.item_id]
             );
         }
 
-        // Логируем транзакцию
-        await client.query(
-            `INSERT INTO transactions (user_id, type, item_id, amount, details)
-             VALUES ($1, 'case_open', $2, $3, $4)`,
-            [req.userId, wonItem.id, wonItem.value, `Выигран предмет: ${wonItem.name}`]
-        );
-
+        await client.query('UPDATE users SET last_daily_case_open = NOW() WHERE id = $1', [userId]);
         await client.query('COMMIT');
-        res.json({ success: true, wonItem, last_daily_case_open: now });
+
+        // Уведомление админа о выигрыше ПОДАРКА (только если wonItem.type === 'gift')
+        if (wonItem.type === 'gift') {
+            const adminId = process.env.ADMIN_TELEGRAM_ID;
+            if (adminId && bot && typeof bot.sendMessage === 'function') {
+                const userMention = user.username ? '@' + user.username : (user.first_name || 'Без имени');
+                const adminMsg = "🎉 *Новый выигрыш подарка в кейсе!*\n\n" +
+                                 "👤 *Пользователь:* " + (user.first_name || "") + " " + (user.last_name || "") + " (" + userMention + ")\n" +
+                                 "🎁 *Выиграл:* " + wonItem.name + " (" + wonItem.value + " GRAM)\n" +
+                                 "🆔 *Telegram ID:* `" + userId + "`";
+                bot.sendMessage(adminId, adminMsg, { parse_mode: 'Markdown' }).catch(() => {});
+            }
+        }
+
+        res.json({ success: true, wonItem: { id: wonItem.item_id, name: wonItem.name, price: wonItem.value + " GRAM", type: wonItem.type }, newBalance: newBalance });
+
     } catch (error) {
-        await client.query('ROLLBACK');
-        console.error('Ошибка сервера при открытии кейса:', error);
-        res.status(500).json({ error: 'Ошибка сервера при открытии кейса' });
+        if (client) await client.query('ROLLBACK');
+        console.error("Ошибка транзакции кейса:", error);
+        res.status(500).json({ error: 'Произошла ошибка при открытии.' });
     } finally {
-        client.release();
+        if (client) client.release(); // Обязательный возврат коннекта в пул Render/Supabase
     }
 });
 
-// 4. Получение инвентаря пользователя
-app.get('/api/inventory', authMiddleware, async (req, res) => {
-    try {
-        const result = await db.query(
-            `SELECT i.*, ui.quantity 
-             FROM user_inventory ui
-             JOIN items i ON ui.item_id = i.id
-             WHERE ui.user_id = $1 AND ui.quantity > 0`,
-            [req.userId]
-        );
-        res.json(result.rows);
-    } catch (error) {
-        console.error('Ошибка сервера при получении инвентаря:', error);
-        res.status(500).json({ error: 'Ошибка сервера при получении инвентаря' });
-    }
-});
+// 4. Продажа подарка (С уведомлением админа)
+app.post('/api/sell_gift', async (req, res) => {
+    if (!req.telegramUser || !req.telegramUser.id) return res.status(401).json({ error: 'Unauthorized' });
+    const userId = req.telegramUser.id;
+    const { itemId, price } = req.body;
 
-// 5. Продажа предмета из инвентаря
-app.post('/api/inventory/sell', authMiddleware, async (req, res) => {
-    const { itemId } = req.body;
-    const client = await db.pool.connect();
+    let client;
     try {
+        client = await pool.connect();
         await client.query('BEGIN');
+        const inventoryRes = await client.query('SELECT quantity FROM user_inventory WHERE user_id = $1 AND item_id = $2 FOR UPDATE', [userId, itemId]);
+        const item = inventoryRes.rows[0];
 
-        // Проверяем наличие предмета
-        const invRes = await client.query(
-            'SELECT quantity FROM user_inventory WHERE user_id = $1 AND item_id = $2 FOR UPDATE',
-            [req.userId, itemId]
-        );
-        
-        if (invRes.rows.length === 0 || invRes.rows[0].quantity <= 0) {
+        if (!item || item.quantity < 1) {
             await client.query('ROLLBACK');
-            return res.status(400).json({ error: 'Предмет отсутствует в инвентаре' });
+            return res.status(400).json({ error: 'У вас нет этого предмета.' });
         }
 
-        // Получаем ценность предмета
-        const itemRes = await client.query('SELECT value, name FROM items WHERE id = $1', [itemId]);
-        const item = itemRes.rows[0];
+        await client.query('UPDATE user_inventory SET quantity = quantity - 1 WHERE user_id = $1 AND item_id = $2', [userId, itemId]);
+        const userRes = await client.query('SELECT username, first_name, last_name, balance FROM users WHERE id = $1 FOR UPDATE', [userId]);
+        const user = userRes.rows[0];
+        const newBalance = parseFloat(user.balance) + parseFloat(price);
 
-        // Списываем из инвентаря
-        await client.query(
-            'UPDATE user_inventory SET quantity = quantity - 1 WHERE user_id = $1 AND item_id = $2',
-            [req.userId, itemId]
-        );
+        await client.query('UPDATE users SET balance = $1 WHERE id = $2', [newBalance, userId]);
+        
+        const giftDetails = (await client.query('SELECT name, type FROM items WHERE id = $1', [itemId])).rows[0];
+        
+        await client.query('COMMIT');
 
-        // Начисляем баланс
-        await client.query(
-            'UPDATE users SET balance = balance + $1 WHERE id = $2',
-            [parseFloat(item.value), req.userId]
-        );
+        // Уведомление админу о продаже ПОДАРКА (только если giftDetails.type === 'gift')
+        if (giftDetails && giftDetails.type === 'gift') {
+            const adminId = process.env.ADMIN_TELEGRAM_ID;
+            if (adminId && bot && typeof bot.sendMessage === 'function') {
+                const userMention = user.username ? '@' + user.username : (user.first_name || 'Без имени');
+                const adminMsg = "💰 *Подарок продан!*\n\n" +
+                                 "👤 *Пользователь:* " + (user.first_name || "") + " " + (user.last_name || "") + " (" + userMention + ")\n" +
+                                 "🎁 *Продан предмет:* " + (giftDetails?.name || 'Подарок') + "\n" +
+                                 "💵 *Сумма сделки:* " + price + " GRAM\n" +
+                                 "🆔 *Telegram ID:* `" + userId + "`";
+                bot.sendMessage(adminId, adminMsg, { parse_mode: 'Markdown' }).catch(() => {});
+            }
+        }
 
-        // Лог транзакции
-        await client.query(
-            `INSERT INTO transactions (user_id, type, item_id, amount, details)
-             VALUES ($1, 'item_sell', $2, $3, $4)`,
-            [req.userId, itemId, item.value, `Продажа предмета: ${item.name}`]
-        );
+        res.json({ success: true, newBalance: newBalance });
+    } catch (error) {
+        if (client) await client.query('ROLLBACK');
+        console.error("Ошибка в /api/sell_gift:", error);
+        res.status(500).json({ error: 'Ошибка при продаже.' });
+    } finally {
+        if (client) client.release();
+    }
+});
+
+// 5. Вывод подарка (С классическими строками уведомлений и прямой ссылкой на чат)
+app.post('/api/withdraw_gift', async (req, res) => {
+    if (!req.telegramUser || !req.telegramUser.id) return res.status(401).json({ error: 'Unauthorized' });
+    const userId = req.telegramUser.id;
+    const { itemId } = req.body;
+
+    const parsedItemId = parseInt(itemId, 10);
+    if (isNaN(parsedItemId)) {
+        return res.status(400).json({ error: 'Неверный ID подарка.' });
+    }
+
+    let client;
+    try {
+        client = await pool.connect();
+        await client.query('BEGIN');
+        const inventoryRes = await client.query('SELECT quantity FROM user_inventory WHERE user_id = $1 AND item_id = $2 FOR UPDATE', [userId, parsedItemId]);
+        const itemRow = inventoryRes.rows[0];
+
+        if (!itemRow || itemRow.quantity < 1) {
+            await client.query('ROLLBACK');
+            return res.status(400).json({ error: 'Недостаточно предметов в вашем инвентаре.' });
+        }
+
+        await client.query('UPDATE user_inventory SET quantity = quantity - 1 WHERE user_id = $1 AND item_id = $2', [userId, parsedItemId]);
+        
+        const itemDetails = (await client.query('SELECT name, value, type FROM items WHERE id = $1', [parsedItemId])).rows[0];
+        const userRes = await client.query('SELECT username, first_name, last_name FROM users WHERE id = $1', [userId]);
+        const user = userRes.rows[0];
 
         await client.query('COMMIT');
-        res.json({ success: true, message: 'Предмет успешно продан' });
-    } catch (error) {
-        await client.query('ROLLBACK');
-        console.error('Ошибка сервера при продаже:', error);
-        res.status(500).json({ error: 'Ошибка сервера при продаже' });
-    } finally {
-        client.release();
-    }
-});
 
-// 6. Подтверждение депозита (ввода) подарка
-app.post('/api/deposit/confirm', authMiddleware, async (req, res) => {
-    const { itemId } = req.body;
-    try {
-        const itemRes = await db.query('SELECT name FROM items WHERE id = $1', [itemId]);
-        if (itemRes.rows.length === 0) {
-            return res.status(400).json({ error: 'Предмет не найден' });
+        // Уведомление админа о выводе ПОДАРКА (только если itemDetails.type === 'gift')
+        if (itemDetails && itemDetails.type === 'gift') {
+            const adminId = process.env.ADMIN_TELEGRAM_ID;
+            if (adminId && bot && typeof bot.sendMessage === 'function') {
+                const userMention = user.username ? '@' + user.username : (user.first_name || 'Без имени');
+                const chatLink = 'tg://user?id=' + userId;
+                const tmeLink = user.username ? 'https://t.me/' + user.username : 'https://t.me/user?id=' + userId;
+
+                const message = "🚨 *Новая заявка на вывод подарка!*\n\n" +
+                                "🎁 *Подарок:* " + itemDetails.name + " (" + itemDetails.value + " GRAM)\n" +
+                                "👤 *Пользователь:* " + (user.first_name || "") + " " + (user.last_name || "") + " (" + userMention + ")\n" +
+                                "🆔 *Telegram ID:* " + userId + "\n\n" +
+                                "💬 [Открыть чат](" + chatLink + ")\n" +
+                                "🔗 [Ссылка t.me](" + tmeLink + ")";
+
+                bot.sendMessage(adminId, message, { parse_mode: 'Markdown' }).catch(err => {
+                    console.error("Бот не смог отправить сообщение админу:", err.message);
+                });
+            }
         }
-        const itemName = itemRes.rows[0].name;
 
-        // Отправка уведомления администратору бота для подтверждения передачи
-        // Исправлено: проблема с переносом строки
-        const adminMessage = `📥 *Заявка на депозит подарка!* \n\nПользователь: @${req.tgUser?.username || 'Без юзернейма'} (ID: `${req.userId}`) \nПредмет: *${itemName}* (ID: ${itemId}) \n\nОжидайте получения подарка на аккаунт @Sintopa.`;
-        await notifyAdmin(adminMessage);
+        res.json({ success: true });
 
-        res.json({ success: true, message: 'Заявка отправлена администратору на проверку!' });
     } catch (error) {
-        console.error('Ошибка при отправке заявки на депозит:', error);
-        res.status(500).json({ error: 'Ошибка при отправке заявки' });
+        if (client) await client.query('ROLLBACK');
+        console.error('Ошибка вывода предмета:', error);
+        res.status(500).json({ error: 'Ошибка сервера при выводе.' });
+    } finally {
+        if (client) client.release();
     }
 });
 
-// Все остальные запросы перенаправляем на index.html
-app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+// 6. Заявка на Ввод подарка (NFT DEPOSIT REQUEST с интерактивными Callback-кнопками проверки)
+app.post('/api/deposit_gift_request', async (req, res) => {
+    if (!req.telegramUser || !req.telegramUser.id) return res.status(401).json({ error: 'Unauthorized' });
+    const userId = req.telegramUser.id;
+    const { itemId } = req.body;
+
+    const parsedItemId = parseInt(itemId, 10);
+    if (isNaN(parsedItemId)) {
+        return res.status(400).json({ error: 'Неверный ID подарка.' });
+    }
+
+    try {
+        const itemDetails = (await query('SELECT name, value, type FROM items WHERE id = $1', [parsedItemId])).rows[0];
+        if (!itemDetails) {
+            return res.status(400).json({ error: 'Подарок не найден в системе.' });
+        }
+
+        // Уведомление админу о вводе ПОДАРКА (только если itemDetails.type === 'gift')
+        if (itemDetails.type === 'gift') {
+            const userRes = await query('SELECT username, first_name, last_name FROM users WHERE id = $1', [userId]);
+            const user = userRes.rows[0];
+
+            const adminId = process.env.ADMIN_TELEGRAM_ID;
+            if (adminId && bot && typeof bot.sendMessage === 'function') {
+                const userMention = user.username ? '@' + user.username : (user.first_name || 'Без имени');
+                const chatLink = 'tg://user?id=' + userId;
+                const tmeLink = user.username ? 'https://t.me/' + user.username : 'https://t.me/user?id=' + userId;
+
+                const message = "📥 *Новая заявка на ВВОД подарка NFT!*\n\n" +
+                                "🎁 *Подарок:* " + itemDetails.name + " (" + itemDetails.value + " GRAM)\n" +
+                                "👤 *Отправитель:* " + (user.first_name || "") + " " + (user.last_name || "") + " (" + userMention + ")\n" +
+                                "🆔 *Telegram ID:* `" + userId + "`\n\n" +
+                                "💬 [Открыть чат с пользователем](" + chatLink + ")\n" +
+                                "🔗 [Прямая ссылка t.me](" + tmeLink + ")\n\n" +
+                                "_Проверьте получение подарка на вашем аккаунте @Sintopa и нажмите кнопку ниже:_";
+
+                const options = {
+                    parse_mode: 'Markdown',
+                    reply_markup: {
+                        inline_keyboard: [
+                            [
+                                { text: '✅ Подтвердить', callback_data: 'dep_app_' + userId + '_' + parsedItemId },
+                                { text: '❌ Отклонить', callback_data: 'dep_rej_' + userId + '_' + parsedItemId }
+                            ]
+                        ]
+                    }
+                };
+
+                bot.sendMessage(adminId, message, options).catch(err => {
+                    console.error("Не удалось отправить заявку ввода админу:", err);
+                });
+            }
+        }
+
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Ошибка отправки заявки на ввод:', error);
+        res.status(500).json({ error: 'Ошибка сервера.' });
+    }
 });
 
-const PORT = process.env.PORT || 10000; // Используйте порт 10000 для Render
-app.listen(PORT, () => {
-    console.log(`🚀 Web-сервер запущен на порту ${PORT}`);
+// АВТОМАТИЧЕСКАЯ ОБРАБОТКА ПОДТВЕРЖДЕНИЙ/ОТКЛОНЕНИЙ ВВОДА АДМИНОМ ИЗ БОТА
+if (bot && typeof bot.on === 'function') {
+    bot.on('callback_query', async (callbackQuery) => {
+        const action = callbackQuery.data;
+        const msg = callbackQuery.message;
+        
+        // Проверка, что запрос пришел от админа
+        if (callbackQuery.from.id.toString() !== process.env.ADMIN_TELEGRAM_ID) {
+            bot.answerCallbackQuery(callbackQuery.id, { text: 'Только администратор может использовать эту кнопку.', show_alert: true });
+            return;
+        }
+
+        if (action.startsWith('dep_app_') || action.startsWith('dep_rej_')) {
+            const parts = action.split('_'); 
+            const isApprove = parts[1] === 'app';
+            const targetUserId = parseInt(parts[2], 10);
+            const itemId = parseInt(parts[3], 10);
+
+            let client;
+            try {
+                client = await pool.connect();
+                await client.query('BEGIN');
+
+                const itemRes = await client.query('SELECT name FROM items WHERE id = $1', [itemId]);
+                const itemName = itemRes.rows[0]?.name || 'Подарок';
+
+                if (isApprove) {
+                    await client.query(
+                        'INSERT INTO user_inventory (user_id, item_id, quantity) VALUES ($1, $2, 1) ON CONFLICT (user_id, item_id) DO UPDATE SET quantity = user_inventory.quantity + 1',
+                        [targetUserId, itemId]
+                    );
+
+                    bot.sendMessage(targetUserId, "🎉 *Подарок зачислен!*\n\nАдминистратор проверил вашу транзакцию. Подарок *\"" + itemName + "\"* успешно зачислен в ваш инвентарь!", { parse_mode: 'Markdown' }).catch(() => {});
+
+                    bot.editMessageText("✅ Заявка на ввод подарка *\"" + itemName + "\"* одобрена. Предмет успешно зачислен в инвентарь пользователя!", {
+                        chat_id: msg.chat.id,
+                        message_id: msg.message_id,
+                        parse_mode: 'Markdown',
+                        reply_markup: { inline_keyboard: [] } // Убираем кнопки после обработки
+                    }).catch(() => {});
+                } else {
+                    bot.sendMessage(targetUserId, "❌ *Ввод подарка отклонен!*\n\nВаша заявка на ввод подарка *\"" + itemName + "\"* была отклонена администратором. Пожалуйста, убедитесь, что вы отправили NFT на аккаунт @Sintopa.", { parse_mode: 'Markdown' }).catch(() => {});
+
+                    bot.editMessageText("❌ Заявка на ввод подарка *\"" + itemName + "\"* была отклонена вами.", {
+                        chat_id: msg.chat.id,
+                        message_id: msg.message_id,
+                        parse_mode: 'Markdown',
+                        reply_markup: { inline_keyboard: [] } // Убираем кнопки после обработки
+                    }).catch(() => {});
+                }
+                await client.query('COMMIT');
+            } catch (err) {
+                if (client) await client.query('ROLLBACK');
+                console.error('Ошибка в callback_query обработчике:', err);
+                bot.sendMessage(msg.chat.id, 'Произошла ошибка при обработке заявки: ' + err.message, { parse_mode: 'Markdown' }).catch(() => {});
+            } finally {
+                if (client) client.release();
+            }
+        }
+
+        bot.answerCallbackQuery(callbackQuery.id).catch(() => {});
+    });
+}
+
+// 7. Получение информации о канале
+app.get('/api/daily_case_info', (req, res) => {
+    res.json({ channel_username: CHANNEL_USERNAME });
 });
+
+app.listen(PORT, () => console.log("🚀 Safe Server running on port " + PORT));
