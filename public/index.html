@@ -4,8 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>BestGifts</title>
-    <link rel="stylesheet" href="/css/style.css?v=9.3">
+    <link rel="stylesheet" href="/css/style.css?v=9.4">
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <!-- Подключение официального TON Connect UI SDK для авторизации кошельков -->
+    <script src="https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>
 </head>
 <body>
     <div id="app">
@@ -44,7 +46,6 @@
             <main class="main-content">
                 <div class="welcome-banner">
                     <h2>Добро пожаловать в BestGifts!</h2>
-                    <p>Открывай ежедневные кейсы и выигрывай ценные призы в GRAM!</p>
                 </div>
 
                 <div class="section-divider-title">Кейсы</div>
@@ -62,10 +63,27 @@
 
                     <!-- Кейс новичка -->
                     <div id="newbie-case-banner" class="case-banner-card newbie-case">
-                        <div class="case-banner-badge">НОВЫЙ</div>
                         <img src="/Images/Cases/keysnovichka.png" alt="Newbie Case" class="case-banner-img" onerror="this.src='https://img.icons8.com/color/144/gift-box.png'">
                         <div class="case-banner-info">
                             <h3>Кейс новичка</h3>
+                        </div>
+                        <div class="case-banner-arrow">→</div>
+                    </div>
+
+                    <!-- Кейс бомжа -->
+                    <div id="bomzh-case-banner" class="case-banner-card">
+                        <img src="/Images/Cases/bomzh.png" alt="Homeless Case" class="case-banner-img" onerror="this.src='https://img.icons8.com/color/144/flea-market.png'">
+                        <div class="case-banner-info">
+                            <h3>Кейс бомжа</h3>
+                        </div>
+                        <div class="case-banner-arrow">→</div>
+                    </div>
+
+                    <!-- Кейс крутого -->
+                    <div id="krutoy-case-banner" class="case-banner-card">
+                        <img src="/Images/Cases/krutoy.png" alt="Cool Case" class="case-banner-img" onerror="this.src='https://img.icons8.com/color/144/vip.png'">
+                        <div class="case-banner-info">
+                            <h3>Кейс крутого</h3>
                         </div>
                         <div class="case-banner-arrow">→</div>
                     </div>
@@ -108,7 +126,7 @@
                     </div>
                 </div>
 
-                <!-- СЕТКА НАГРАД (Без названий предметов) -->
+                <!-- СЕТКА НАГРАД -->
                 <div id="rewards-section-container" class="rewards-section">
                     <div class="rewards-header">
                         <span class="rewards-header-icon">🏆</span>
@@ -176,6 +194,12 @@
                         <img src="/Images/Items/gram_popolnenie.png" alt="Gram" onerror="this.src='https://img.icons8.com/color/96/diamond.png'">
                     </div>
                     <p class="balance-screen-desc">Принимайте участие в розыгрышах и выводите ценные NFT призы прямо на свой кошелек!</p>
+                    
+                    <!-- КНОПКА ПРИВЯЗКИ TON-КОШЕЛЬКА -->
+                    <button id="connect-wallet-btn" class="action-button-gradient" style="background: linear-gradient(135deg, #0088cc, #00a2ff); margin-bottom: 12px; box-shadow: 0 4px 15px rgba(0, 136, 204, 0.4);">
+                        Привязать кошелёк
+                    </button>
+
                     <button class="action-button-gradient" style="opacity: 0.6; cursor: not-allowed;" disabled>Пополнить баланс</button>
                     <p style="font-size: 0.8rem; color: var(--light-text-color); margin-top: 4px;">Пополнение временно недоступно</p>
                 </div>
@@ -220,6 +244,6 @@
     </div>
 
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <script src="/js/app.js?v=9.3"></script>
+    <script src="/js/app.js?v=9.4"></script>
 </body>
     </html>
