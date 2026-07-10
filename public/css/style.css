@@ -218,7 +218,7 @@ body {
     transition: transform 0.2s ease, border-color 0.2s;
     text-align: center; 
     min-width: 120px; 
-    height: 185px; 
+    height: 210px; /* Увеличено со 185px для поддержки крупных аватарок */
     justify-content: center; 
 }
 
@@ -247,10 +247,11 @@ body {
 }
 
 .case-banner-img {
-    width: 90px; 
-    height: 90px;
+    width: 115px; /* Увеличено с 90px — картинка кейса стала больше и приятней */
+    height: 115px; /* Увеличено с 90px */
     object-fit: contain;
     margin: 0 auto; 
+    filter: drop-shadow(0 5px 15px rgba(0, 0, 0, 0.5)); /* Красивая тень кейса */
 }
 
 .case-banner-info h3 {
@@ -332,7 +333,7 @@ body {
 
 .roulette-container {
     width: 100%;
-    height: 90px;
+    height: 102px; /* Увеличено для поддержки более крупных ячеек */
     overflow: hidden;
     display: flex;
     align-items: center;
@@ -347,10 +348,10 @@ body {
 }
 
 .roulette-item {
-    min-width: 84px !important;
-    width: 84px !important;
-    max-width: 84px !important;
-    height: 84px !important;
+    min-width: 96px !important; /* Увеличено с 84px */
+    width: 96px !important;
+    max-width: 96px !important;
+    height: 96px !important; /* Увеличено с 84px */
     background: #1a1a26;
     border: 1.5px solid #2e2e42;
     border-radius: 12px;
@@ -362,8 +363,8 @@ body {
 }
 
 .roulette-item img {
-    width: 46px;
-    height: 46px;
+    width: 58px; /* Увеличено с 46px — картинки подарков в рулетке стали больше */
+    height: 58px; /* Увеличено с 46px */
     object-fit: contain;
     margin-bottom: 2px;
 }
@@ -487,10 +488,11 @@ body {
 }
 
 .reward-card img {
-    width: 58px;
-    height: 58px;
+    width: 78px; /* Увеличено с 58px — картинка подарка в сетках стала намного больше и красивее */
+    height: 78px; /* Увеличено с 58px */
     object-fit: contain;
     margin-bottom: 8px;
+    filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.3)); /* Красивая тень предмета */
 }
 
 .reward-name {
@@ -954,4 +956,4 @@ body {
 
 #rating-section .empty-inventory {
     margin-top: 20px;
-                          }
+}
