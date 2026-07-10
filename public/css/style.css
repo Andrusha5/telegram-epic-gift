@@ -167,7 +167,7 @@ body {
     background: linear-gradient(135deg, #1a103c, #0d0722);
     border: 1px solid #321e5c;
     border-radius: 16px;
-    padding: 16px;
+    padding: 18px 16px;
     margin-bottom: 20px;
     text-align: center;
 }
@@ -179,13 +179,6 @@ body {
     color: #fff;
 }
 
-.welcome-banner p {
-    font-size: 0.8rem;
-    color: var(--light-text-color);
-    margin: 0;
-    line-height: 1.4;
-}
-
 .section-divider-title {
     font-size: 0.9rem;
     font-weight: 700;
@@ -195,7 +188,7 @@ body {
     margin-bottom: 12px;
 }
 
-/* СЕТКА КЕЙСОВ - GRID 2x2 С КРУПНЫМИ КАРТИНКАМИ */
+/* СЕТКА КЕЙСОВ - GRID 2x2 С ЕЩЕ БОЛЕЕ КРУПНЫМИ КАРТИНКАМИ */
 .cases-layout {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
@@ -207,18 +200,18 @@ body {
     background: linear-gradient(135deg, #1c1c2d, #141420);
     border: 1px solid var(--border-color);
     border-radius: 16px; 
-    padding: 12px; 
+    padding: 14px 10px 10px 10px; 
     display: flex;
     flex-direction: column; 
     align-items: center;
-    gap: 10px; 
+    gap: 8px; 
     position: relative;
     cursor: pointer;
     box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
     transition: transform 0.2s ease, border-color 0.2s;
     text-align: center; 
-    min-height: 220px; 
-    justify-content: flex-end; /* Выравнивание элементов, чтобы они стояли ровно */
+    min-height: 240px; /* Увеличено, чтобы вмещать огромные картинки */
+    justify-content: flex-end; 
     box-sizing: border-box;
 }
 
@@ -241,15 +234,15 @@ body {
 }
 
 .case-banner-img {
-    width: 130px; /* Картинка увеличена для лучшего визуального восприятия */
-    height: 130px; 
+    width: 145px; /* Картинка увеличена до максимума для невероятно сочного вида! */
+    height: 145px; 
     object-fit: contain;
     margin: 0 auto auto auto; 
-    filter: drop-shadow(0 6px 15px rgba(0, 0, 0, 0.6)); /* Сочная тень под картинкой кейса */
+    filter: drop-shadow(0 8px 20px rgba(0, 0, 0, 0.75)); /* Красивая 3D тень */
 }
 
 .case-banner-info h3 {
-    margin: 0 0 6px 0; 
+    margin: 0; 
     font-size: 0.95rem; 
     font-weight: 700;
     color: #fff;
@@ -950,4 +943,4 @@ body {
 
 #rating-section .empty-inventory {
     margin-top: 20px;
-}
+        }
