@@ -4,110 +4,202 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>BestGifts</title>
-    <link rel="stylesheet" href="/css/style.css?v=9.0">
+    <link rel="stylesheet" href="/css/style.css?v=9.1">
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&display=swap" rel="stylesheet">
 </head>
 <body>
     <div id="app">
+        <!-- Контейнер для красивых уведомлений внизу -->
         <div id="toast-container" class="toast-container"></div>
 
-        <!-- Кнопка баланса в углу -->
-        <div id="balance-pill" class="top-right-balance">
-            <span id="user-balance-pill">0.000 GRAM</span>
+        <!-- КРАСИВЫЙ ПАРЯЩИЙ ОВАЛЬНЫЙ БАЛАНС В УГЛУ -->
+        <div id="balance-pill" class="balance-pill">
+            <span id="user-balance-pill-value">0.000 GRAM</span>
         </div>
 
+        <!-- Дизайнерские модальные окна -->
         <div id="custom-modal" class="modal-overlay hidden">
             <div class="modal-card">
                 <button id="modal-close-btn" class="modal-close-x">&times;</button>
                 <div id="modal-icon" class="modal-icon-glow">🎁</div>
-                <h3 id="modal-title"></h3>
-                <p id="modal-message"></p>
+                <h3 id="modal-title">Поздравляем!</h3>
+                <p id="modal-message">Вы выиграли подарок!</p>
                 <div id="modal-actions" class="modal-buttons-layout"></div>
             </div>
         </div>
 
+        <!-- ГЛАВНЫЙ ЭКРАН -->
         <section id="home-section">
             <header class="header">
                 <div class="brand-title">🎁 BestGifts</div>
                 <div class="user-profile">
-                    <img id="user-avatar" class="user-avatar" src="" alt="">
-                    <span id="user-username" class="user-username">Загрузка...</span>
+                    <img id="user-avatar" class="user-avatar" src="https://img.icons8.com/color/96/user.png" alt=" ">
+                    <div class="user-info">
+                        <span id="user-username" class="user-username">Загрузка...</span>
+                    </div>
                 </div>
             </header>
+
             <main class="main-content">
                 <div class="welcome-banner">
-                    <h2>Добро пожаловать!</h2>
-                    <p>Открывай кейсы и выигрывай GRAM!</p>
+                    <h2>Добро пожаловать в BestGifts!</h2>
+                    <p>Открывай ежедневные кейсы и выигрывай ценные призы в GRAM!</p>
                 </div>
+
                 <div class="section-divider-title">Кейсы</div>
+                
                 <div class="cases-layout">
+                    <!-- Ежедневный кейс -->
                     <div id="daily-case-banner" class="case-banner-card">
                         <div class="case-banner-badge">БЕСПЛАТНО</div>
-                        <img src="/Images/Items/pack.jpg" class="case-banner-img">
-                        <h3>Ежедневный</h3>
-                        <p id="home-case-status">Доступно</p>
+                        <img src="/Images/Items/pack.jpg" alt="Case" class="case-banner-img" onerror="this.src='https://img.icons8.com/color/144/treasure-chest.png'">
+                        <div class="case-banner-info">
+                            <h3>Ежедневный кейс</h3>
+                            <p id="home-case-status">Загрузка...</p>
+                        </div>
+                        <div class="case-banner-arrow">→</div>
                     </div>
-                    <div id="newbie-case-banner" class="case-banner-card">
+
+                    <!-- Кейс новичка -->
+                    <div id="newbie-case-banner" class="case-banner-card newbie-case">
                         <div class="case-banner-badge">НОВЫЙ</div>
-                        <img src="/Images/Items/hat.jpg" class="case-banner-img">
-                        <h3>Новичок</h3>
-                        <p>Бесплатно</p>
+                        <img src="/Images/Items/hat.jpg" alt="Newbie Case" class="case-banner-img" onerror="this.src='https://img.icons8.com/color/144/gift-box.png'">
+                        <div class="case-banner-info">
+                            <h3>Кейс новичка</h3>
+                            <p>Первый спин бесплатно!</p>
+                        </div>
+                        <div class="case-banner-arrow">→</div>
                     </div>
                 </div>
             </main>
         </section>
 
+        <!-- ЭКРАН КЕЙСА -->
         <section id="case-section" class="hidden">
             <header class="header-nav">
                 <button id="back-to-home-button" class="back-button">← Назад</button>
-                <div class="nav-title" id="case-page-title">Кейс</div>
+                <div class="nav-title" id="case-header-title">🎁 BestGifts</div>
+                <div style="width: 70px;"></div>
             </header>
+
             <main class="main-content">
+                <div class="case-page-header">
+                    <div class="case-title-block">
+                        <span class="case-icon-mini">🎁</span>
+                        <div class="case-text-group">
+                            <span id="case-page-main-title" class="case-main-title">Ежедневный кейс</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- РУЛЕТКА -->
                 <div class="roulette-wrapper">
                     <div class="roulette-pointer pointer-top"></div>
-                    <div class="roulette-container"><div id="roulette-track" class="roulette-track"></div></div>
                     <div class="roulette-pointer pointer-bottom"></div>
+                    <div class="roulette-container">
+                        <div id="roulette-track" class="roulette-track"></div>
+                    </div>
                 </div>
+
                 <div class="case-control-area">
                     <button id="spin-case-button" class="action-button-gradient">Запустить</button>
                     <div id="timer-container" class="timer-card hidden">
-                        <div id="daily-case-timer" class="timer-clock">00:00:00</div>
+                        <span class="timer-title">Возвращайтесь через</span>
+                        <div id="daily-case-timer" class="timer-clock">23h 59m 49s</div>
                     </div>
                 </div>
+
+                <!-- СЕТКА НАГРАД (Скрывается для кейса новичка) -->
                 <div id="rewards-section-container" class="rewards-section">
+                    <div class="rewards-header">
+                        <span class="rewards-header-icon">🏆</span>
+                        <h3>Ежедневные награды</h3>
+                    </div>
                     <div id="rewards-grid" class="rewards-grid"></div>
                 </div>
             </main>
         </section>
 
+        <!-- ЭКРАН ИНВЕНТАРЯ -->
         <section id="inventory-section" class="hidden">
-            <div class="header"><h3>🎒 Инвентарь</h3></div>
+            <header class="header">
+                <div class="brand-title">🎒 Ваш Инвентарь</div>
+                <div class="user-profile">
+                    <img id="inv-user-avatar" class="user-avatar" src="https://img.icons8.com/color/96/user.png" alt="Avatar">
+                    <div class="user-info">
+                        <span id="inv-user-username" class="user-username">Загрузка...</span>
+                    </div>
+                </div>
+            </header>
+
             <main class="main-content">
-                <div id="inventory-grid" class="rewards-grid"></div>
+                <div class="section-divider-title">Мои Подарки</div>
+                <div id="inventory-grid" class="rewards-grid" style="margin-bottom: 25px;"></div>
+
                 <div class="deposit-panel">
-                    <h3>📥 Ввод NFT</h3>
+                    <h3>📥 Ввод подарков NFT</h3>
+                    <p class="deposit-desc">1. Отправьте ваш NFT-подарок в Telegram на аккаунт:</p>
+                    <a href="https://t.me/Sintopa" class="deposit-telegram-link" target="_blank">✈️ Отправить на @Sintopa</a>
+                    <p class="deposit-desc" style="margin-top: 10px;"&gt;2. Выберите отправленный подарок ниже и подтвердите отправку:</p>
+                    
                     <div class="deposit-form-row">
                         <select id="deposit-item-select" class="deposit-select"></select>
-                        <button id="deposit-confirm-button" class="deposit-btn-confirm">Подтвердить</button>
+                        <button id="deposit-confirm-button" class="deposit-btn-confirm">Подтвердить передачу</button>
                     </div>
                 </div>
             </main>
         </section>
 
+        <!-- ЭКРАН РЕЙТИНГА -->
         <section id="rating-section" class="hidden">
-            <div class="header"><h3>🏆 Рейтинг</h3></div>
+            <header class="header">
+                <div class="brand-title">🏆 Рейтинг Лидеров</div>
+            </header>
             <main class="main-content">
-                <div class="empty-inventory">Скоро...</div>
+                <div class="empty-inventory">
+                    👑 Таблица лидеров находится в разработке.<br>Скоро...
+                </div>
             </main>
         </section>
 
+        <!-- ПАРЯЩЕЕ GLASS-МЕНЮ (С рейтингом справа) -->
         <nav id="bottom-navigation" class="bottom-nav">
-            <div class="nav-tab" data-target="inventory">📦 Инвентарь</div>
-            <div class="nav-tab active" data-target="home">🏠 Меню</div>
-            <div class="nav-tab" data-target="rating">🏆 Рейтинг</div>
+            <div class="nav-tab" data-target="inventory">
+                <div class="nav-tab-icon-wrapper">
+                    <svg class="nav-tab-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+                        <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+                        <line x1="12" y1="22.08" x2="12" y2="12"/>
+                    </svg>
+                </div>
+                <span class="nav-text">Инвентарь</span>
+                <div class="active-indicator"></div>
+            </div>
+
+            <div class="nav-tab active" data-target="home">
+                <div class="nav-tab-icon-wrapper">
+                    <svg class="nav-tab-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                        <polyline points="9 22 9 12 15 12 15 22"/>
+                    </svg>
+                </div>
+                <span class="nav-text">Меню</span>
+                <div class="active-indicator"></div>
+            </div>
+
+            <div class="nav-tab" data-target="rating">
+                <div class="nav-tab-icon-wrapper">
+                    <svg class="nav-tab-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6M18 9h1.5a2.5 2.5 0 0 0 0-5H18M4 22h16M10 14.66V17c0 .55-.45 1-1 1H4v2h16v-2h-5c-.55 0-1-.45-1-1v-2.34M12 2a4 4 0 0 1 4 4v5c0 .55-.45 1-1 1H9c-.55 0-1-.45-1-1V6a4 4 0 0 1 4-4z"/>
+                    </svg>
+                </div>
+                <span class="nav-text">Рейтинг</span>
+                <div class="active-indicator"></div>
+            </div>
         </nav>
     </div>
+
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <script src="/js/app.js?v=9.0"></script>
+    <script src="/js/app.js?v=9.1"></script>
 </body>
-                            </html>
+                </html>
