@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>BestGifts</title>
-    <link rel="stylesheet" href="/css/style.css?v=9.1">
+    <link rel="stylesheet" href="/css/style.css?v=9.2">
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&display=swap" rel="stylesheet">
 </head>
 <body>
@@ -14,7 +14,8 @@
 
         <!-- КРАСИВЫЙ ПАРЯЩИЙ ОВАЛЬНЫЙ БАЛАНС В УГЛУ -->
         <div id="balance-pill" class="balance-pill">
-            <span id="user-balance-pill-value">0.000 GRAM</span>
+            <span id="user-balance-pill-value">0.000</span>
+            <img src="/Images/Items/gram_popolnenie.png" alt="Gram" onerror="this.src='https://img.icons8.com/color/48/diamond.png'">
         </div>
 
         <!-- Дизайнерские модальные окна -->
@@ -52,10 +53,9 @@
                     <!-- Ежедневный кейс -->
                     <div id="daily-case-banner" class="case-banner-card">
                         <div class="case-banner-badge">БЕСПЛАТНО</div>
-                        <img src="/Images/Cases/freebox.png" alt="Case" class="case-banner-img" onerror="this.src='https://img.icons8.com/color/144/treasure-chest.png'">
+                        <img src="/Images/Items/pack.jpg" alt="Case" class="case-banner-img" onerror="this.src='https://img.icons8.com/color/144/treasure-chest.png'">
                         <div class="case-banner-info">
                             <h3>Ежедневный кейс</h3>
-                            <p id="home-case-status">Загрузка...</p>
                         </div>
                         <div class="case-banner-arrow">→</div>
                     </div>
@@ -66,7 +66,6 @@
                         <img src="/Images/Items/hat.jpg" alt="Newbie Case" class="case-banner-img" onerror="this.src='https://img.icons8.com/color/144/gift-box.png'">
                         <div class="case-banner-info">
                             <h3>Кейс новичка</h3>
-                            <p>Первый спин бесплатно!</p>
                         </div>
                         <div class="case-banner-arrow">→</div>
                     </div>
@@ -109,11 +108,11 @@
                     </div>
                 </div>
 
-                <!-- СЕТКА НАГРАД (Скрывается для кейса новичка) -->
+                <!-- СЕТКА НАГРАД (Динамически настраиваемая для каждого кейса) -->
                 <div id="rewards-section-container" class="rewards-section">
                     <div class="rewards-header">
                         <span class="rewards-header-icon">🏆</span>
-                        <h3>Ежедневные награды</h3>
+                        <h3 id="rewards-grid-title">Ежедневные награды</h3>
                     </div>
                     <div id="rewards-grid" class="rewards-grid"></div>
                 </div>
@@ -140,10 +139,10 @@
                     <h3>📥 Ввод подарков NFT</h3>
                     <p class="deposit-desc">1. Отправьте ваш NFT-подарок в Telegram на аккаунт:</p>
                     <a href="https://t.me/Sintopa" class="deposit-telegram-link" target="_blank">✈️ Отправить на @Sintopa</a>
-                    <p class="deposit-desc" style="margin-top: 10px;"&gt;2. Выберите отправленный подарок ниже и подтвердите отправку:</p>
+                    <p class="deposit-desc" style="margin-top: 10px;">2. Выберите отправленный подарок ниже и подтвердите отправку:</p>
                     
                     <div class="deposit-form-row">
-                        <select id="deposit-item-select" class="deposit-select"></select>
+                        <select id="deposit-item-select" class="deposit-select">--</select>
                         <button id="deposit-confirm-button" class="deposit-btn-confirm">Подтвердить передачу</button>
                     </div>
                 </div>
@@ -162,7 +161,28 @@
             </main>
         </section>
 
-        <!-- ПАРЯЩЕЕ GLASS-МЕНЮ (С рейтингом справа) -->
+        <!-- ЭКРАН ПОЛНОЭКРАННОГО БАЛАНСА -->
+        <section id="balance-section" class="hidden">
+            <header class="header-nav">
+                <button id="back-to-home-from-balance" class="back-button">← Назад</button>
+                <div class="nav-title">💎 Мой Баланс</div>
+                <div style="width: 70px;"></div>
+            </header>
+            <main class="main-content">
+                <div class="balance-screen-content">
+                    <span class="large-balance-title">Ваш текущий баланс</span>
+                    <div class="large-balance-amount">
+                        <span id="large-balance-value">0.000</span>
+                        <img src="/Images/Items/gram_popolnenie.png" alt="Gram" onerror="this.src='https://img.icons8.com/color/96/diamond.png'">
+                    </div>
+                    <p class="balance-screen-desc">Принимайте участие в розыгрышах и выводите ценные NFT призы прямо на свой кошелек!</p>
+                    <button class="action-button-gradient" style="opacity: 0.6; cursor: not-allowed;" disabled>Пополнить баланс</button>
+                    <p style="font-size: 0.8rem; color: var(--light-text-color); margin-top: 4px;">Пополнение временно недоступно</p>
+                </div>
+            </main>
+        </section>
+
+        <!-- ПАРЯЩЕЕ GLASS-МЕНЮ -->
         <nav id="bottom-navigation" class="bottom-nav">
             <div class="nav-tab" data-target="inventory">
                 <div class="nav-tab-icon-wrapper">
@@ -200,6 +220,6 @@
     </div>
 
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <script src="/js/app.js?v=9.1"></script>
+    <script src="/js/app.js?v=9.2"></script>
 </body>
                 </html>
