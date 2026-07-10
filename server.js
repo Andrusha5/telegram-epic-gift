@@ -3,7 +3,7 @@ const path = require('path');
 const crypto = require('crypto');
 require('dotenv').config();
 
-// Глобальные перехватчики ошибок, чтобы сервер никогда не падал при старте на Render/Supabase
+// Глобальные перехватчики ошибок
 process.on('unhandledRejection', (reason, promise) => {
     console.error('⚠️ [Safe Engine] Unhandled Rejection:', reason);
 });
@@ -85,7 +85,7 @@ app.use(async (req, res, next) => {
     next();
 });
 
-// 1. Получение данных пользователя
+// Получение данных пользователя
 app.get('/api/user', async (req, res) => {
     if (!req.telegramUser || !req.telegramUser.id) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -118,7 +118,7 @@ app.get('/api/user', async (req, res) => {
     }
 });
 
-// 2. Получение инвентаря
+// Получение инвентаря
 app.get('/api/inventory', async (req, res) => {
     if (!req.telegramUser || !req.telegramUser.id) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -152,7 +152,7 @@ app.get('/api/inventory', async (req, res) => {
     }
 });
 
-// 3. Открытие кейса (С уведомлением админа о подарках и сбросом таймера отправки сообщения)
+// Открытие Ежедневного бесплатного кейса
 app.post('/api/open_daily_case', async (req, res) => {
     if (!req.telegramUser || !req.telegramUser.id) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -218,7 +218,7 @@ app.post('/api/open_daily_case', async (req, res) => {
             newBalance += parseFloat(wonItem.value);
             await client.query('UPDATE users SET balance = $1 WHERE id = $2', [newBalance, userId]);
             await client.query('INSERT INTO transactions (user_id, type, item_id, amount, details) VALUES ($1, $2, $3, $4, $5)',
-                [userId, 'case_open', wonItem.item_id, wonItem.value, 'Выигрыш из ежедневного кейса: ' + wonItem.name]);
+                [userId, 'case_open_daily', wonItem.item_id, wonItem.value, 'Ежедневный кейс: ' + wonItem.name]);
         } else { 
             await client.query(
                 'INSERT INTO user_inventory (user_id, item_id, quantity) VALUES ($1, $2, 1) ON CONFLICT (user_id, item_id) DO UPDATE SET quantity = user_inventory.quantity + 1',
@@ -226,16 +226,15 @@ app.post('/api/open_daily_case', async (req, res) => {
             );
         }
 
-        // Записываем время открытия и сбрасываем статус уведомления (notified = false), чтобы через 24 часа бот снова отправил ЛС
         await client.query('UPDATE users SET last_daily_case_open = NOW(), daily_case_notified = false WHERE id = $1', [userId]);
         await client.query('COMMIT');
 
-        // Уведомление админа о выигрыше ПОДАРКА (только если wonItem.type === 'gift')
+        // Уведомление админа о выигрыше подарка
         if (wonItem.type === 'gift') {
             const adminId = process.env.ADMIN_TELEGRAM_ID;
             if (adminId && bot && typeof bot.sendMessage === 'function') {
                 const userMention = user.username ? '@' + user.username : (user.first_name || 'Без имени');
-                const adminMsg = "🎉 *Новый выигрыш подарка в кейсе!*\n\n" +
+                const adminMsg = "🎉 *Новый выигрыш подарка в ежедневном кейсе!*\n\n" +
                                  "👤 *Пользователь:* " + (user.first_name || "") + " " + (user.last_name || "") + " (" + userMention + ")\n" +
                                  "🎁 *Выиграл:* " + wonItem.name + " (" + wonItem.value + " GRAM)\n" +
                                  "🆔 *Telegram ID:* `" + userId + "`";
@@ -247,14 +246,105 @@ app.post('/api/open_daily_case', async (req, res) => {
 
     } catch (error) {
         if (client) await client.query('ROLLBACK');
-        console.error("Ошибка транзакции кейса:", error);
+        console.error("Ошибка транзакции ежедневного кейса:", error);
         res.status(500).json({ error: 'Произошла ошибка при открытии.' });
     } finally {
         if (client) client.release(); 
     }
 });
 
-// 4. Продажа подарка (С уведомлением админа)
+// Открытие Кейса Новичка (Стоит 0.1 GRAM, бесконечный, без таймеров)
+app.post('/api/open_newbie_case', async (req, res) => {
+    if (!req.telegramUser || !req.telegramUser.id) {
+        return res.status(401).json({ error: 'Unauthorized' });
+    }
+    const userId = req.telegramUser.id;
+
+    let client;
+    try {
+        client = await pool.connect();
+        await client.query('BEGIN');
+
+        const userRes = await client.query('SELECT username, first_name, last_name, balance FROM users WHERE id = $1 FOR UPDATE', [userId]);
+        const user = userRes.rows[0];
+
+        if (!user) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({ error: 'Пользователь не найден.' });
+        }
+
+        const spinCost = 0.1;
+        if (parseFloat(user.balance) < spinCost) {
+            await client.query('ROLLBACK');
+            return res.status(400).json({ error: 'Недостаточно средств. Прокрут стоит 0.1 GRAM!' });
+        }
+
+        const drops = (await client.query(`
+            SELECT ncd.item_id, ncd.chance, i.name, i.type, i.value, i.image_url
+            FROM newbie_case_drops ncd
+            JOIN items i ON ncd.item_id = i.id
+        `)).rows;
+
+        if (drops.length === 0) {
+            await client.query('ROLLBACK');
+            return res.status(500).json({ error: 'Кейс новичка временно пуст.' });
+        }
+
+        let totalChance = drops.reduce((sum, drop) => sum + parseFloat(drop.chance), 0);
+        let rand = Math.random() * totalChance;
+        let wonItem = null;
+
+        for (const drop of drops) {
+            rand -= parseFloat(drop.chance);
+            if (rand <= 0) {
+                wonItem = drop;
+                break;
+            }
+        }
+
+        if (!wonItem) wonItem = drops[drops.length - 1]; 
+
+        let newBalance = parseFloat(user.balance) - spinCost;
+        if (wonItem.type === 'balance') {
+            newBalance += parseFloat(wonItem.value);
+            await client.query('UPDATE users SET balance = $1 WHERE id = $2', [newBalance, userId]);
+            await client.query('INSERT INTO transactions (user_id, type, item_id, amount, details) VALUES ($1, $2, $3, $4, $5)',
+                [userId, 'case_open_newbie', wonItem.item_id, wonItem.value, 'Кейс Новичка: ' + wonItem.name]);
+        } else { 
+            await client.query('UPDATE users SET balance = $1 WHERE id = $2', [newBalance, userId]);
+            await client.query(
+                'INSERT INTO user_inventory (user_id, item_id, quantity) VALUES ($1, $2, 1) ON CONFLICT (user_id, item_id) DO UPDATE SET quantity = user_inventory.quantity + 1',
+                [userId, wonItem.item_id]
+            );
+        }
+
+        await client.query('COMMIT');
+
+        // Уведомление админа о выигрыше подарка
+        if (wonItem.type === 'gift') {
+            const adminId = process.env.ADMIN_TELEGRAM_ID;
+            if (adminId && bot && typeof bot.sendMessage === 'function') {
+                const userMention = user.username ? '@' + user.username : (user.first_name || 'Без имени');
+                const adminMsg = "🎉 *Новый выигрыш подарка в кейсе новичка!*\n\n" +
+                                 "👤 *Пользователь:* " + (user.first_name || "") + " " + (user.last_name || "") + " (" + userMention + ")\n" +
+                                 "🎁 *Выиграл:* " + wonItem.name + " (" + wonItem.value + " GRAM)\n" +
+                                 "🆔 *Telegram ID:* `" + userId + "`";
+                bot.sendMessage(adminId, adminMsg, { parse_mode: 'Markdown' }).catch(() => {});
+            }
+        }
+
+        res.json({ success: true, wonItem: { id: wonItem.item_id, name: wonItem.name, price: wonItem.value + " GRAM", type: wonItem.type }, newBalance: newBalance });
+
+    } catch (error) {
+        if (client) await client.query('ROLLBACK');
+        console.error("Ошибка транзакции кейса новичка:", error);
+        res.status(500).json({ error: 'Произошла ошибка при открытии.' });
+    } finally {
+        if (client) client.release();
+    }
+});
+
+// Продажа подарка
 app.post('/api/sell_gift', async (req, res) => {
     if (!req.telegramUser || !req.telegramUser.id) return res.status(401).json({ error: 'Unauthorized' });
     const userId = req.telegramUser.id;
@@ -283,7 +373,7 @@ app.post('/api/sell_gift', async (req, res) => {
         
         await client.query('COMMIT');
 
-        // Уведомление админу о продаже ПОДАРКА (только если giftDetails.type === 'gift')
+        // Уведомление админу о продаже подарка
         if (giftDetails && giftDetails.type === 'gift') {
             const adminId = process.env.ADMIN_TELEGRAM_ID;
             if (adminId && bot && typeof bot.sendMessage === 'function') {
@@ -307,7 +397,7 @@ app.post('/api/sell_gift', async (req, res) => {
     }
 });
 
-// 5. Вывод подарка (С прямой ссылкой в ЛС чат)
+// Вывод подарка
 app.post('/api/withdraw_gift', async (req, res) => {
     if (!req.telegramUser || !req.telegramUser.id) return res.status(401).json({ error: 'Unauthorized' });
     const userId = req.telegramUser.id;
@@ -338,7 +428,7 @@ app.post('/api/withdraw_gift', async (req, res) => {
 
         await client.query('COMMIT');
 
-        // Уведомление админа о выводе ПОДАРКА (только если itemDetails.type === 'gift')
+        // Уведомление админа о выводе подарка
         if (itemDetails && itemDetails.type === 'gift') {
             const adminId = process.env.ADMIN_TELEGRAM_ID;
             if (adminId && bot && typeof bot.sendMessage === 'function') {
@@ -370,7 +460,7 @@ app.post('/api/withdraw_gift', async (req, res) => {
     }
 });
 
-// 6. Заявка на Ввод подарка (NFT DEPOSIT REQUEST)
+// Заявка на Ввод подарка NFT
 app.post('/api/deposit_gift_request', async (req, res) => {
     if (!req.telegramUser || !req.telegramUser.id) return res.status(401).json({ error: 'Unauthorized' });
     const userId = req.telegramUser.id;
@@ -387,7 +477,7 @@ app.post('/api/deposit_gift_request', async (req, res) => {
             return res.status(400).json({ error: 'Подарок не найден в системе.' });
         }
 
-        // Уведомление админу о вводе ПОДАРКА (только если itemDetails.type === 'gift')
+        // Уведомление админу о вводе подарка
         if (itemDetails.type === 'gift') {
             const userRes = await query('SELECT username, first_name, last_name FROM users WHERE id = $1', [userId]);
             const user = userRes.rows[0];
@@ -494,18 +584,14 @@ if (bot && typeof bot.on === 'function') {
     });
 }
 
-// 7. Получение информации о канале
+// Получение информации о канале
 app.get('/api/daily_case_info', (req, res) => {
     res.json({ channel_username: CHANNEL_USERNAME });
 });
 
-// =========================================================================
-// ПЛАНИРОВЩИК: Проверка таймеров 24 часа и автоматическая отправка ЛС ботом
-// =========================================================================
+// ПЛАНИРОВЩИК УВЕДОМЛЕНИЙ
 async function checkAndNotifyDailyCases() {
     try {
-        // Выбираем игроков, у которых прошло 24 часа с момента последнего открытия
-        // и которые еще не получали уведомление в ЛС (notified = false)
         const res = await query(`
             SELECT id, username, first_name 
             FROM users 
@@ -515,7 +601,6 @@ async function checkAndNotifyDailyCases() {
         
         for (const user of res.rows) {
             try {
-                // Отправка личного сообщения в бота пользователю
                 await bot.sendMessage(user.id, `🎁 *Ваш ежедневный кейс BestGifts снова доступен!*\n\nПрошло 24 часа, заходите скорее и испытайте удачу бесплатно!`, {
                     parse_mode: 'Markdown',
                     reply_markup: {
@@ -525,12 +610,10 @@ async function checkAndNotifyDailyCases() {
                     }
                 });
                 
-                // Фиксируем успешную отправку сообщения
                 await query('UPDATE users SET daily_case_notified = true WHERE id = $1', [user.id]);
                 console.log(`✉️ Напоминание отправлено пользователю ${user.id}`);
             } catch (err) {
                 console.error(`Бот не смог напомнить пользователю ${user.id} в ЛС:`, err.message);
-                // Отмечаем уведомленным, чтобы избежать бесконечной попытки отправки заблокированным
                 await query('UPDATE users SET daily_case_notified = true WHERE id = $1', [user.id]);
             }
         }
@@ -539,7 +622,6 @@ async function checkAndNotifyDailyCases() {
     }
 }
 
-// Проверка запускается автоматически в фоновом режиме раз в минуту
 setInterval(checkAndNotifyDailyCases, 60000);
 
 app.listen(PORT, () => console.log("🚀 Safe Server running on port " + PORT));
