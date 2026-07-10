@@ -28,17 +28,18 @@ const CHANNEL_USERNAME = process.env.CHANNEL_USERNAME || "";
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// ЭНДПОИНТ МАНИФЕСТА ДЛЯ РАБОТЫ TON CONNECT (Обязателен!)
+// ЭНДПОИНТ МАНИФЕСТА С ПРИНУДИТЕЛЬНЫМ HTTPS (Решает проблему работы TON Connect)
 app.get('/tonconnect-manifest.json', (req, res) => {
-    // Автоматически берется URL-адрес из конфига (.env) или формируется на основе хоста
-    const protocol = req.secure ? 'https' : 'http';
     const host = req.get('host');
+    // Если на локальной машине - разрешаем HTTP, на хостинге - строго HTTPS (TON требует HTTPS)
+    const protocol = (host.includes('localhost') || host.includes('127.0.0.1')) ? 'http' : 'https';
     const appUrl = process.env.WEB_APP_URL || `${protocol}://${host}`;
     
+    res.setHeader('Content-Type', 'application/json');
     res.json({
         url: appUrl,
         name: "BestGifts",
-        iconUrl: "https://img.icons8.com/color/96/gift.png"
+        iconUrl: `${appUrl}/Images/Items/gram_popolnenie.png`
     });
 });
 
