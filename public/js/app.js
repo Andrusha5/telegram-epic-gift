@@ -8,6 +8,16 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const GRAMCOIN_ICON_URL = "/Images/Items/gram_popolnenie.png"; 
 
+    // Инициализация TON Connect SDK
+    let tonConnectUI;
+    try {
+        tonConnectUI = new TONConnectUI.TonConnectUI({
+            manifestUrl: `${API_BASE_URL}/tonconnect-manifest.json`
+        });
+    } catch (err) {
+        console.error("Не удалось инициализировать TON Connect UI SDK:", err);
+    }
+
     // Награды ежедневного кейса (отсортированы от самых дорогих к дешевым)
     const GIFT_POOL = [
         { id: 1, name: "Статуя птицы серая", icon: "/Images/Items/rare_bird.jpg", price: "20 GRAM", rawPrice: 20.0, isGold: true, type: "gift" },
@@ -26,7 +36,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         { id: 14, name: "Пополнение 0.03 GRAM", icon: GRAMCOIN_ICON_URL, price: "0.03 GRAM", rawPrice: 0.03, isGold: false, type: "balance" }
     ];
 
-    // Награды кейса новичка (отсортированы от самых дорогих к дешевым)
+    // Награды кейса новичка
     const NEWBIE_GIFT_POOL = [
         { id: 101, name: "Розовый мишка", icon: "/Images/Items/bearpink.png", price: "29 GRAM", rawPrice: 29.0, isGold: true, type: "gift" },
         { id: 102, name: "Шлем Неко", icon: "/Images/Items/Neko_helmet.png", price: "26.8 GRAM", rawPrice: 26.8, isGold: true, type: "gift" },
@@ -64,22 +74,23 @@ document.addEventListener('DOMContentLoaded', async () => {
         navTabs: document.querySelectorAll('.nav-tab'),
         dailyCaseBanner: document.getElementById('daily-case-banner'),
         newbieCaseBanner: document.getElementById('newbie-case-banner'),
+        bomzhCaseBanner: document.getElementById('bomzh-case-banner'),
+        krutoyCaseBanner: document.getElementById('krutoy-case-banner'),
         rewardsSectionContainer: document.getElementById('rewards-section-container'),
         rewardsGridTitle: document.getElementById('rewards-grid-title'),
-        casePageMainTitle: document.getElementById('case-page-main-title')
+        casePageMainTitle: document.getElementById('case-page-main-title'),
+        connectWalletBtn: document.getElementById('connect-wallet-btn')
     };
 
     // --- ФУНКЦИЯ ОЧИСТКИ ИМЕНИ ПОДАРКОВ ---
     function formatItemName(name) {
         if (!name) return "";
-        // Убираем расширения .png, .jpg, .jpeg
         let clean = name.replace(/\.(png|jpg|jpeg)$/i, '');
-        // Заменяем нижние подчеркивания на пробелы
         clean = clean.replace(/_/g, ' ');
         return clean.trim();
     }
 
-    // --- Безопасное форматирование юзернейма (макс. 10 символов) ---
+    // --- Безопасное форматирование юзернейма ---
     function formatUsername(name) {
         if (!name) return "Пользователь";
         return name.length > 10 ? name.substring(0, 10) + "..." : name;
@@ -146,6 +157,53 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         closeX.onclick = handleClose;
         overlay.classList.remove('hidden');
+    }
+
+    // --- ОБРАБОТКА ПОДКЛЮЧЕНИЯ КОШЕЛЬКА TON CONNECT ---
+    if (tonConnectUI) {
+        // Подписка на обновление статуса подключения
+        tonConnectUI.onStatusChange(wallet => {
+            if (wallet) {
+                const address = wallet.account.address;
+                // Преобразуем адрес в удобный формат: EQ...5f4e
+                const rawAddress = address;
+                const friendlyAddress = rawAddress.slice(0, 4) + '...' + rawAddress.slice(-4);
+                
+                elements.connectWalletBtn.innerText = `Отключить (${friendlyAddress})`;
+                elements.connectWalletBtn.style.background = 'linear-gradient(135deg, #28a745, #218838)';
+                elements.connectWalletBtn.style.boxShadow = '0 4px 15px rgba(40, 167, 69, 0.4)';
+                showNotification("Кошелек успешно подключен!", "💎");
+            } else {
+                elements.connectWalletBtn.innerText = 'Привязать кошелёк';
+                elements.connectWalletBtn.style.background = 'linear-gradient(135deg, #0088cc, #00a2ff)';
+                elements.connectWalletBtn.style.boxShadow = '0 4px 15px rgba(0, 136, 204, 0.4)';
+            }
+        });
+
+        // Слушатель нажатия на кнопку "Привязать"
+        elements.connectWalletBtn.addEventListener('click', async () => {
+            if (tonConnectUI.connected) {
+                showCustomModal({
+                    icon: '💎',
+                    title: 'Отключить кошелек?',
+                    message: 'Вы уверены, что хотите отвязать текущий TON кошелек?',
+                    buttons: [
+                        {
+                            text: 'Да, отключить',
+                            primary: true,
+                            onClick: async () => {
+                                await tonConnectUI.disconnect();
+                                showNotification("Кошелек успешно отключен.", "ℹ️");
+                            }
+                        },
+                        { text: 'Отмена', primary: false }
+                    ]
+                });
+            } else {
+                // Открывает нативное красивое меню выбора кошельков в Telegram WebApp
+                await tonConnectUI.openModal();
+            }
+        });
     }
 
     // --- НАЖАТИЕ НА БАЛАНС -> Открытие нового полноэкранного окна ---
@@ -215,6 +273,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         elements.spinBtn.innerText = "Открыть (0.1 GRAM)";
         renderRewardsGrid();
         navigateTo('case');
+    });
+
+    // Дополнительные кнопки новых кейсов
+    elements.bomzhCaseBanner.addEventListener('click', () => {
+        showNotification("Кейс бомжа скоро появится в игре!", "🎒");
+    });
+
+    elements.krutoyCaseBanner.addEventListener('click', () => {
+        showNotification("Кейс крутого в разработке!", "😎");
     });
 
     document.getElementById('back-to-home-button').addEventListener('click', () => navigateTo('home'));
