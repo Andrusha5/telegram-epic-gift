@@ -1,21 +1,31 @@
-document.addEventListener('DOMContentLoaded', async () => {
-    let tg = window.Telegram.WebApp;
-    tg.expand();
+// СТАРТУЕМ С ПЕРВОЙ ЖЕ МИЛЛИСЕКУНДЫ!
+// Это предотвращает зависание загрузочного экрана Telegram на слабых устройствах.
+const tg = window.Telegram.WebApp;
+tg.expand();
+tg.ready();
 
+document.addEventListener('DOMContentLoaded', async () => {
     const API_BASE_URL = window.location.origin;
     let currentUser = {};
     let isNewbieCaseMode = false; 
 
     const GRAMCOIN_ICON_URL = "/Images/Items/gram_popolnenie.png"; 
 
-    // Инициализация TON Connect SDK
-    let tonConnectUI;
+    // --- БЕЗОПАСНАЯ ИНИЦИАЛИЗАЦИЯ TON CONNECT SDK ---
+    let tonConnectUI = null;
     try {
-        tonConnectUI = new TONConnectUI.TonConnectUI({
-            manifestUrl: `${API_BASE_URL}/tonconnect-manifest.json`
-        });
+        const manifestUrl = `${API_BASE_URL}/tonconnect-manifest.json`;
+        
+        // Автоматически определяем конструктор, защищая SPA от падения
+        if (typeof TonConnectUI !== 'undefined') {
+            if (typeof TonConnectUI.TonConnectUI === 'function') {
+                tonConnectUI = new TonConnectUI.TonConnectUI({ manifestUrl });
+            } else if (typeof TonConnectUI === 'function') {
+                tonConnectUI = new TonConnectUI({ manifestUrl });
+            }
+        }
     } catch (err) {
-        console.error("Не удалось инициализировать TON Connect UI SDK:", err);
+        console.error("Не удалось подключить TON Connect UI:", err);
     }
 
     // Награды ежедневного кейса (отсортированы от самых дорогих к дешевым)
@@ -165,9 +175,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         tonConnectUI.onStatusChange(wallet => {
             if (wallet) {
                 const address = wallet.account.address;
-                // Преобразуем адрес в удобный формат: EQ...5f4e
-                const rawAddress = address;
-                const friendlyAddress = rawAddress.slice(0, 4) + '...' + rawAddress.slice(-4);
+                const friendlyAddress = address.slice(0, 4) + '...' + address.slice(-4);
                 
                 elements.connectWalletBtn.innerText = `Отключить (${friendlyAddress})`;
                 elements.connectWalletBtn.style.background = 'linear-gradient(135deg, #28a745, #218838)';
@@ -200,7 +208,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     ]
                 });
             } else {
-                // Открывает нативное красивое меню выбора кошельков в Telegram WebApp
+                // Открывает нативное меню TON Connect прямо в Telegram!
                 await tonConnectUI.openModal();
             }
         });
@@ -275,7 +283,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         navigateTo('case');
     });
 
-    // Дополнительные кнопки новых кейсов
+    // Новые кейсы (кнопки-заглушки)
     elements.bomzhCaseBanner.addEventListener('click', () => {
         showNotification("Кейс бомжа скоро появится в игре!", "🎒");
     });
@@ -360,7 +368,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             card.className = `reward-card ${gift.isGold ? 'gold-tier' : ''}`;
             const randomBadge = gift.type === 'gift' ? '<div class="reward-random-badge">random</div>' : '';
 
-            // Оставляем только цену, крупную картинку и плашку random (названия подарков убраны)
+            // Оставляем только цену, крупную картинку и плашку random
             card.innerHTML = `
                 <div class="reward-price-top">${gift.price}</div>
                 <img src="${gift.icon}" alt="${formatItemName(gift.name)}" onerror="this.src='https://img.icons8.com/color/96/gift.png'">
@@ -503,7 +511,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                                     NEWBIE_GIFT_POOL.find(g => g.name.toLowerCase() === item.name.toLowerCase()) || {};
                 const imageSrc = matchedItem.icon || item.image_url;
 
-                // В инвентаре НАЗВАНИЯ ОЧИЩАЮТСЯ от расширений и подчеркиваний на лету через formatItemName()
                 const card = document.createElement('div');
                 card.className = 'reward-card';
                 card.innerHTML = `
@@ -613,7 +620,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             const randomItem = currentPool[Math.floor(Math.random() * currentPool.length)];
             const itemEl = document.createElement('div');
             itemEl.className = 'roulette-item';
-            // В самой ленте рулетки отображаются только картинка и цена
             itemEl.innerHTML = `
                 <img src="${randomItem.icon}" onerror="this.src='https://img.icons8.com/color/96/gift.png'">
                 <span>${randomItem.price}</span>
@@ -624,7 +630,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // --- Прокрутка рулетки ---
     function spinRoulette(winningItem, onComplete) {
-        const itemWidth = 96; // Увеличенная ячейка
+        const itemWidth = 96; 
         const gap = 8; 
         const itemFullWidth = itemWidth + gap; 
         const targetIndex = 35; 
@@ -654,7 +660,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     function processWinning(winningGift, apiNewBalance = null) {
         const isBalance = winningGift.type === "balance" || winningGift.name.toLowerCase().includes("пополнение");
         
-        // После окончания спина обновляем баланс на реальный подтвержденный баланс из базы данных
         if (apiNewBalance !== null) {
             currentUser.balance = apiNewBalance;
             updateBalanceUI();
@@ -691,7 +696,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                                 if (sellRes.ok) {
                                     const sellData = await sellRes.json();
                                     currentUser.balance = sellData.newBalance;
-                                    showNotification(`Подарок продан за +${winningGift.price}!`, '💰');
+                                    showNotification("Подарок успешно продан за " + winningGift.price, "💰");
                                     fetchUserData();
                                 } else {
                                     const errorData = await sellRes.json();
@@ -726,7 +731,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         elements.spinBtn.disabled = true;
 
-        // --- МГНОВЕННОЕ ВИЗУАЛЬНОЕ СПИСАНИЕ С БАЛАНСА ---
+        // --- МГНОВЕННОЕ ВИЗУАЛЬНОЕ СПИСАНИЕ С БАЛАНСА НА ЭКРАНАХ ---
         if (isNewbieCaseMode) {
             const tempDeductedBalance = Math.max(0, parseFloat(currentUser.balance || 0) - spinCost);
             updateBalanceUI(tempDeductedBalance);
@@ -754,18 +759,16 @@ document.addEventListener('DOMContentLoaded', async () => {
                     if (!winningGift) { 
                         showNotification('Неизвестный предмет выигран.', '❓');
                         elements.spinBtn.disabled = false;
-                        fetchUserData(); // Восстанавливаем точный баланс в случае ошибки сопоставления
+                        fetchUserData(); // Восстанавливаем точный баланс
                         return;
                     }
 
-                    // Передаем итоговый balance (из ответа сервера) в завершающий колбэк прокрутки рулетки
                     spinRoulette(winningGift, () => {
                         processWinning(winningGift, data.newBalance);
                     });
 
                 } else {
-                    // Возвращаем баланс в случае ошибки на стороне сервера
-                    fetchUserData();
+                    fetchUserData(); // Восстанавливаем баланс при ошибке
 
                     if (data.error && data.error.includes('подписчиком канала')) {
                         const infoRes = await fetch(`${API_BASE_URL}/api/daily_case_info`, {
@@ -796,8 +799,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     }
                 }
             } catch (error) {
-                // Возвращаем баланс в исходное состояние при обрыве связи с сервером
-                fetchUserData();
+                fetchUserData(); // Восстанавливаем баланс при ошибке сети
                 showNotification('Ошибка связи с сервером при открытии кейса.', '⚠️');
                 elements.spinBtn.disabled = false;
             }
@@ -805,6 +807,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     renderRewardsGrid();
-    await fetchUserData(); 
+    
+    // --- ПЕРЕНЕСЕНО В ФОН (ПОЛНОСТЬЮ ИСКЛЮЧАЕТ ЗАВИСАНИЕ) ---
+    fetchUserData(); 
     navigateTo('home'); 
 });
