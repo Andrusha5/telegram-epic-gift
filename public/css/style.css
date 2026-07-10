@@ -42,31 +42,40 @@ body {
     display: none !important;
 }
 
-/* НОВЫЙ СТИЛЬ: ОВАЛЬНЫЙ БАЛАНС В УГЛУ */
+/* ОВАЛЬНЫЙ БАЛАНС В УГЛУ - БЕЗ СЛОВА GRAM, С ИКОНКОЙ */
 .balance-pill {
     position: fixed;
     top: 15px;
     right: 15px;
-    background: rgba(40, 40, 50, 0.8); /* Темный фон с прозрачностью */
-    border: 1px solid rgba(255, 255, 255, 0.15); /* Немного заметная рамка */
-    padding: 8px 18px;
-    border-radius: 25px; /* Сильно скругленные углы для овала */
-    z-index: 1000; /* Поверх всего */
+    background: rgba(40, 40, 50, 0.9); 
+    border: 1px solid rgba(138, 43, 226, 0.4); 
+    padding: 8px 16px;
+    border-radius: 25px; 
+    z-index: 1001; 
     cursor: pointer;
     color: var(--green-success);
     font-weight: 800;
-    font-size: 0.95rem; /* Размер текста */
-    backdrop-filter: blur(10px); /* Эффект размытия */
+    font-size: 0.95rem; 
+    backdrop-filter: blur(10px); 
     -webkit-backdrop-filter: blur(10px);
-    box-shadow: 0 4px 15px rgba(0,0,0,0.4); /* Мягкая тень */
+    box-shadow: 0 4px 15px rgba(0,0,0,0.5), 0 0 10px rgba(138, 43, 226, 0.2); 
     transition: transform 0.1s ease;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.balance-pill img {
+    width: 18px;
+    height: 18px;
+    object-fit: contain;
 }
 
 .balance-pill:active {
     transform: scale(0.98);
 }
 
-/* ШАПКА */
+/* ШАПКА - ДОБАВЛЕН ОТСТУП СПРАВА ЧТОБЫ БАЛАНС НЕ МЕШАЛ НАДПИСЯМ */
 .header {
     padding: 16px;
     background-color: var(--card-bg-color);
@@ -74,6 +83,8 @@ body {
     display: flex;
     flex-direction: column;
     gap: 12px;
+    padding-right: 160px; /* Свободное место для овала баланса */
+    box-sizing: border-box;
 }
 
 .brand-title {
@@ -111,12 +122,6 @@ body {
     color: #fff;
 }
 
-/* Убрал баланс из основного хедера, теперь он в овале */
-.balance-container {
-    display: none; 
-}
-
-
 .header-nav {
     display: flex;
     justify-content: space-between;
@@ -124,6 +129,8 @@ body {
     padding: 12px 16px;
     background-color: var(--card-bg-color);
     border-bottom: 1px solid var(--border-color);
+    padding-right: 160px; /* Свободное место для овала баланса */
+    box-sizing: border-box;
 }
 
 .back-button {
@@ -147,15 +154,9 @@ body {
     font-weight: 800;
 }
 
-/* Убрал user-bar-sub, так как баланс теперь в овале */
-.user-bar-sub {
-    display: none; 
-}
-
-
 .main-content {
     flex-grow: 1;
-    padding: 16px 16px 140px 16px; /* Дополнительный нижний отступ для прокрутки под меню */
+    padding: 16px 16px 140px 16px; 
     display: flex;
     flex-direction: column;
     box-sizing: border-box;
@@ -194,7 +195,7 @@ body {
     margin-bottom: 12px;
 }
 
-/* СЕТКА КЕЙСОВ - Улучшенный дизайн с локальными картинками */
+/* СЕТКА КЕЙСОВ - УВЕЛИЧЕННЫЕ КАРТИНКИ КЕЙСОВ И ЧИСТЫЙ ДИЗАЙН */
 .cases-layout {
     display: flex;
     gap: 12px; 
@@ -210,14 +211,14 @@ body {
     display: flex;
     flex-direction: column; 
     align-items: center;
-    gap: 10px; 
+    gap: 14px; 
     position: relative;
     cursor: pointer;
     box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
     transition: transform 0.2s ease, border-color 0.2s;
     text-align: center; 
     min-width: 120px; 
-    height: 140px; 
+    height: 185px; 
     justify-content: center; 
 }
 
@@ -231,11 +232,12 @@ body {
     right: 8px; 
     background: var(--secondary-color);
     color: #000;
-    font-size: 0.6rem; 
+    font-size: 0.65rem; 
     font-weight: 800;
-    padding: 3px 6px; 
+    padding: 3px 8px; 
     border-radius: 6px;
     white-space: nowrap; 
+    z-index: 5;
 }
 
 .case-banner-card.newbie-case .case-banner-badge {
@@ -245,10 +247,10 @@ body {
 }
 
 .case-banner-img {
-    width: 60px; /* Увеличил размер иконок */
-    height: 60px;
+    width: 90px; 
+    height: 90px;
     object-fit: contain;
-    margin: 0; 
+    margin: 0 auto; 
 }
 
 .case-banner-info h3 {
@@ -258,21 +260,13 @@ body {
     color: #fff;
 }
 
-.case-banner-info p {
-    margin: 0;
-    font-size: 0.75rem; 
-    color: var(--light-text-color);
-    font-weight: 600;
-    line-height: 1.2;
-}
-
 .case-banner-arrow {
     font-size: 1.2rem; 
     color: var(--light-text-color);
     font-weight: 700;
     position: absolute; 
     bottom: 8px;
-    right: 8px;
+    right: 12px;
 }
 
 /* СТРАНИЦА КЕЙСА */
@@ -558,7 +552,7 @@ body {
     box-shadow: 0 2px 8px rgba(40, 167, 69, 0.2);
 }
 
-/* ДИЗАЙН ПАНЕЛИ ВВОДА ПОДАРКОВ (DEPOSIT PANEL) */
+/* ДИЗАЙН ПАНЕЛИ ВВОДА ПОДАРКОВ */
 .deposit-panel {
     background: linear-gradient(135deg, #1c1c2d, #141420);
     border: 1.5px solid rgba(138, 43, 226, 0.4);
@@ -640,7 +634,51 @@ body {
     transform: scale(0.97);
 }
 
-/* СТИЛЬНЫЙ iOS/CYBERPUNK BOTTOM DOCK MENU - Добавлена вкладка рейтинга */
+/* СТИЛИ ЭКРАНА БАЛАНСА */
+.balance-screen-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex-grow: 1;
+    gap: 15px;
+    text-align: center;
+    padding: 50px 20px;
+}
+
+.large-balance-title {
+    font-size: 1.1rem;
+    color: var(--light-text-color);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.large-balance-amount {
+    font-size: 3.5rem;
+    font-weight: 800;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    text-shadow: 0 0 25px rgba(0, 230, 118, 0.4);
+}
+
+.large-balance-amount img {
+    width: 48px;
+    height: 48px;
+    object-fit: contain;
+}
+
+.balance-screen-desc {
+    font-size: 0.85rem;
+    color: var(--light-text-color);
+    max-width: 280px;
+    line-height: 1.4;
+    margin: 10px 0 20px 0;
+}
+
+/* BOTTOM NAVIGATION */
 .bottom-nav {
     position: fixed; 
     bottom: 16px; 
@@ -865,7 +903,7 @@ body {
     gap: 12px;
     box-shadow: 0 8px 25px rgba(0,0,0,0.5), 0 0 15px rgba(138, 43, 226, 0.2);
     transform: translateY(20px);
-    opacity: 0;
+    opacity: 1;
     transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     pointer-events: auto; 
 }
@@ -886,7 +924,6 @@ body {
     line-height: 1.3;
 }
 
-/* Кнопка закрытия внутри тоста */
 .custom-toast-close {
     background: none;
     border: none;
@@ -901,7 +938,6 @@ body {
     color: #fff;
 }
 
-/* СТИЛИ ПУСТОГО ИНВЕНТАРЯ */
 .empty-inventory {
     grid-column: 1 / -1; 
     text-align: center;
@@ -916,7 +952,6 @@ body {
     border: 1px solid var(--border-color);
 }
 
-/* НОВАЯ СЕКЦИЯ: Рейтинг */
 #rating-section .empty-inventory {
     margin-top: 20px;
-}
+                          }
