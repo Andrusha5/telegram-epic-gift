@@ -84,7 +84,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         rewardsSectionContainer: document.getElementById('rewards-section-container'),
         rewardsGridTitle: document.getElementById('rewards-grid-title'),
         casePageMainTitle: document.getElementById('case-page-main-title'),
-        connectWalletBtn: document.getElementById('connect-wallet-btn')
+        connectWalletBtn: document.getElementById('connect-wallet-btn'),
+        depositBalanceBtn: document.getElementById('deposit-balance-btn'),
+        depositNoticeText: document.getElementById('deposit-notice-text')
     };
 
     // --- ФУНКЦИЯ ОЧИСТКИ ИМЕНИ ПОДАРКОВ ---
@@ -170,17 +172,32 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const address = wallet.account.address;
                 const friendlyAddress = address.slice(0, 4) + '...' + address.slice(-4);
                 
-                elements.connectWalletBtn.innerText = `Отключить (${friendlyAddress})`;
+                // Изменение кнопки привязки
+                elements.connectWalletBtn.innerText = `Привязан: (${friendlyAddress})`;
                 elements.connectWalletBtn.style.background = 'linear-gradient(135deg, #28a745, #218838)';
                 elements.connectWalletBtn.style.boxShadow = '0 4px 15px rgba(40, 167, 69, 0.4)';
-                showNotification("Кошелек успешно подключен!", "💎");
+
+                // Разблокировка кнопки пополнения баланса
+                elements.depositBalanceBtn.disabled = false;
+                elements.depositBalanceBtn.style.opacity = "1";
+                elements.depositBalanceBtn.style.cursor = "pointer";
+                elements.depositNoticeText.innerText = "Пополнение кошелька полностью разблокировано";
+                elements.depositNoticeText.style.color = "var(--green-success)";
             } else {
                 elements.connectWalletBtn.innerText = 'Привязать кошелёк';
                 elements.connectWalletBtn.style.background = 'linear-gradient(135deg, #0088cc, #00a2ff)';
                 elements.connectWalletBtn.style.boxShadow = '0 4px 15px rgba(0, 136, 204, 0.4)';
+
+                // Блокировка кнопки пополнения
+                elements.depositBalanceBtn.disabled = true;
+                elements.depositBalanceBtn.style.opacity = "0.5";
+                elements.depositBalanceBtn.style.cursor = "not-allowed";
+                elements.depositNoticeText.innerText = "Пополнение доступно после привязки кошелька";
+                elements.depositNoticeText.style.color = "var(--light-text-color)";
             }
         });
 
+        // Нажатие на кнопку привязки
         elements.connectWalletBtn.addEventListener('click', async () => {
             if (tonConnectUI.connected) {
                 showCustomModal({
@@ -202,6 +219,89 @@ document.addEventListener('DOMContentLoaded', async () => {
             } else {
                 // Запускает официальный нативный диалог привязки Telegram
                 await tonConnectUI.openModal();
+            }
+        });
+
+        // НАЖАТИЕ НА КНОПКУ ПОПОЛНЕНИЯ (С ПЕРЕХОДОМ В КОШЕЛЕК И ПРОВЕРКОЙ БЭКЕНДОМ)
+        elements.depositBalanceBtn.addEventListener('click', async () => {
+            if (!tonConnectUI.connected) {
+                showNotification("Пожалуйста, сначала привяжите кошелек!", "⚠️");
+                return;
+            }
+
+            const amountStr = prompt("Введите сумму пополнения в TON:", "0.1");
+            if (!amountStr) return;
+
+            const amountFloat = parseFloat(amountStr);
+            if (isNaN(amountFloat) || amountFloat <= 0) {
+                showNotification("Неверно указана сумма!", "⚠️");
+                return;
+            }
+
+            try {
+                // Получаем депозитный адрес администратора с бэкенда
+                const addrRes = await fetch(`${API_BASE_URL}/api/deposit_address`);
+                const addrData = await addrRes.json();
+                const adminTonAddress = addrData.address;
+
+                if (!adminTonAddress) {
+                    showNotification("Ошибка сервера при получении реквизитов.", "⚠️");
+                    return;
+                }
+
+                // Переводим в нанотоны (1 TON = 1,000,000,000 NanoTON)
+                const nanoAmount = Math.floor(amountFloat * 1000000000).toString();
+
+                // Готовим нативную транзакцию для вызова в TON Connect
+                const transaction = {
+                    validUntil: Math.floor(Date.now() / 1000) + 360, // Срок жизни 6 минут
+                    messages: [
+                        {
+                            address: adminTonAddress,
+                            amount: nanoAmount,
+                            // Комментарий транзакции (Передаем Telegram ID пользователя для автоматического зачисления бэкендом)
+                            payload: btoa(currentUser.id ? currentUser.id.toString() : "deposit") 
+                        }
+                    ]
+                };
+
+                showNotification("Ожидание подтверждения в вашем TON-кошельке...", "💎");
+
+                // Запуск официальной транзакции в кошельке
+                const result = await tonConnectUI.sendTransaction(transaction);
+
+                if (result && result.boc) {
+                    showNotification("Транзакция отправлена в блокчейн TON! Ожидаем авто-зачисление...", "⌛");
+                    
+                    // Отправляем BOC (доказательство платежа) на бэкенд для мгновенного зачисления
+                    const verifyRes = await fetch(`${API_BASE_URL}/api/verify-payment`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-Telegram-Init-Data': tg.initData || ""
+                        },
+                        body: JSON.stringify({
+                            boc: result.boc,
+                            amount: amountFloat,
+                            userId: currentUser.id
+                        })
+                    });
+
+                    if (verifyRes.ok) {
+                        const verifyData = await verifyRes.json();
+                        if (verifyData.success) {
+                            showNotification(`Баланс успешно пополнен на +${amountFloat} TON!`, "✅");
+                            fetchUserData();
+                        } else {
+                            showNotification("Платеж ожидает подтверждения сетью TON.", "⌛");
+                        }
+                    } else {
+                        showNotification("Ваш платеж обрабатывается. Баланс обновится в течение пары минут.", "⌛");
+                    }
+                }
+            } catch (err) {
+                console.error("Ошибка при оплате TON Connect:", err);
+                showNotification("Оплата отменена или произошел сбой.", "❌");
             }
         });
     }
@@ -414,7 +514,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     function updateDailyCaseTimer() {
         clearInterval(dailyCaseTimerInterval); 
 
-        // ЕСЛИ ЭТО КЕЙС НОВИЧКА — ТАЙМЕР ВООБЩЕ НЕ ЗАПУСКАЕТСЯ! КНОПКА ВСЕГДА АКТИВНА
+        // ИСКЛЮЧЕНИЕ: Для кейса новичка таймер НИКОГДА не показывается! Окно с таймером полностью прячется.
         if (isNewbieCaseMode) {
             elements.spinBtn.classList.remove('hidden');
             elements.spinBtn.disabled = false;
@@ -644,7 +744,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             updateBalanceUI();
         }
 
-        // РЕАКТИВИРУЕМ КНОПКУ СРАЗУ ПОСЛЕ ОКОНЧАНИЯ АНИМАЦИИ (ЕСЛИ ПЛАТНЫЙ КЕЙС)
+        // РАЗБЛОКИРУЕМ КНОПКУ МГНОВЕННО (Для платного кейса, чтобы можно было крутить без остановки!)
         if (isNewbieCaseMode) {
             elements.spinBtn.disabled = false;
         }
