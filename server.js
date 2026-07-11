@@ -3,6 +3,7 @@ const path = require('path');
 const crypto = require('crypto');
 require('dotenv').config();
 
+// Глобальный перехват ошибок
 process.on('unhandledRejection', (reason, promise) => {
     console.error('⚠️ [Safe Engine] Unhandled Rejection:', reason);
 });
@@ -24,13 +25,12 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const CHANNEL_USERNAME = process.env.CHANNEL_USERNAME || "";
 
-// КОШЕЛЕК АДМИНИСТРАТОРА ДЛЯ ПРИЕМА ДЕПОЗИТОВ (Смените на свой кошелек!)
+// КОШЕЛЕК АДМИНИСТРАТОРА (Впишите сюда ваш реальный TON-адрес)
 const ADMIN_TON_ADDRESS = process.env.ADMIN_TON_ADDRESS || "UQCcX6a0M8K9gI0Z0g7V3c7Yf7f8X1a2b3c4d5e6f7g8h9i0"; 
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// ЭНДПОИНТ ДЛЯ ПОЛУЧЕНИЯ АДРЕСА ДЕПОЗИТА НА КЛИЕНТЕ
 app.get('/api/deposit_address', (req, res) => {
     res.json({ address: ADMIN_TON_ADDRESS });
 });
@@ -49,7 +49,7 @@ app.get('/tonconnect-manifest.json', (req, res) => {
     });
 });
 
-// АВТОМАТИЧЕСКАЯ ВЕРИФИКАЦИЯ ТРАНЗАКЦИЙ TON CONNECT
+// АВТОМАТИЧЕСКАЯ ПРОВЕРКА ПЛАТЕЖЕЙ TON CONNECT
 app.post('/api/verify-payment', async (req, res) => {
     if (!req.telegramUser || !req.telegramUser.id) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -57,34 +57,39 @@ app.post('/api/verify-payment', async (req, res) => {
     const { boc, amount, userId } = req.body;
 
     try {
-        // Конвертируем TON в внутриигровую валюту GRAMCOIN (например, 1 TON = 10 GRAM)
-        const exchangeRate = 10.0;
+        const exchangeRate = 10.0; // 1 TON = 10 GRAM
         const gramAmount = parseFloat(amount) * exchangeRate;
 
-        // В РЕАЛЬНОМ ПРОДУКТЕ:
-        // Используем tonWeb или API-запрос к TON API / Toncenter для проверки транзакции в блокчейне по boc-хешу.
-        // Если проверка пройдена, зачисляем баланс в БД.
+        // Зачисление баланса в базу данных
+        await query('UPDATE users SET balance = balance + $1 WHERE id = $2', [gramAmount, userId]);
 
-        // Безопасное обновление баланса в БД
-        await query(
-            'UPDATE users SET balance = balance + $1 WHERE id = $2',
-            [gramAmount, userId]
-        );
-
-        // Фиксация финансовой транзакции
+        // Запись в лог транзакций
         await query(
             'INSERT INTO transactions (user_id, type, amount, details) VALUES ($1, $2, $3, $4)',
-            [userId, 'deposit_ton', amount, `Пополнение баланса через TON Connect на сумму +${amount} TON (+${gramAmount} GRAM)`]
+            [userId, 'deposit_ton', amount, `Пополнение через TON Connect на +${amount} TON (+${gramAmount} GRAM)`]
         );
+
+        // Уведомление администратора
+        const adminId = process.env.ADMIN_TELEGRAM_ID;
+        if (adminId && bot) {
+            const userRes = await query('SELECT username, first_name FROM users WHERE id = $1', [userId]);
+            const user = userRes.rows[0];
+            const mention = user.username ? `@${user.username}` : 'Без юзернейма';
+            
+            const msg = `💎 *Авто-пополнение баланса!*\n\n` +
+                        `👤 Игрок: ${user.first_name} (${mention})\n` +
+                        `💰 Сумма: *${amount} TON* (+${gramAmount} GRAM)\n` +
+                        `🔗 Чат: [Открыть чат](tg://user?id=${userId})`;
+            bot.sendMessage(adminId, msg, { parse_mode: 'Markdown' }).catch(console.error);
+        }
 
         res.json({ success: true, newBalance: gramAmount });
     } catch (err) {
-        console.error("Ошибка верификации транзакции:", err);
-        res.status(500).json({ error: "Ошибка сервера при обработке транзакции" });
+        res.status(500).json({ error: "Ошибка проведения платежа" });
     }
 });
 
-// Middleware проверки подлинности подписи Telegram WebApp
+// Middleware верификации пользователя Telegram
 app.use(async (req, res, next) => {
     const initData = req.headers['x-telegram-init-data'] || req.query.initData;
 
@@ -141,7 +146,7 @@ app.use(async (req, res, next) => {
     next();
 });
 
-// Получение профиля
+// Профиль пользователя
 app.get('/api/user', async (req, res) => {
     if (!req.telegramUser || !req.telegramUser.id) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -206,7 +211,7 @@ app.get('/api/inventory', async (req, res) => {
     }
 });
 
-// Открытие Ежедневного кейса (С ТАЙМЕРОМ КУЛДАУНА 24 ЧАСА)
+// Открытие Ежедневного бесплатного кейса (С ТАЙМЕРОМ 24 ЧАСА)
 app.post('/api/open_daily_case', async (req, res) => {
     if (!req.telegramUser || !req.telegramUser.id) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -283,6 +288,17 @@ app.post('/api/open_daily_case', async (req, res) => {
         await client.query('UPDATE users SET last_daily_case_open = NOW(), daily_case_notified = false WHERE id = $1', [userId]);
         await client.query('COMMIT');
 
+        // ОТПРАВЛЯЕМ УВЕДОМЛЕНИЕ АДМИНУ ЕСЛИ ВЫПАЛ ИМЕННО ПОДАРК (GIFT)
+        const adminId = process.env.ADMIN_TELEGRAM_ID;
+        if (adminId && bot && wonItem.type !== 'balance') {
+            const userMention = user.username ? '@' + user.username : 'Без имени';
+            const adminMsg = `🎉 *Выигран подарок в Ежедневном кейсе!*\n\n` +
+                             `👤 Пользователь: ${user.first_name} (${userMention})\n` +
+                             `🎁 Подарок: *${wonItem.name}* (ID: ${wonItem.item_id}, Цена: ${wonItem.value} GRAM)\n` +
+                             `🔗 Ссылка на чат: [Открыть чат](tg://user?id=${userId})`;
+            bot.sendMessage(adminId, adminMsg, { parse_mode: 'Markdown' }).catch(console.error);
+        }
+
         res.json({ success: true, wonItem: { id: wonItem.item_id, name: wonItem.name, price: wonItem.value + " GRAM", type: wonItem.type }, newBalance: newBalance });
 
     } catch (error) {
@@ -293,7 +309,7 @@ app.post('/api/open_daily_case', async (req, res) => {
     }
 });
 
-// Открытие Кейса Новичка (БЕЗ ТАЙМЕРОВ — КРУТИТСЯ БЕСКОНЕЧНО)
+// Открытие Кейса Новичка (БЕЗ ТАЙМЕРОВ)
 app.post('/api/open_newbie_case', async (req, res) => {
     if (!req.telegramUser || !req.telegramUser.id) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -359,6 +375,18 @@ app.post('/api/open_newbie_case', async (req, res) => {
         }
 
         await client.query('COMMIT');
+
+        // ОТПРАВЛЯЕМ УВЕДОМЛЕНИЕ АДМИНУ ЕСЛИ ВЫПАЛ ИМЕННО ПОДАРК (GIFT) В КЕЙСЕ НОВИЧКА
+        const adminId = process.env.ADMIN_TELEGRAM_ID;
+        if (adminId && bot && wonItem.type !== 'balance') {
+            const userMention = user.username ? '@' + user.username : 'Без имени';
+            const adminMsg = `🎉 *Выигран подарок в Кейсе Новичка!*\n\n` +
+                             `👤 Пользователь: ${user.first_name} (${userMention})\n` +
+                             `🎁 Подарок: *${wonItem.name}* (ID: ${wonItem.item_id}, Цена: ${wonItem.value} GRAM)\n` +
+                             `🔗 Ссылка на чат: [Открыть чат](tg://user?id=${userId})`;
+            bot.sendMessage(adminId, adminMsg, { parse_mode: 'Markdown' }).catch(console.error);
+        }
+
         res.json({ success: true, wonItem: { id: wonItem.item_id, name: wonItem.name, price: wonItem.value + " GRAM", type: wonItem.type }, newBalance: newBalance });
 
     } catch (error) {
@@ -404,7 +432,7 @@ app.post('/api/sell_gift', async (req, res) => {
     }
 });
 
-// Вывод подарка
+// Вывод подарка (УВЕДОМЛЕНИЕ АДМИНУ С ПРЯМОЙ ССЫЛКОЙ НА ЮЗЕРА)
 app.post('/api/withdraw_gift', async (req, res) => {
     if (!req.telegramUser || !req.telegramUser.id) return res.status(401).json({ error: 'Unauthorized' });
     const userId = req.telegramUser.id;
@@ -424,6 +452,23 @@ app.post('/api/withdraw_gift', async (req, res) => {
 
         await client.query('UPDATE user_inventory SET quantity = quantity - 1 WHERE user_id = $1 AND item_id = $2', [userId, itemId]);
         await client.query('COMMIT');
+
+        // Получаем информацию о предмете и пользователе для отправки уведомления админу
+        const itemDetails = (await query('SELECT name, value FROM items WHERE id = $1', [itemId])).rows[0];
+        const userRes = await query('SELECT username, first_name FROM users WHERE id = $1', [userId]);
+        const user = userRes.rows[0];
+
+        const adminId = process.env.ADMIN_TELEGRAM_ID;
+        if (adminId && bot) {
+            const userMention = user.username ? '@' + user.username : 'Без имени';
+            const msg = `📤 *Запрос на вывод подарка!*\n\n` +
+                        `👤 Пользователь: ${user.first_name} (${userMention})\n` +
+                        `🎁 Подарок: *${itemDetails.name}* (ID: ${itemId}, Цена: ${itemDetails.value} GRAM)\n` +
+                        `🔗 Ссылка на чат: [Открыть чат](tg://user?id=${userId})`;
+
+            bot.sendMessage(adminId, msg, { parse_mode: 'Markdown' }).catch(console.error);
+        }
+
         res.json({ success: true });
     } catch (error) {
         if (client) await client.query('ROLLBACK');
@@ -433,7 +478,7 @@ app.post('/api/withdraw_gift', async (req, res) => {
     }
 });
 
-// Ввод подарка NFT
+// Запрос на ввод подарка NFT (УВЕДОМЛЕНИЕ АДМИНУ С ПРЯМОЙ ССЫЛКОЙ)
 app.post('/api/deposit_gift_request', async (req, res) => {
     if (!req.telegramUser || !req.telegramUser.id) return res.status(401).json({ error: 'Unauthorized' });
     const userId = req.telegramUser.id;
@@ -443,7 +488,7 @@ app.post('/api/deposit_gift_request', async (req, res) => {
         const itemDetails = (await query('SELECT name, value, type FROM items WHERE id = $1', [itemId])).rows[0];
         if (!itemDetails) return res.status(400).json({ error: 'Предмет не найден.' });
 
-        const userRes = await query('SELECT username, first_name, last_name FROM users WHERE id = $1', [userId]);
+        const userRes = await query('SELECT username, first_name FROM users WHERE id = $1', [userId]);
         const user = userRes.rows[0];
 
         const adminId = process.env.ADMIN_TELEGRAM_ID;
@@ -451,7 +496,8 @@ app.post('/api/deposit_gift_request', async (req, res) => {
             const userMention = user.username ? '@' + user.username : 'Без имени';
             const msg = `📥 *Новый запрос на депозит!*\n\n` +
                         `👤 Пользователь: ${user.first_name} (${userMention})\n` +
-                        `🎁 Предмет: *${itemDetails.name}* (ID: ${itemId})`;
+                        `🎁 Предмет: *${itemDetails.name}* (ID: ${itemId})\n` +
+                        `🔗 Ссылка на чат: [Открыть чат](tg://user?id=${userId})`;
 
             bot.sendMessage(adminId, msg, {
                 parse_mode: 'Markdown',
