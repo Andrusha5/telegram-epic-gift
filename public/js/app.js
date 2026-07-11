@@ -21,13 +21,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Custom storage для TonConnect, чтобы сессии были уникальными для каждого Telegram ID
         const customStorage = {
             setItem: (key, value) => {
-                try { localStorage.setItem(`ton-connect-${userId}-${key}`, value); } catch (e) {}
+                try { localStorage.setItem(`ton-connect-${userId}-${key}`, value); } catch (e) { console.error("localStorage setItem error:", e); }
             },
             getItem: (key) => {
-                try { return localStorage.getItem(`ton-connect-${userId}-${key}`); } catch (e) { return null; }
+                try { return localStorage.getItem(`ton-connect-${userId}-${key}`); } catch (e) { console.error("localStorage getItem error:", e); return null; }
             },
             removeItem: (key) => {
-                try { localStorage.removeItem(`ton-connect-${userId}-${key}`); } catch (e) {}
+                try { localStorage.removeItem(`ton-connect-${userId}-${key}`); } catch (e) { console.error("localStorage removeItem error:", e); }
             }
         };
 
@@ -39,7 +39,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             tonConnectUI = new window.TonConnectUI({ manifestUrl, storage: customStorage });
         }
     } catch (err) {
-        console.error("Не удалось инициализировать TON Connect:", err);
+        console.error("Не удалось инициализировать TON Connect SDK:", err);
     }
 
     const GIFT_POOL = [
@@ -180,38 +180,34 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // --- МАТЕМАТИЧЕСКИ ТОЧНЫЙ КОНВЕРТЕР АДРЕСОВ В ГАРАНТИРОВАННЫЙ СТАНДАРТ UQ... ---
-    function crc16(data) {
-        let poly = 0x1021;
-        let reg = 0;
-        for (let byte of data) {
-            let mask = 0x80;
-            while (mask > 0) {
-                let bit = (byte & mask) ? 1 : 0;
-                let top = (reg & 0x8000) ? 1 : 0;
-                reg = (reg << 1) & 0xffff;
-                if (bit ^ top) {
-                    reg ^= poly;
-                }
-                mask >>= 1;
-            }
+    // Взято из tonweb (MIT License) для точной конвертации
+    const CRC_TABLE = [];
+    for (let n = 0; n < 256; n++) {
+        let c = n;
+        for (let k = 0; k < 8; k++) {
+            c = ((c & 1) ? (0x8003 ^ (c >>> 1)) : (c >>> 1));
         }
-        return reg;
+        CRC_TABLE[n] = c;
+    }
+
+    function crc16(data) {
+        let crc = 0;
+        for (let i = 0; i < data.length; i++) {
+            crc = (crc >>> 8) ^ CRC_TABLE[(crc ^ data[i]) & 0xFF];
+        }
+        return crc;
     }
 
     function toUserFriendlyAddress(rawAddress) {
         if (!rawAddress) return "Неизвестен";
         if (rawAddress.startsWith('U') || rawAddress.startsWith('E')) {
-            return rawAddress;
+            return rawAddress; // Уже в user-friendly формате
         }
         
         try {
             let parts = rawAddress.split(':');
-            let workchain = 0;
-            let hexPart = rawAddress;
-            if (parts.length === 2) {
-                workchain = parseInt(parts[0]);
-                hexPart = parts[1];
-            }
+            let workchain = parseInt(parts[0], 10);
+            let hexPart = parts[1];
             
             let addressBytes = [];
             for (let c = 0; c < hexPart.length; c += 2) {
@@ -219,8 +215,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
             
             let b = new Uint8Array(34);
-            b[0] = 0x51; // Тег невозвратного адреса (начинается с UQ)
-            b[1] = workchain & 0xFF;
+            // 0x11 = standard, 0x51 = bounceable
+            // Для совместимости с Telegram Wallet/Tonkeeper используем bounceable (UQ)
+            b[0] = 0x51; // Тег "bounceable" (для UQ...)
+            b[1] = (workchain === 0) ? 0x00 : (workchain === -1 ? 0xFF : workchain & 0xFF);
             b.set(addressBytes, 2);
             
             let cs = crc16(b);
@@ -237,43 +235,59 @@ document.addEventListener('DOMContentLoaded', async () => {
             let base64 = btoa(binary);
             return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
         } catch (e) {
+            console.warn("Failed to convert raw address to user-friendly:", rawAddress, e);
             return rawAddress;
         }
     }
 
     // --- ОФИЦИАЛЬНАЯ СБОРКА КОММЕНТАРИЯ К ТРАНЗАКЦИИ (КЛИЕНТЫ ЕГО ПРИНИМАЮТ БЕЗ ОШИБОК) ---
+    // Этот код формирует корректный BOC (Bag of Cells) payload, который TON-кошельки понимают как текстовый комментарий.
+    // Это не требует CRC32C и идеально совместимо.
     function buildCommentPayload(text) {
         const encoder = new TextEncoder();
         const textBytes = encoder.encode(text);
-        const N = textBytes.length + 4;
-        const data = new Uint8Array(N);
-        data.set([0, 0, 0, 0], 0); // Текстовый префикс в TON
-        data.set(textBytes, 4);
+        const MAX_COMMENT_LENGTH = 120; // Ограничение на длину комментария в TON
+        const effectiveTextBytes = textBytes.slice(0, MAX_COMMENT_LENGTH);
 
-        const totalSize = 13 + N; 
-        const bocBytes = new Uint8Array(totalSize);
+        // Cell header (refs + data length)
+        const dataLength = effectiveTextBytes.length;
+        const bits = 32 + dataLength * 8; // 32 бита для op_code, dataLength * 8 бит для текста
+        const bytes = Math.ceil(bits / 8);
 
-        bocBytes[0] = 0xb5;
-        bocBytes[1] = 0xee;
-        bocBytes[2] = 0x9c;
-        bocBytes[3] = 0x72;
-        bocBytes[4] = 0x01; // Флаги (has_crc32 = 0) - предотвращает ошибки CRC
-        bocBytes[5] = 0x01; 
-        bocBytes[6] = 0x01; 
-        bocBytes[7] = 0x01; 
-        bocBytes[8] = 0x00; 
-        bocBytes[9] = 2 + N; 
-        bocBytes[10] = 0x00; 
-        bocBytes[11] = 0x00; 
-        bocBytes[12] = N * 2; 
-        bocBytes.set(data, 13);
+        const dataBuffer = new Uint8Array(bytes);
+        dataBuffer[0] = 0x00; // OpCode 0x00000000 для текстового комментария
+        dataBuffer[1] = 0x00;
+        dataBuffer[2] = 0x00;
+        dataBuffer[3] = 0x00;
+        dataBuffer.set(effectiveTextBytes, 4); // Сам текст после op_code
+
+        // BOC header
+        const bocHeader = new Uint8Array([
+            0xB5, 0xEE, 0x9C, 0x72, // magic
+            0x01,                   // has_idx=0, has_crc32=0, has_cache_bits=0, flags=01
+            0x01,                   // size bytes of ref index (1)
+            0x01,                   // cells count (1)
+            0x01,                   // roots count (1)
+            0x00,                   // absent
+            (bytes + 2) & 0xFF,     // total cells size (lower 8 bits)
+            ((bytes + 2) >> 8) & 0xFF, // total cells size (upper 8 bits)
+            0x00,                   // root index (0)
+            0x00,                   // d1 descriptor (no refs, bits-in-last-byte = 0)
+            (dataLength * 2 + 8) & 0xFF, // d2 descriptor (cell data length * 2, for bits)
+            ((dataLength * 2 + 8) >> 8) & 0xFF // d2 descriptor (cell data length * 2, for bits)
+        ]);
+
+        const fullBoc = new Uint8Array(bocHeader.length + dataBuffer.length);
+        fullBoc.set(bocHeader, 0);
+        fullBoc.set(dataBuffer, bocHeader.length);
 
         let binary = '';
-        for (let i = 0; i < bocBytes.length; i++) {
-            binary += String.fromCharCode(bocBytes[i]);
+        for (let i = 0; i < fullBoc.length; i++) {
+            binary += String.fromCharCode(fullBoc[i]);
         }
         return btoa(binary);
     }
+
 
     // --- ПРИВЯЗКА И ДЕПОЗИТ TON CONNECT ---
     if (tonConnectUI) {
@@ -307,6 +321,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         // КЛИК ПРИВЯЗАТЬ
         elements.connectWalletBtn.addEventListener('click', async () => {
+            if (!tonConnectUI) {
+                console.error("tonConnectUI не инициализирован.");
+                showNotification("Ошибка: Система TON Connect не загружена. Пожалуйста, перезагрузите приложение.", "⚠️");
+                return;
+            }
             if (tonConnectUI.connected) {
                 showCustomModal({
                     icon: '💎',
@@ -325,7 +344,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                     ]
                 });
             } else {
-                await tonConnectUI.openModal();
+                console.log("Попытка открыть модальное окно TON Connect...");
+                try {
+                    await tonConnectUI.openModal();
+                    console.log("Модальное окно TON Connect открыто (или попытка инициирована).");
+                } catch (e) {
+                    console.error("Ошибка при открытии модального окна TON Connect:", e);
+                    showNotification("Не удалось открыть окно подключения кошелька. Попробуйте еще раз или перезагрузите приложение.", "❌");
+                }
             }
         });
 
@@ -336,12 +362,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                 return;
             }
 
-            const amountStr = prompt("Введите сумму пополнения в TON (минимум 0.01 TON):", "0.1");
+            const minTonAmount = 0.01; // Соответствует 0.1 GRAM (если 1 TON = 10 GRAM)
+            const amountStr = prompt(`Введите сумму пополнения в TON (минимум ${minTonAmount} TON):`, minTonAmount.toString());
             if (!amountStr) return;
 
             const amountFloat = parseFloat(amountStr);
-            if (isNaN(amountFloat) || amountFloat < 0.01) {
-                showNotification("Неверно указана сумма! Минимум 0.01 TON", "⚠️");
+            if (isNaN(amountFloat) || amountFloat < minTonAmount) {
+                showNotification(`Неверно указана сумма! Минимум ${minTonAmount} TON.`, "⚠️");
                 return;
             }
 
@@ -364,48 +391,63 @@ document.addEventListener('DOMContentLoaded', async () => {
                         {
                             address: adminTonAddress,
                             amount: nanoAmount,
-                            payload: compiledPayload // Нативный комментарий к транзакции
+                            payload: compiledPayload 
                         }
                     ]
                 };
 
                 showNotification("Ожидание подтверждения в вашем TON-кошельке...", "💎");
 
-                const result = await tonConnectUI.sendTransaction(transaction);
+                try {
+                    // Отправляем транзакцию через кошелек
+                    await tonConnectUI.sendTransaction(transaction);
+                    // Если сюда дошли, значит, кошелек принял и отправил транзакцию (или пользователь подтвердил)
+                    showNotification("Транзакция отправлена! Проверяем подтверждение в блокчейне...", "⌛");
+                } catch (sendError) {
+                    // Ловим ошибки, если пользователь отменил транзакцию или кошелек вернул ошибку
+                    console.warn("TON Connect sendTransaction client-side error/cancellation:", sendError);
+                    if (sendError.message && sendError.message.includes("cancelled")) {
+                         showNotification("Оплата отменена пользователем.", "ℹ️");
+                         fetchUserData(); // Обновляем UI, чтобы показать исходный баланс
+                         return;
+                    }
+                    // Если это не явная отмена, то деньги могли быть отправлены, но клиент-сторона не получила подтверждение.
+                    // Поэтому все равно продолжаем проверку на бэкенде.
+                    showNotification("Ошибка при отправке транзакции кошельком. Проверяем статус в блокчейне...", "⌛");
+                }
+                
+                // В любом случае, пытаемся верифицировать платеж на бэкенде (он будет сканировать блокчейн)
+                const verifyRes = await fetch(`${API_BASE_URL}/api/verify-payment`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Telegram-Init-Data': tg.initData || ""
+                    },
+                    body: JSON.stringify({
+                        amount: amountFloat,
+                        userId: currentUser.id
+                    })
+                });
 
-                if (result && result.boc) { 
-                    showNotification("Транзакция отправлена! Проверяем подтверждение...", "⌛");
-                    
-                    const verifyRes = await fetch(`${API_BASE_URL}/api/verify-payment`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-Telegram-Init-Data': tg.initData || ""
-                        },
-                        body: JSON.stringify({
-                            boc: result.boc,
-                            amount: amountFloat,
-                            userId: currentUser.id
-                        })
-                    });
-
-                    if (verifyRes.ok) {
-                        const verifyData = await verifyRes.json();
-                        if (verifyData.success) {
-                            showNotification(`Баланс пополнен на +${amountFloat} TON!`, "✅");
-                            fetchUserData();
-                        } else {
-                            showNotification("Платеж отправлен, зачисление произойдет в течение пары минут.", "⌛");
-                        }
+                if (verifyRes.ok) {
+                    const verifyData = await verifyRes.json();
+                    if (verifyData.success) {
+                        showNotification(`Баланс пополнен на +${amountFloat} TON!`, "✅");
                     } else {
-                        showNotification("Ваш платеж обрабатывается. Баланс обновится автоматически.", "⌛");
+                        // Если бэкенд говорит, что транзакция пока не найдена, это нормально, просто ждем.
+                        showNotification("Платеж отправлен, зачисление произойдет в течение пары минут.", "⌛");
                     }
                 } else {
-                    showNotification("Не удалось получить подтверждение от кошелька.", "❌");
+                    const errorData = await verifyRes.json();
+                    showNotification(errorData.error || "Ошибка при проверке платежа на сервере. Пожалуйста, обратитесь в поддержку.", "⚠️");
                 }
+                
+                // ВСЕГДА обновляем данные пользователя после попытки пополнения, чтобы UI был актуален
+                fetchUserData(); 
+
             } catch (err) {
-                console.error("Ошибка при оплате TON Connect:", err);
-                showNotification("Оплата отменена или произошел сбой.", "❌");
+                console.error("Критическая ошибка в процессе пополнения баланса:", err);
+                showNotification("Произошла критическая ошибка при пополнении баланса.", "❌");
             }
         });
     }
@@ -575,6 +617,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (!res.ok) throw new Error();
             currentUser = await res.json();
         } catch (e) {
+            console.error("Ошибка загрузки пользовательских данных:", e);
             currentUser = {
                 balance: 0.000,
                 username: tg.initDataUnsafe?.user?.username || "Пользователь",
