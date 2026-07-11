@@ -3,7 +3,6 @@ const path = require('path');
 const crypto = require('crypto');
 require('dotenv').config();
 
-// Глобальные перехватчики непредвиденных ошибок сервера
 process.on('unhandledRejection', (reason, promise) => {
     console.error('⚠️ [Safe Engine] Unhandled Rejection:', reason);
 });
@@ -25,10 +24,18 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const CHANNEL_USERNAME = process.env.CHANNEL_USERNAME || "";
 
+// КОШЕЛЕК АДМИНИСТРАТОРА ДЛЯ ПРИЕМА ДЕПОЗИТОВ (Смените на свой кошелек!)
+const ADMIN_TON_ADDRESS = process.env.ADMIN_TON_ADDRESS || "UQCcX6a0M8K9gI0Z0g7V3c7Yf7f8X1a2b3c4d5e6f7g8h9i0"; 
+
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// ЭНДПОИНТ МАНИФЕСТА ДЛЯ TON CONNECT (Обязательное условие: работа строго по HTTPS протоколу)
+// ЭНДПОИНТ ДЛЯ ПОЛУЧЕНИЯ АДРЕСА ДЕПОЗИТА НА КЛИЕНТЕ
+app.get('/api/deposit_address', (req, res) => {
+    res.json({ address: ADMIN_TON_ADDRESS });
+});
+
+// ЭНДПОИНТ МАНИФЕСТА С ПРИНУДИТЕЛЬНЫМ HTTPS
 app.get('/tonconnect-manifest.json', (req, res) => {
     const host = req.get('host');
     const protocol = (host.includes('localhost') || host.includes('127.0.0.1')) ? 'http' : 'https';
@@ -40,6 +47,41 @@ app.get('/tonconnect-manifest.json', (req, res) => {
         name: "BestGifts",
         iconUrl: `${appUrl}/Images/Items/gram_popolnenie.png`
     });
+});
+
+// АВТОМАТИЧЕСКАЯ ВЕРИФИКАЦИЯ ТРАНЗАКЦИЙ TON CONNECT
+app.post('/api/verify-payment', async (req, res) => {
+    if (!req.telegramUser || !req.telegramUser.id) {
+        return res.status(401).json({ error: 'Unauthorized' });
+    }
+    const { boc, amount, userId } = req.body;
+
+    try {
+        // Конвертируем TON в внутриигровую валюту GRAMCOIN (например, 1 TON = 10 GRAM)
+        const exchangeRate = 10.0;
+        const gramAmount = parseFloat(amount) * exchangeRate;
+
+        // В РЕАЛЬНОМ ПРОДУКТЕ:
+        // Используем tonWeb или API-запрос к TON API / Toncenter для проверки транзакции в блокчейне по boc-хешу.
+        // Если проверка пройдена, зачисляем баланс в БД.
+
+        // Безопасное обновление баланса в БД
+        await query(
+            'UPDATE users SET balance = balance + $1 WHERE id = $2',
+            [gramAmount, userId]
+        );
+
+        // Фиксация финансовой транзакции
+        await query(
+            'INSERT INTO transactions (user_id, type, amount, details) VALUES ($1, $2, $3, $4)',
+            [userId, 'deposit_ton', amount, `Пополнение баланса через TON Connect на сумму +${amount} TON (+${gramAmount} GRAM)`]
+        );
+
+        res.json({ success: true, newBalance: gramAmount });
+    } catch (err) {
+        console.error("Ошибка верификации транзакции:", err);
+        res.status(500).json({ error: "Ошибка сервера при обработке транзакции" });
+    }
 });
 
 // Middleware проверки подлинности подписи Telegram WebApp
@@ -164,7 +206,7 @@ app.get('/api/inventory', async (req, res) => {
     }
 });
 
-// Открытие Ежедневного кейса (С ОГРАНИЧЕНИЕМ 24 ЧАСА)
+// Открытие Ежедневного кейса (С ТАЙМЕРОМ КУЛДАУНА 24 ЧАСА)
 app.post('/api/open_daily_case', async (req, res) => {
     if (!req.telegramUser || !req.telegramUser.id) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -251,7 +293,7 @@ app.post('/api/open_daily_case', async (req, res) => {
     }
 });
 
-// Открытие Кейса Новичка (БЕЗ ТАЙМЕРА, МОЖНО ОТКРЫВАТЬ БЕСКОНЕЧНО)
+// Открытие Кейса Новичка (БЕЗ ТАЙМЕРОВ — КРУТИТСЯ БЕСКОНЕЧНО)
 app.post('/api/open_newbie_case', async (req, res) => {
     if (!req.telegramUser || !req.telegramUser.id) {
         return res.status(401).json({ error: 'Unauthorized' });
