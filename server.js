@@ -1,10 +1,10 @@
 const express = require('express');
 const path = require('path');
 const crypto = require('crypto');
-const axios = require('axios'); // !!! Установите: npm install axios
+const axios = require('axios'); // !!! Убедитесь, что сделали коммит package.json с axios
 require('dotenv').config();
 
-// Глобальный перехват ошибок
+// Глобальный перехват ошибок для стабильности
 process.on('unhandledRejection', (reason, promise) => {
     console.error('⚠️ [Safe Engine] Unhandled Rejection:', reason);
 });
@@ -26,16 +26,9 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const CHANNEL_USERNAME = process.env.CHANNEL_USERNAME || "";
 
-// КОШЕЛЕК АДМИНИСТРАТОРА ДЛЯ ПРИЕМА ДЕПОЗИТОВ (ОБЯЗАТЕЛЬНО УКАЖИТЕ СВОЙ РЕАЛЬНЫЙ TON-АДРЕС)
-const ADMIN_TON_ADDRESS = process.env.ADMIN_TON_ADDRESS || "EQCD39VS5jcptHL8vMjEXrzGaRcApWG5Q7SRjx4HDXSxWrite"; // Пример, замените на свой адрес!
-const TONCENTER_API_KEY = process.env.TONCENTER_API_KEY; // Ваш API Key от TonCenter.com
-
-if (!ADMIN_TON_ADDRESS || ADMIN_TON_ADDRESS === "EQCD39VS5jcptHL8vMjEXrzGaRcApWG5Q7SRjx4HDXSxWrite") {
-    console.warn("⚠️ ВНИМАНИЕ: ADMIN_TON_ADDRESS не установлен или используется значение по умолчанию. Пожалуйста, укажите свой реальный TON-адрес в .env или в server.js!");
-}
-if (!TONCENTER_API_KEY) {
-    console.warn("⚠️ ВНИМАНИЕ: TONCENTER_API_KEY не установлен. Автоматическая проверка платежей может быть нестабильной. Получите ключ на toncenter.com!");
-}
+// КОШЕЛЕК АДМИНИСТРАТОРА (ВЕРНЫЙ АДРЕС ПОЛУЧАЕМ ИЗ НАСТРОЕК RENDER)
+const ADMIN_TON_ADDRESS = process.env.ADMIN_TON_ADDRESS || "UQCcX6a0M8K9gI0Z0g7V3c7Yf7f8X1a2b3c4d5e6f7g8h9i0"; 
+const TONCENTER_API_KEY = process.env.TONCENTER_API_KEY; 
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
@@ -58,65 +51,77 @@ app.get('/tonconnect-manifest.json', (req, res) => {
     });
 });
 
-// АВТОМАТИЧЕСКАЯ ПРОВЕРКА ПЛАТЕЖЕЙ TON CONNECT
+// АВТОМАТИЧЕСКАЯ ПРОВЕРКА ПЛАТЕЖЕЙ TON CONNECT (СКАНИРУЕМ ПОСЛЕДНИЕ ТРАНЗАКЦИИ АДМИНА)
 app.post('/api/verify-payment', async (req, res) => {
     if (!req.telegramUser || !req.telegramUser.id) {
         return res.status(401).json({ error: 'Unauthorized' });
     }
-    const { externalMessageHash, amount, userId } = req.body;
+    const { amount, userId } = req.body;
 
     if (!TONCENTER_API_KEY) {
-        console.error("TONCENTER_API_KEY не установлен. Невозможно проверить транзакцию.");
-        return res.status(500).json({ error: "Ошибка сервера: API ключ для TON не настроен." });
+        console.error("TONCENTER_API_KEY отсутствует в переменных окружения.");
+        return res.status(500).json({ error: "Ошибка сервера: Не настроен API ключ TON." });
     }
 
     try {
         const TONCENTER_BASE_URL = "https://toncenter.com/api/v2/jsonRPC";
         const exchangeRate = 10.0; // 1 TON = 10 GRAM
 
-        // Проверяем статус отправленного сообщения в блокчейне
-        const getMessageResponse = await axios.post(TONCENTER_BASE_URL, {
+        // Делаем запрос последних 20 транзакций нашего кошелька админа
+        const getTxsResponse = await axios.post(TONCENTER_BASE_URL, {
             jsonrpc: "2.0",
             id: 1,
             method: "getTransactions",
             params: {
-                address: ADMIN_TON_ADDRESS, // Проверяем транзакции на адресе админа
-                limit: 10, // Последние 10 транзакций
-                hash: externalMessageHash // Пытаемся найти по хешу внешнего сообщения
+                address: ADMIN_TON_ADDRESS,
+                limit: 20
             }
         }, {
             headers: { 'X-API-Key': TONCENTER_API_KEY }
         });
 
-        const transactions = getMessageResponse.data.result || [];
+        const transactions = getTxsResponse.data.result || [];
         
         let foundTransaction = null;
+        const expectedNano = Math.floor(parseFloat(amount) * 1000000000);
+
         for (const tx of transactions) {
-            if (tx.in_msg.message) {
-                // Если есть комментарий (text) в in_msg
-                const decodedComment = Buffer.from(tx.in_msg.message, 'base64').toString('utf8');
-                // Проверяем, что это наша транзакция по комментарию (deposit_ID), сумме и получателю
-                if (decodedComment.includes(`deposit_${userId}`) &&
-                    parseInt(tx.in_msg.value) === Math.floor(parseFloat(amount) * 1000000000) &&
-                    tx.in_msg.destination === ADMIN_TON_ADDRESS) {
-                    
-                    foundTransaction = tx;
-                    break;
+            if (tx.in_msg && tx.in_msg.value) {
+                const valNano = parseInt(tx.in_msg.value);
+                
+                // Проверяем, совпадает ли сумма (погрешность до 0.001 TON)
+                if (Math.abs(valNano - expectedNano) < 1000000) {
+                    let decodedComment = "";
+                    if (tx.in_msg.message) {
+                        try {
+                            decodedComment = Buffer.from(tx.in_msg.message, 'base64').toString('utf8');
+                        } catch (e) {
+                            // Игнорируем ошибки декодирования
+                        }
+                    }
+
+                    // Ищем уникальный текстовый паттерн комментария `deposit_USERID`
+                    if (decodedComment.includes(`deposit_${userId}`)) {
+                        foundTransaction = tx;
+                        break;
+                    }
                 }
             }
         }
 
         if (foundTransaction) {
-            // Если транзакция найдена и подтверждена в блокчейне
             const gramAmount = parseFloat(amount) * exchangeRate;
 
+            // Зачисляем баланс
             await query('UPDATE users SET balance = balance + $1 WHERE id = $2', [gramAmount, userId]);
 
+            // Пишем транзакцию в историю
             await query(
                 'INSERT INTO transactions (user_id, type, amount, details) VALUES ($1, $2, $3, $4)',
                 [userId, 'deposit_ton', amount, `Пополнение через TON Connect на +${amount} TON (+${gramAmount} GRAM)`]
             );
 
+            // Уведомление администратора
             const adminId = process.env.ADMIN_TELEGRAM_ID;
             if (adminId && bot) {
                 const userRes = await query('SELECT username, first_name FROM users WHERE id = $1', [userId]);
@@ -132,12 +137,12 @@ app.post('/api/verify-payment', async (req, res) => {
 
             return res.json({ success: true, newBalance: gramAmount });
         } else {
-            // Транзакция еще не найдена или не подтверждена
-            return res.status(200).json({ success: false, message: "Транзакция ожидает подтверждения в сети TON." });
+            // Транзакция еще в обработке блокчейном, возвращаем success: false
+            return res.json({ success: false, message: "Транзакция пока не найдена в блокчейне. Ожидайте." });
         }
     } catch (err) {
-        console.error("Ошибка верификации транзакции через TonCenter:", err.response ? err.response.data : err.message);
-        res.status(500).json({ error: "Ошибка сервера при проверке платежа в блокчейне." });
+        console.error("Ошибка верификации через TonCenter:", err.message);
+        res.status(500).json({ error: "Ошибка сервера при проверке платежа." });
     }
 });
 
