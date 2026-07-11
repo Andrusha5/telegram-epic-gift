@@ -1,4 +1,4 @@
-// ВЫЗЫВАЕМ МГНОВЕННО, ИСКЛЮЧАЯ БЛОКИРОВКУ ЗАПУСКА WEBAPP ТЕЛЕГРАМОМ!
+// ВЫЗЫВАЕМ СРАЗУ ЖЕ ДЛЯ СТАБИЛЬНОГО ВХОДА И ПРЕДОТВРАЩЕНИЯ СТАРТОВОГО ЗАВИСАНИЯ!
 const tg = window.Telegram.WebApp;
 tg.expand();
 tg.ready();
@@ -10,7 +10,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const GRAMCOIN_ICON_URL = "/Images/Items/gram_popolnenie.png"; 
 
-    // --- БЕЗОПАСНАЯ И КОРРЕКТНАЯ ИНИЦИАЛИЗАЦИЯ TON CONNECT SDK ---
+    // --- БЕЗОПАСНАЯ И НАДЁЖНАЯ ИНИЦИАЛИЗАЦИЯ TON CONNECT SDK ---
     let tonConnectUI = null;
     try {
         const manifestUrl = `${API_BASE_URL}/tonconnect-manifest.json`;
@@ -22,7 +22,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         }
     } catch (err) {
-        console.error("TON Connect UI SDK Init Error:", err);
+        console.error("Не удалось инициализировать TON Connect UI SDK:", err);
     }
 
     const GIFT_POOL = [
@@ -200,6 +200,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     ]
                 });
             } else {
+                // Запускает официальный нативный диалог привязки Telegram
                 await tonConnectUI.openModal();
             }
         });
@@ -256,6 +257,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         elements.rewardsGridTitle.innerText = "Ежедневные награды";
         elements.spinBtn.innerText = "Запустить";
         renderRewardsGrid();
+        updateDailyCaseTimer(); 
         navigateTo('case');
     });
 
@@ -266,6 +268,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         elements.rewardsGridTitle.innerText = "Содержимое кейса";
         elements.spinBtn.innerText = "Открыть (0.1 GRAM)";
         renderRewardsGrid();
+        updateDailyCaseTimer(); 
         navigateTo('case');
     });
 
@@ -411,6 +414,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     function updateDailyCaseTimer() {
         clearInterval(dailyCaseTimerInterval); 
 
+        // ЕСЛИ ЭТО КЕЙС НОВИЧКА — ТАЙМЕР ВООБЩЕ НЕ ЗАПУСКАЕТСЯ! КНОПКА ВСЕГДА АКТИВНА
+        if (isNewbieCaseMode) {
+            elements.spinBtn.classList.remove('hidden');
+            elements.spinBtn.disabled = false;
+            document.getElementById('timer-container').classList.add('hidden');
+            return;
+        }
+
         if (currentUser.is_admin) {
             elements.spinBtn.classList.remove('hidden');
             elements.spinBtn.disabled = false;
@@ -436,32 +447,26 @@ document.addEventListener('DOMContentLoaded', async () => {
             elements.spinBtn.disabled = false;
             document.getElementById('timer-container').classList.add('hidden');
         } else {
-            if (isNewbieCaseMode) {
-                elements.spinBtn.classList.remove('hidden');
-                elements.spinBtn.disabled = false;
-                document.getElementById('timer-container').classList.add('hidden');
-            } else {
-                elements.spinBtn.classList.add('hidden');
-                elements.spinBtn.disabled = true;
-                document.getElementById('timer-container').classList.remove('hidden');
+            elements.spinBtn.classList.add('hidden');
+            elements.spinBtn.disabled = true;
+            document.getElementById('timer-container').classList.remove('hidden');
 
-                const tick = () => {
-                    const nowTick = new Date();
-                    const diff = nextOpenTime.getTime() - nowTick.getTime();
-                    if (diff <= 0) {
-                        clearInterval(dailyCaseTimerInterval);
-                        updateDailyCaseTimer();
-                        return;
-                    }
-                    const hours = Math.floor(diff / (1000 * 60 * 60));
-                    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-                    const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-                    
-                    document.getElementById('daily-case-timer').innerText = `${hours}ч ${minutes}м ${seconds}с`;
-                };
-                tick();
-                dailyCaseTimerInterval = setInterval(tick, 1000); 
-            }
+            const tick = () => {
+                const nowTick = new Date();
+                const diff = nextOpenTime.getTime() - nowTick.getTime();
+                if (diff <= 0) {
+                    clearInterval(dailyCaseTimerInterval);
+                    updateDailyCaseTimer();
+                    return;
+                }
+                const hours = Math.floor(diff / (1000 * 60 * 60));
+                const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+                const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+                
+                document.getElementById('daily-case-timer').innerText = `${hours}ч ${minutes}м ${seconds}с`;
+            };
+            tick();
+            dailyCaseTimerInterval = setInterval(tick, 1000); 
         }
     }
 
@@ -639,6 +644,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             updateBalanceUI();
         }
 
+        // РЕАКТИВИРУЕМ КНОПКУ СРАЗУ ПОСЛЕ ОКОНЧАНИЯ АНИМАЦИИ (ЕСЛИ ПЛАТНЫЙ КЕЙС)
+        if (isNewbieCaseMode) {
+            elements.spinBtn.disabled = false;
+        }
+
         if (isBalance) {
             showCustomModal({
                 icon: '💰',
@@ -647,7 +657,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 buttons: [{ text: 'Отлично!', primary: true }]
             });
             fetchUserData();
-            elements.spinBtn.disabled = false;
+            if (!isNewbieCaseMode) elements.spinBtn.disabled = false;
         } else { 
             showCustomModal({
                 icon: `<img src="${winningGift.icon}" style="width:70px;height:70px;object-fit:contain;" onerror="this.src='https://img.icons8.com/color/96/gift.png'">`,
@@ -691,7 +701,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     }
                 ]
             });
-            elements.spinBtn.disabled = false;
+            if (!isNewbieCaseMode) elements.spinBtn.disabled = false;
         }
     }
 
