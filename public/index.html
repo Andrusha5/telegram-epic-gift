@@ -4,9 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>BestGifts</title>
-    <link rel="stylesheet" href="/css/style.css?v=9.7">
+    <link rel="stylesheet" href="/css/style.css?v=9.8">
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&display=swap" rel="stylesheet">
-    <!-- Официальный скрипт TON Connect UI SDK -->
+    <!-- Официальный скрипт TON Connect UI SDK для авторизации транзакций -->
     <script src="https://unpkg.com/@tonconnect/ui@2.0.6/dist/tonconnect-ui.min.js"></script>
 </head>
 <body>
@@ -200,8 +200,11 @@
                         Привязать кошелёк
                     </button>
 
-                    <button class="action-button-gradient" style="opacity: 0.6; cursor: not-allowed;" disabled>Пополнить баланс</button>
-                    <p style="font-size: 0.8rem; color: var(--light-text-color); margin-top: 4px;">Пополнение временно недоступно</p>
+                    <!-- АКТИВНАЯ КНОПКА ПОПОЛНЕНИЯ (РАЗБЛОКИРУЕТСЯ ПОСЛЕ ПРИВЯЗКИ) -->
+                    <button id="deposit-balance-btn" class="action-button-gradient" style="background: linear-gradient(135deg, #28a745, #218838); opacity: 0.5; cursor: not-allowed;" disabled>
+                        Пополнить баланс
+                    </button>
+                    <p id="deposit-notice-text" style="font-size: 0.8rem; color: var(--light-text-color); margin-top: 4px;">Пополнение доступно после привязки кошелька</p>
                 </div>
             </main>
         </section>
@@ -244,6 +247,6 @@
     </div>
 
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <script src="/js/app.js?v=9.7"></script>
+    <script src="/js/app.js?v=9.8"></script>
 </body>
     </html>
