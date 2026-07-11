@@ -188,7 +188,7 @@ body {
     margin-bottom: 12px;
 }
 
-/* СЕТКА КЕЙСОВ - GRID 2x2 */
+/* СЕТКА КЕЙСОВ */
 .cases-layout {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
@@ -505,7 +505,7 @@ body {
     text-transform: uppercase;
 }
 
-/* КНОПКИ ДЕЙСТВИЯ В ИНВЕНТАРЕ */
+/* КНОПКИ ДЕЙСТВИЯ */
 .inv-actions {
     display: flex;
     gap: 6px;
@@ -541,7 +541,7 @@ body {
     box-shadow: 0 2px 8px rgba(40, 167, 69, 0.2);
 }
 
-/* ДИЗАЙН ПАНЕЛИ ВВОДА ПОДАРКОВ */
+/* ДЕПОЗИТ NFT */
 .deposit-panel {
     background: linear-gradient(135deg, #1c1c2d, #141420);
     border: 1.5px solid rgba(138, 43, 226, 0.4);
@@ -938,4 +938,4 @@ body {
     border-radius: 16px;
     margin-top: 15px;
     border: 1px solid var(--border-color);
-    }
+}
