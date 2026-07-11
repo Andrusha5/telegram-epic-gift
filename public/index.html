@@ -4,14 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>BestGifts</title>
-    <link rel="stylesheet" href="/css/style.css?v=9.8">
+    <link rel="stylesheet" href="/css/style.css?v=9.9">
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&display=swap" rel="stylesheet">
-    <!-- Официальный скрипт TON Connect UI SDK для авторизации транзакций -->
+    <!-- Официальный TON Connect UI SDK -->
     <script src="https://unpkg.com/@tonconnect/ui@2.0.6/dist/tonconnect-ui.min.js"></script>
 </head>
 <body>
     <div id="app">
-        <!-- Контейнер для красивых уведомлений внизу -->
+        <!-- Контейнер для уведомлений -->
         <div id="toast-container" class="toast-container"></div>
 
         <!-- КРАСИВЫЙ ПАРЯЩИЙ ОВАЛЬНЫЙ БАЛАНС В УГЛУ -->
@@ -20,7 +20,7 @@
             <img src="/Images/Items/gram_popolnenie.png" alt="Gram" onerror="this.src='https://img.icons8.com/color/48/diamond.png'">
         </div>
 
-        <!-- Дизайнерские модальные окна -->
+        <!-- Модальные окна -->
         <div id="custom-modal" class="modal-overlay hidden">
             <div class="modal-card">
                 <button id="modal-close-btn" class="modal-close-x">&times;</button>
@@ -179,7 +179,7 @@
             </main>
         </section>
 
-        <!-- ЭКРАН ПОЛНОЭКРАННОГО БАЛАНСА -->
+        <!-- ЭКРАН БАЛАНСА -->
         <section id="balance-section" class="hidden">
             <header class="header-nav">
                 <button id="back-to-home-from-balance" class="back-button">← Назад</button>
@@ -195,12 +195,12 @@
                     </div>
                     <p class="balance-screen-desc">Принимайте участие в розыгрышах и выводите ценные NFT призы прямо на свой кошелек!</p>
                     
-                    <!-- КНОПКА ПРИВЯЗКИ TON-КОШЕЛЬКА -->
+                    <!-- КНОПКА ПРИВЯЗКИ -->
                     <button id="connect-wallet-btn" class="action-button-gradient" style="background: linear-gradient(135deg, #0088cc, #00a2ff); margin-bottom: 12px; box-shadow: 0 4px 15px rgba(0, 136, 204, 0.4);">
                         Привязать кошелёк
                     </button>
 
-                    <!-- АКТИВНАЯ КНОПКА ПОПОЛНЕНИЯ (РАЗБЛОКИРУЕТСЯ ПОСЛЕ ПРИВЯЗКИ) -->
+                    <!-- ДИНАМИЧЕСКАЯ КНОПКА ПОПОЛНЕНИЯ (СТАНОВИТСЯ АКТИВНОЙ ПОСЛЕ ПРИВЯЗКИ) -->
                     <button id="deposit-balance-btn" class="action-button-gradient" style="background: linear-gradient(135deg, #28a745, #218838); opacity: 0.5; cursor: not-allowed;" disabled>
                         Пополнить баланс
                     </button>
@@ -209,7 +209,7 @@
             </main>
         </section>
 
-        <!-- ПАРЯЩЕЕ GLASS-МЕНЮ -->
+        <!-- ПАРЯЩЕЕ МЕНЮ -->
         <nav id="bottom-navigation" class="bottom-nav">
             <div class="nav-tab" data-target="inventory">
                 <div class="nav-tab-icon-wrapper">
@@ -247,6 +247,6 @@
     </div>
 
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <script src="/js/app.js?v=9.8"></script>
+    <script src="/js/app.js?v=9.9"></script>
 </body>
     </html>
