@@ -3,6 +3,7 @@ const path = require('path');
 const crypto = require('crypto');
 require('dotenv').config();
 
+// Глобальные перехватчики непредвиденных ошибок сервера
 process.on('unhandledRejection', (reason, promise) => {
     console.error('⚠️ [Safe Engine] Unhandled Rejection:', reason);
 });
@@ -27,7 +28,7 @@ const CHANNEL_USERNAME = process.env.CHANNEL_USERNAME || "";
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// ЭНДПОИНТ МАНИФЕСТА ДЛЯ TON CONNECT (Принудительный безопасный HTTPS)
+// ЭНДПОИНТ МАНИФЕСТА ДЛЯ TON CONNECT (Обязательное условие: работа строго по HTTPS протоколу)
 app.get('/tonconnect-manifest.json', (req, res) => {
     const host = req.get('host');
     const protocol = (host.includes('localhost') || host.includes('127.0.0.1')) ? 'http' : 'https';
@@ -41,7 +42,7 @@ app.get('/tonconnect-manifest.json', (req, res) => {
     });
 });
 
-// Middleware проверки подписи Telegram WebApp
+// Middleware проверки подлинности подписи Telegram WebApp
 app.use(async (req, res, next) => {
     const initData = req.headers['x-telegram-init-data'] || req.query.initData;
 
@@ -98,7 +99,7 @@ app.use(async (req, res, next) => {
     next();
 });
 
-// Роут получения данных профиля
+// Получение профиля
 app.get('/api/user', async (req, res) => {
     if (!req.telegramUser || !req.telegramUser.id) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -130,6 +131,7 @@ app.get('/api/user', async (req, res) => {
     }
 });
 
+// Получение инвентаря
 app.get('/api/inventory', async (req, res) => {
     if (!req.telegramUser || !req.telegramUser.id) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -162,6 +164,7 @@ app.get('/api/inventory', async (req, res) => {
     }
 });
 
+// Открытие Ежедневного кейса (С ОГРАНИЧЕНИЕМ 24 ЧАСА)
 app.post('/api/open_daily_case', async (req, res) => {
     if (!req.telegramUser || !req.telegramUser.id) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -248,6 +251,7 @@ app.post('/api/open_daily_case', async (req, res) => {
     }
 });
 
+// Открытие Кейса Новичка (БЕЗ ТАЙМЕРА, МОЖНО ОТКРЫВАТЬ БЕСКОНЕЧНО)
 app.post('/api/open_newbie_case', async (req, res) => {
     if (!req.telegramUser || !req.telegramUser.id) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -270,7 +274,7 @@ app.post('/api/open_newbie_case', async (req, res) => {
         const spinCost = 0.1;
         if (parseFloat(user.balance) < spinCost) {
             await client.query('ROLLBACK');
-            return res.status(400).json({ error: 'Недостаточно средств.' });
+            return res.status(400).json({ error: 'Недостаточно средств. Прокрут стоит 0.1 GRAM!' });
         }
 
         const drops = (await client.query(`
@@ -278,6 +282,11 @@ app.post('/api/open_newbie_case', async (req, res) => {
             FROM newbie_case_drops ncd
             JOIN items i ON ncd.item_id = i.id
         `)).rows;
+
+        if (drops.length === 0) {
+            await client.query('ROLLBACK');
+            return res.status(500).json({ error: 'Кейс новичка временно пуст.' });
+        }
 
         let totalChance = drops.reduce((sum, drop) => sum + parseFloat(drop.chance), 0);
         let rand = Math.random() * totalChance;
@@ -297,6 +306,8 @@ app.post('/api/open_newbie_case', async (req, res) => {
         if (wonItem.type === 'balance') {
             newBalance += parseFloat(wonItem.value);
             await client.query('UPDATE users SET balance = $1 WHERE id = $2', [newBalance, userId]);
+            await client.query('INSERT INTO transactions (user_id, type, item_id, amount, details) VALUES ($1, $2, $3, $4, $5)',
+                [userId, 'case_open_newbie', wonItem.item_id, wonItem.value, 'Кейс Новичка: ' + wonItem.name]);
         } else { 
             await client.query('UPDATE users SET balance = $1 WHERE id = $2', [newBalance, userId]);
             await client.query(
@@ -316,6 +327,7 @@ app.post('/api/open_newbie_case', async (req, res) => {
     }
 });
 
+// Продажа подарка
 app.post('/api/sell_gift', async (req, res) => {
     if (!req.telegramUser || !req.telegramUser.id) return res.status(401).json({ error: 'Unauthorized' });
     const userId = req.telegramUser.id;
@@ -350,6 +362,7 @@ app.post('/api/sell_gift', async (req, res) => {
     }
 });
 
+// Вывод подарка
 app.post('/api/withdraw_gift', async (req, res) => {
     if (!req.telegramUser || !req.telegramUser.id) return res.status(401).json({ error: 'Unauthorized' });
     const userId = req.telegramUser.id;
@@ -378,6 +391,7 @@ app.post('/api/withdraw_gift', async (req, res) => {
     }
 });
 
+// Ввод подарка NFT
 app.post('/api/deposit_gift_request', async (req, res) => {
     if (!req.telegramUser || !req.telegramUser.id) return res.status(401).json({ error: 'Unauthorized' });
     const userId = req.telegramUser.id;
