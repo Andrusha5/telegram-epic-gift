@@ -221,10 +221,10 @@ app.post('/api/verify-payment', async (req, res) => {
                 await client.query('COMMIT');
 
                 if (bot && userId) {
-                    const msg = `🎉 *Баланс успешно пополнен!*\n\n` +
-                                `💰 На игровой счет зачислено: *${gramAmount.toFixed(2)} GRAM*\n\n` +
+                    const msg = `🎉 <b>Баланс успешно пополнен!</b>\n\n` +
+                                `💰 На игровой счет зачислено: <b>${gramAmount.toFixed(2)} GRAM</b>\n\n` +
                                 `🎈 Приятной игры!`;
-                    bot.sendMessage(userId, msg, { parse_mode: 'Markdown' }).catch(console.error);
+                    bot.sendMessage(userId, msg, { parse_mode: 'HTML' }).catch(console.error);
                 }
 
                 return res.json({ success: true, newBalance: gramAmount });
@@ -387,17 +387,16 @@ app.post('/api/open_daily_case', async (req, res) => {
 
         const adminId = process.env.ADMIN_TELEGRAM_ID;
         if (adminId && bot && wonItem.type !== 'balance') {
-            const userMention = user.username ? `@${user.username}` : '';
+            const userMention = user.username ? `@${user.username}` : 'нет юзернейма';
             const fullName = [user.first_name, user.last_name].filter(Boolean).join(' ') || 'Пользователь';
-            const userProfileStr = `${fullName} ${userMention ? '(' + userMention + ')' : ''}`.trim();
 
-            const adminMsg = `🎉 *Выигран подарок в Ежедневном кейсе!*\n\n` +
-                             `🎁 Подарок: *${wonItem.name}* (ID: ${wonItem.item_id}, Цена: ${wonItem.value} GRAM)\n` +
-                             `👤 Пользователь: *${userProfileStr}*\n` +
-                             `🆔 Telegram ID: `${userId}`\n\n` +
-                             `💬 [Открыть чат (Вечная ссылка)](tg://user?id=${userId})\n` +
-                             (user.username ? `🔗 [Ссылка t.me](https://t.me/${user.username})` : `🔗 [Ссылка t.me](tg://user?id=${userId})`);
-            bot.sendMessage(adminId, adminMsg, { parse_mode: 'Markdown' }).catch(console.error);
+            const adminMsg = `🎉 <b>Выигран подарок в Ежедневном кейсе!</b>\n\n` +
+                             `🎁 <b>Подарок:</b> ${wonItem.name} (ID: ${wonItem.item_id}, Цена: ${wonItem.value} GRAM)\n` +
+                             `👤 <b>Пользователь:</b> ${fullName} (${userMention})\n` +
+                             `🆔 <b>Telegram ID:</b> <code>${userId}</code>\n\n` +
+                             `💬 <a href="tg://user?id=${userId}">Открыть чат (Вечная ссылка)</a>\n` +
+                             (user.username ? `🔗 <a href="https://t.me/${user.username}">Ссылка t.me</a>` : `🔗 <a href="tg://user?id=${userId}">Ссылка t.me</a>`);
+            bot.sendMessage(adminId, adminMsg, { parse_mode: 'HTML' }).catch(console.error);
         }
 
         res.json({ success: true, wonItem: { id: wonItem.item_id, name: wonItem.name, price: wonItem.value + " GRAM", type: wonItem.type }, newBalance: newBalance });
@@ -479,17 +478,16 @@ app.post('/api/open_newbie_case', async (req, res) => {
 
         const adminId = process.env.ADMIN_TELEGRAM_ID;
         if (adminId && bot && wonItem.type !== 'balance') {
-            const userMention = user.username ? `@${user.username}` : '';
+            const userMention = user.username ? `@${user.username}` : 'нет юзернейма';
             const fullName = [user.first_name, user.last_name].filter(Boolean).join(' ') || 'Пользователь';
-            const userProfileStr = `${fullName} ${userMention ? '(' + userMention + ')' : ''}`.trim();
 
-            const adminMsg = `🎉 *Выигран подарок в Кейсе Новичка!*\n\n` +
-                             `🎁 Подарок: *${wonItem.name}* (ID: ${wonItem.item_id}, Цена: ${wonItem.value} GRAM)\n` +
-                             `👤 Пользователь: *${userProfileStr}*\n` +
-                             `🆔 Telegram ID: `${userId}`\n\n` +
-                             `💬 [Открыть чат (Вечная ссылка)](tg://user?id=${userId})\n` +
-                             (user.username ? `🔗 [Ссылка t.me](https://t.me/${user.username})` : `🔗 [Ссылка t.me](tg://user?id=${userId})`);
-            bot.sendMessage(adminId, adminMsg, { parse_mode: 'Markdown' }).catch(console.error);
+            const adminMsg = `🎉 <b>Выигран подарок в Кейсе Новичка!</b>\n\n` +
+                             `🎁 <b>Подарок:</b> ${wonItem.name} (ID: ${wonItem.item_id}, Цена: ${wonItem.value} GRAM)\n` +
+                             `👤 <b>Пользователь:</b> ${fullName} (${userMention})\n` +
+                             `🆔 <b>Telegram ID:</b> <code>${userId}</code>\n\n` +
+                             `💬 <a href="tg://user?id=${userId}">Открыть чат (Вечная ссылка)</a>\n` +
+                             (user.username ? `🔗 <a href="https://t.me/${user.username}">Ссылка t.me</a>` : `🔗 <a href="tg://user?id=${userId}">Ссылка t.me</a>`);
+            bot.sendMessage(adminId, adminMsg, { parse_mode: 'HTML' }).catch(console.error);
         }
 
         res.json({ success: true, wonItem: { id: wonItem.item_id, name: wonItem.name, price: wonItem.value + " GRAM", type: wonItem.type }, newBalance: newBalance });
@@ -537,7 +535,7 @@ app.post('/api/sell_gift', async (req, res) => {
     }
 });
 
-// Вывод подарка (ФОРМАТ СООБЩЕНИЯ С ВЕЧНОЙ ССЫЛКОЙ)
+// Вывод подарка (HTML ШАБЛОН С ВЕЧНОЙ ССЫЛКОЙ)
 app.post('/api/withdraw_gift', async (req, res) => {
     if (!req.telegramUser || !req.telegramUser.id) return res.status(401).json({ error: 'Unauthorized' });
     const userId = req.telegramUser.id;
@@ -564,18 +562,17 @@ app.post('/api/withdraw_gift', async (req, res) => {
 
         const adminId = process.env.ADMIN_TELEGRAM_ID;
         if (adminId && bot) {
-            const userMention = user.username ? `@${user.username}` : '';
+            const userMention = user.username ? `@${user.username}` : 'нет юзернейма';
             const fullName = [user.first_name, user.last_name].filter(Boolean).join(' ') || 'Пользователь';
-            const userProfileStr = `${fullName} ${userMention ? '(' + userMention + ')' : ''}`.trim();
 
-            const msg = `🚨 *Новая заявка на вывод подарка!*\n\n` +
-                        `🎁 Подарок: *${itemDetails.name}* (${parseFloat(itemDetails.value).toFixed(3)} TON)\n` +
-                        `👤 Пользователь: *${userProfileStr}*\n` +
-                        `🆔 Telegram ID: `${userId}`\n\n` +
-                        `💬 [Открыть чат (Вечная ссылка)](tg://user?id=${userId})\n` +
-                        (user.username ? `🔗 [Ссылка t.me](https://t.me/${user.username})` : `🔗 [Ссылка t.me](tg://user?id=${userId})`);
+            const msg = `📤 <b>Запрос на вывод подарка!</b>\n\n` +
+                        `🎁 <b>Подарок:</b> ${itemDetails.name} (${parseFloat(itemDetails.value).toFixed(3)} GRAM)\n` +
+                        `👤 <b>Пользователь:</b> ${fullName} (${userMention})\n` +
+                        `🆔 <b>Telegram ID:</b> <code>${userId}</code>\n\n` +
+                        `💬 <a href="tg://user?id=${userId}">Открыть чат (Вечная ссылка)</a>\n` +
+                        (user.username ? `🔗 <a href="https://t.me/${user.username}">Ссылка t.me</a>` : `🔗 <a href="tg://user?id=${userId}">Ссылка t.me</a>`);
 
-            bot.sendMessage(adminId, msg, { parse_mode: 'Markdown' }).catch(console.error);
+            bot.sendMessage(adminId, msg, { parse_mode: 'HTML' }).catch(console.error);
         }
 
         res.json({ success: true });
@@ -587,7 +584,7 @@ app.post('/api/withdraw_gift', async (req, res) => {
     }
 });
 
-// Запрос на ввод подарка (ФОРМАТ СООБЩЕНИЯ С ВЕЧНОЙ ССЫЛКОЙ)
+// Запрос на ввод подарка NFT (HTML ШАБЛОН С ВЕЧНОЙ ССЫЛКОЙ)
 app.post('/api/deposit_gift_request', async (req, res) => {
     if (!req.telegramUser || !req.telegramUser.id) return res.status(401).json({ error: 'Unauthorized' });
     const userId = req.telegramUser.id;
@@ -602,19 +599,18 @@ app.post('/api/deposit_gift_request', async (req, res) => {
 
         const adminId = process.env.ADMIN_TELEGRAM_ID;
         if (adminId && bot) {
-            const userMention = user.username ? `@${user.username}` : '';
+            const userMention = user.username ? `@${user.username}` : 'нет юзернейма';
             const fullName = [user.first_name, user.last_name].filter(Boolean).join(' ') || 'Пользователь';
-            const userProfileStr = `${fullName} ${userMention ? '(' + userMention + ')' : ''}`.trim();
 
-            const msg = `🚨 *Новая заявка на ввод подарка!*\n\n` +
-                        `🎁 Подарок: *${itemDetails.name}* (${parseFloat(itemDetails.value).toFixed(3)} TON)\n` +
-                        `👤 Пользователь: *${userProfileStr}*\n` +
-                        `🆔 Telegram ID: `${userId}`\n\n` +
-                        `💬 [Открыть чат (Вечная ссылка)](tg://user?id=${userId})\n` +
-                        (user.username ? `🔗 [Ссылка t.me](https://t.me/${user.username})` : `🔗 [Ссылка t.me](tg://user?id=${userId})`);
+            const msg = `📥 <b>Новый запрос на депозит!</b>\n\n` +
+                        `🎁 <b>Предмет:</b> ${itemDetails.name} (ID: ${itemId})\n` +
+                        `👤 <b>Пользователь:</b> ${fullName} (${userMention})\n` +
+                        `🆔 <b>Telegram ID:</b> <code>${userId}</code>\n\n` +
+                        `💬 <a href="tg://user?id=${userId}">Открыть чат (Вечная ссылка)</a>\n` +
+                        (user.username ? `🔗 <a href="https://t.me/${user.username}">Ссылка t.me</a>` : `🔗 <a href="tg://user?id=${userId}">Ссылка t.me</a>`);
 
             bot.sendMessage(adminId, msg, {
-                parse_mode: 'Markdown',
+                parse_mode: 'HTML',
                 reply_markup: {
                     inline_keyboard: [
                         [
