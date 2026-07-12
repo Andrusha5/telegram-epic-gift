@@ -77,9 +77,33 @@ document.addEventListener('DOMContentLoaded', async () => {
     let isNewbieCaseMode = false; 
 
     const GRAMCOIN_ICON_URL = "/Images/Items/gram_popolnenie.png"; 
-    const userId = tg.initDataUnsafe?.user?.id || "guest_user_id";
 
-    // --- ИНИЦИАЛИЗАЦИЯ TON CONNECT SDK С УНИКАЛЬНЫМ ХРАНИЛИЩЕМ ДЛЯ КАЖДОГО ПОЛЬЗОВАТЕЛЯ ---
+    // Безопасно получаем Telegram ID пользователя
+    let userId = tg.initDataUnsafe?.user?.id;
+    if (!userId) {
+        try {
+            const params = new URLSearchParams(tg.initData);
+            const userRaw = params.get('user');
+            if (userRaw) {
+                userId = JSON.parse(userRaw).id;
+            }
+        } catch (e) {}
+    }
+    if (!userId) userId = "guest_user_id";
+
+    // --- УМНАЯ ОЧИСТКА КОНФЛИКТНЫХ СЕССИЙ ДЛЯ СТАБИЛЬНОЙ ПРИВЯЗКИ НА РАЗНЫХ АККАУНТАХ ---
+    try {
+        for (let i = localStorage.length - 1; i >= 0; i--) {
+            const key = localStorage.key(i);
+            if (key && key.startsWith('ton-connect') && !key.includes(String(userId))) {
+                localStorage.removeItem(key);
+            }
+        }
+    } catch (err) {
+        console.error("Ошибка очистки сессий:", err);
+    }
+
+    // --- ИНИЦИАЛИЗАЦИЯ TON CONNECT SDK ---
     let tonConnectUI = null;
     try {
         const manifestUrl = `${API_BASE_URL}/tonconnect-manifest.json`;
@@ -358,7 +382,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         const bocBytes = new Uint8Array(11 + 2 + len);
         
-        // BOC Header
         bocBytes[0] = 0xb5;
         bocBytes[1] = 0xee;
         bocBytes[2] = 0x9c;
@@ -371,17 +394,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         bocBytes[9] = 2 + len; 
         bocBytes[10] = 0x00; 
         
-        // Cell Data Descriptors
         bocBytes[11] = 0x00;   
         bocBytes[12] = len * 2;  
         
-        // Text comment prefix (0x00000000)
         bocBytes[13] = 0x00;
         bocBytes[14] = 0x00;
         bocBytes[15] = 0x00;
         bocBytes[16] = 0x00;
         
-        // Comment text
         bocBytes.set(textBytes, 17);
         
         let binary = '';
@@ -429,7 +449,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             } catch (pollErr) {
                 console.error("Ошибка при опросе сервера:", pollErr);
             }
-        }, 2500); // Опрашиваем чаще (каждые 2.5 секунды) для мгновенного зачисления!
+        }, 2500); 
     }
 
     // --- ОБРАБОТЧИКИ СОБЫТИЙ TON CONNECT ---
@@ -635,6 +655,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (item.type === 'gift' && !map.has(item.name)) {
                 map.set(item.name, true);
                 uniqueGifts.push(item);
+                
             }
         }
 
