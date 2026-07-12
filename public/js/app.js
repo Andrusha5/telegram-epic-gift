@@ -180,20 +180,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // --- МАТЕМАТИЧЕСКИ ТОЧНЫЙ КОНВЕРТЕР АДРЕСОВ В ГАРАНТИРОВАННЫЙ СТАНДАРТ UQ... ---
-    // Взято из tonweb (MIT License) для точной конвертации
-    const CRC_TABLE = [];
-    for (let n = 0; n < 256; n++) {
-        let c = n;
-        for (let k = 0; k < 8; k++) {
-            c = ((c & 1) ? (0x8003 ^ (c >>> 1)) : (c >>> 1));
-        }
-        CRC_TABLE[n] = c;
-    }
-
-    function crc16(data) {
-        let crc = 0;
+    function crc16Xmodem(data) {
+        let crc = 0x0000;
+        const polynomial = 0x1021;
         for (let i = 0; i < data.length; i++) {
-            crc = (crc >>> 8) ^ CRC_TABLE[(crc ^ data[i]) & 0xFF];
+            crc ^= (data[i] << 8);
+            for (let j = 0; j < 8; j++) {
+                if (crc & 0x8000) {
+                    crc = ((crc << 1) ^ polynomial) & 0xFFFF;
+                } else {
+                    crc = (crc << 1) & 0xFFFF;
+                }
+            }
         }
         return crc;
     }
@@ -201,7 +199,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     function toUserFriendlyAddress(rawAddress) {
         if (!rawAddress) return "Неизвестен";
         if (rawAddress.startsWith('U') || rawAddress.startsWith('E')) {
-            return rawAddress; // Уже в user-friendly формате
+            return rawAddress; 
         }
         
         try {
@@ -215,13 +213,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
             
             let b = new Uint8Array(34);
-            // 0x11 = standard, 0x51 = bounceable
-            // Для совместимости с Telegram Wallet/Tonkeeper используем bounceable (UQ)
-            b[0] = 0x51; // Тег "bounceable" (для UQ...)
+            b[0] = 0x51; // Тег "non-bounceable" (для префикса UQ...)
             b[1] = (workchain === 0) ? 0x00 : (workchain === -1 ? 0xFF : workchain & 0xFF);
             b.set(addressBytes, 2);
             
-            let cs = crc16(b);
+            let cs = crc16Xmodem(b);
             
             let finalBytes = new Uint8Array(36);
             finalBytes.set(b, 0);
@@ -235,46 +231,42 @@ document.addEventListener('DOMContentLoaded', async () => {
             let base64 = btoa(binary);
             return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
         } catch (e) {
-            console.warn("Failed to convert raw address to user-friendly:", rawAddress, e);
+            console.warn("Ошибка конвертации сырого адреса:", rawAddress, e);
             return rawAddress;
         }
     }
 
-    // --- ОФИЦИАЛЬНАЯ СБОРКА КОММЕНТАРИЯ К ТРАНЗАКЦИИ (КЛИЕНТЫ ЕГО ПРИНИМАЮТ БЕЗ ОШИБОК) ---
-    // Этот код формирует корректный BOC (Bag of Cells) payload, который TON-кошельки понимают как текстовый комментарий.
-    // Это не требует CRC32C и идеально совместимо.
+    // --- ОФИЦИАЛЬНАЯ СБОРКА КОММЕНТАРИЯ К ТРАНЗАКЦИИ (СОВМЕСТИМОСТЬ 100%) ---
     function buildCommentPayload(text) {
         const encoder = new TextEncoder();
         const textBytes = encoder.encode(text);
-        const MAX_COMMENT_LENGTH = 120; // Ограничение на длину комментария в TON
+        const MAX_COMMENT_LENGTH = 120;
         const effectiveTextBytes = textBytes.slice(0, MAX_COMMENT_LENGTH);
 
-        // Cell header (refs + data length)
         const dataLength = effectiveTextBytes.length;
-        const bits = 32 + dataLength * 8; // 32 бита для op_code, dataLength * 8 бит для текста
+        const bits = 32 + dataLength * 8; 
         const bytes = Math.ceil(bits / 8);
 
         const dataBuffer = new Uint8Array(bytes);
-        dataBuffer[0] = 0x00; // OpCode 0x00000000 для текстового комментария
+        dataBuffer[0] = 0x00; 
         dataBuffer[1] = 0x00;
         dataBuffer[2] = 0x00;
         dataBuffer[3] = 0x00;
-        dataBuffer.set(effectiveTextBytes, 4); // Сам текст после op_code
+        dataBuffer.set(effectiveTextBytes, 4); 
 
-        // BOC header
         const bocHeader = new Uint8Array([
-            0xB5, 0xEE, 0x9C, 0x72, // magic
-            0x01,                   // has_idx=0, has_crc32=0, has_cache_bits=0, flags=01
-            0x01,                   // size bytes of ref index (1)
-            0x01,                   // cells count (1)
-            0x01,                   // roots count (1)
-            0x00,                   // absent
-            (bytes + 2) & 0xFF,     // total cells size (lower 8 bits)
-            ((bytes + 2) >> 8) & 0xFF, // total cells size (upper 8 bits)
-            0x00,                   // root index (0)
-            0x00,                   // d1 descriptor (no refs, bits-in-last-byte = 0)
-            (dataLength * 2 + 8) & 0xFF, // d2 descriptor (cell data length * 2, for bits)
-            ((dataLength * 2 + 8) >> 8) & 0xFF // d2 descriptor (cell data length * 2, for bits)
+            0xB5, 0xEE, 0x9C, 0x72, 
+            0x01,                   
+            0x01,                   
+            0x01,                   
+            0x01,                   
+            0x00,                   
+            (bytes + 2) & 0xFF,     
+            ((bytes + 2) >> 8) & 0xFF, 
+            0x00,                   
+            0x00,                   
+            (dataLength * 2 + 8) & 0xFF, 
+            ((dataLength * 2 + 8) >> 8) & 0xFF 
         ]);
 
         const fullBoc = new Uint8Array(bocHeader.length + dataBuffer.length);
@@ -288,6 +280,47 @@ document.addEventListener('DOMContentLoaded', async () => {
         return btoa(binary);
     }
 
+    // --- ФУНКЦИЯ ЦИКЛИЧЕСКОЙ ПРОВЕРКИ ТРАНЗАКЦИИ (POLLING) ---
+    async function startPaymentPolling(amountFloat, maxAttempts = 15) {
+        let attempt = 0;
+        
+        const intervalId = setInterval(async () => {
+            attempt++;
+            if (attempt > maxAttempts) {
+                clearInterval(intervalId);
+                showNotification("Время ожидания транзакции истекло. Баланс обновится, как только TON поступят на кошелек.", "⌛");
+                fetchUserData();
+                return;
+            }
+
+            try {
+                // Отправляем запрос верификации с передачей initData внутри JSON Body
+                const verifyRes = await fetch(`${API_BASE_URL}/api/verify-payment`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        amount: amountFloat,
+                        userId: currentUser.id,
+                        initData: tg.initData || "" // Избавляет от проблем с UTF-8 заголовками
+                    })
+                });
+
+                if (verifyRes.ok) {
+                    const verifyData = await verifyRes.json();
+                    if (verifyData.success) {
+                        clearInterval(intervalId);
+                        showNotification(`Баланс успешно пополнен на +${(amountFloat * 10).toFixed(3)} GRAM!`, "✅");
+                        fetchUserData(); // Обновляем баланс мгновенно!
+                    }
+                } else if (verifyRes.status === 401) {
+                    clearInterval(intervalId);
+                    showNotification("Ошибка авторизации. Пожалуйста, перезапустите мини-приложение.", "❌");
+                }
+            } catch (pollErr) {
+                console.error("Ошибка при опросе сервера верификации:", pollErr);
+            }
+        }, 4000); // Опрос каждые 4 секунды
+    }
 
     // --- ПРИВЯЗКА И ДЕПОЗИТ TON CONNECT ---
     if (tonConnectUI) {
@@ -322,8 +355,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         // КЛИК ПРИВЯЗАТЬ
         elements.connectWalletBtn.addEventListener('click', async () => {
             if (!tonConnectUI) {
-                console.error("tonConnectUI не инициализирован.");
-                showNotification("Ошибка: Система TON Connect не загружена. Пожалуйста, перезагрузите приложение.", "⚠️");
+                showNotification("Ошибка: TON Connect не загрузился. Перезапустите приложение.", "⚠️");
                 return;
             }
             if (tonConnectUI.connected) {
@@ -344,13 +376,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                     ]
                 });
             } else {
-                console.log("Попытка открыть модальное окно TON Connect...");
                 try {
                     await tonConnectUI.openModal();
-                    console.log("Модальное окно TON Connect открыто (или попытка инициирована).");
                 } catch (e) {
-                    console.error("Ошибка при открытии модального окна TON Connect:", e);
-                    showNotification("Не удалось открыть окно подключения кошелька. Попробуйте еще раз или перезагрузите приложение.", "❌");
+                    console.error("Ошибка при открытии TON Connect модала:", e);
+                    showNotification("Не удалось запустить подключение. Попробуйте снова.", "❌");
                 }
             }
         });
@@ -362,13 +392,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                 return;
             }
 
-            const minTonAmount = 0.01; // Соответствует 0.1 GRAM (если 1 TON = 10 GRAM)
-            const amountStr = prompt(`Введите сумму пополнения в TON (минимум ${minTonAmount} TON):`, minTonAmount.toString());
+            const minTonAmount = 0.01; // Соответствует 0.1 GRAM (1 TON = 10 GRAM)
+            const amountStr = prompt(`Введите сумму пополнения в TON (минимум ${minTonAmount} TON = 0.1 GRAM):`, minTonAmount.toString());
             if (!amountStr) return;
 
             const amountFloat = parseFloat(amountStr);
             if (isNaN(amountFloat) || amountFloat < minTonAmount) {
-                showNotification(`Неверно указана сумма! Минимум ${minTonAmount} TON.`, "⚠️");
+                showNotification(`Неверно указана сумма! Минимальное пополнение ${minTonAmount} TON (0.1 GRAM)`, "⚠️");
                 return;
             }
 
@@ -378,7 +408,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const adminTonAddress = addrData.address;
 
                 if (!adminTonAddress) {
-                    showNotification("Ошибка получения реквизитов.", "⚠️");
+                    showNotification("Ошибка получения реквизитов администратора.", "⚠️");
                     return;
                 }
 
@@ -396,58 +426,27 @@ document.addEventListener('DOMContentLoaded', async () => {
                     ]
                 };
 
-                showNotification("Ожидание подтверждения в вашем TON-кошельке...", "💎");
+                showNotification("Ожидание подтверждения транзакции в вашем кошельке...", "💎");
 
                 try {
-                    // Отправляем транзакцию через кошелек
                     await tonConnectUI.sendTransaction(transaction);
-                    // Если сюда дошли, значит, кошелек принял и отправил транзакцию (или пользователь подтвердил)
-                    showNotification("Транзакция отправлена! Проверяем подтверждение в блокчейне...", "⌛");
+                    showNotification("Транзакция отправлена в блокчейн! Ожидаем подтверждения...", "⌛");
+                    
+                    // Запуск автоматического фонового опроса сервера до победного конца
+                    startPaymentPolling(amountFloat);
                 } catch (sendError) {
-                    // Ловим ошибки, если пользователь отменил транзакцию или кошелек вернул ошибку
-                    console.warn("TON Connect sendTransaction client-side error/cancellation:", sendError);
+                    console.warn("Транзакция отменена или не удалась:", sendError);
                     if (sendError.message && sendError.message.includes("cancelled")) {
                          showNotification("Оплата отменена пользователем.", "ℹ️");
-                         fetchUserData(); // Обновляем UI, чтобы показать исходный баланс
-                         return;
-                    }
-                    // Если это не явная отмена, то деньги могли быть отправлены, но клиент-сторона не получила подтверждение.
-                    // Поэтому все равно продолжаем проверку на бэкенде.
-                    showNotification("Ошибка при отправке транзакции кошельком. Проверяем статус в блокчейне...", "⌛");
-                }
-                
-                // В любом случае, пытаемся верифицировать платеж на бэкенде (он будет сканировать блокчейн)
-                const verifyRes = await fetch(`${API_BASE_URL}/api/verify-payment`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-Telegram-Init-Data': tg.initData || ""
-                    },
-                    body: JSON.stringify({
-                        amount: amountFloat,
-                        userId: currentUser.id
-                    })
-                });
-
-                if (verifyRes.ok) {
-                    const verifyData = await verifyRes.json();
-                    if (verifyData.success) {
-                        showNotification(`Баланс пополнен на +${amountFloat} TON!`, "✅");
                     } else {
-                        // Если бэкенд говорит, что транзакция пока не найдена, это нормально, просто ждем.
-                        showNotification("Платеж отправлен, зачисление произойдет в течение пары минут.", "⌛");
+                         showNotification("Ошибка при отправке. Попробуем проверить статус...", "⌛");
+                         startPaymentPolling(amountFloat);
                     }
-                } else {
-                    const errorData = await verifyRes.json();
-                    showNotification(errorData.error || "Ошибка при проверке платежа на сервере. Пожалуйста, обратитесь в поддержку.", "⚠️");
                 }
-                
-                // ВСЕГДА обновляем данные пользователя после попытки пополнения, чтобы UI был актуален
-                fetchUserData(); 
 
             } catch (err) {
-                console.error("Критическая ошибка в процессе пополнения баланса:", err);
-                showNotification("Произошла критическая ошибка при пополнении баланса.", "❌");
+                console.error("Ошибка инициализации транзакции:", err);
+                showNotification("Не удалось инициировать оплату.", "❌");
             }
         });
     }
