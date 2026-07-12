@@ -2,251 +2,276 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>BestGifts</title>
-    <link rel="stylesheet" href="/css/style.css?v=9.9">
-    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&display=swap" rel="stylesheet">
-    <!-- Официальный TON Connect UI SDK -->
-    <script src="https://unpkg.com/@tonconnect/ui@2.0.6/dist/tonconnect-ui.min.js"></script>
+    <!-- Подключение стилей -->
+    <link rel="stylesheet" href="css/style.css">
+    <!-- Telegram WebApp SDK -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <!-- TON Connect SDK для привязки кошелька -->
+    <script src="https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>
 </head>
 <body>
-    <div id="app">
-        <!-- Контейнер для уведомлений -->
-        <div id="toast-container" class="toast-container"></div>
 
-        <!-- КРАСИВЫЙ ПАРЯЩИЙ ОВАЛЬНЫЙ БАЛАНС В УГЛУ -->
-        <div id="balance-pill" class="balance-pill">
+    <!-- ВЕРХНЯЯ ПАНЕЛЬ (ХЕДЕР) -->
+    <header class="main-header">
+        <div class="user-profile-pill">
+            <img id="user-avatar" src="https://img.icons8.com/color/96/user.png" alt="Avatar" class="header-avatar">
+            <span id="user-username" class="header-username">Загрузка...</span>
+        </div>
+        <div class="balance-pill" id="balance-pill">
             <span id="user-balance-pill-value">0.000</span>
-            <img src="/Images/Items/gram_popolnenie.png" alt="Gram" onerror="this.src='https://img.icons8.com/color/48/diamond.png'">
+            <img src="/Images/Items/gram_popolnenie.png" alt="GRAM" class="balance-icon">
+        </div>
+    </header>
+
+    <!-- ================= 1. ГЛАВНЫЙ ЭКРАН (МЕНЮ) ================= -->
+    <section id="home-section" class="app-section">
+        <!-- ЖИВАЯ ИГРА "АРЕНА" (НА САМОМ ВЕРХУ) -->
+        <div class="arena-banner-btn" id="arena-banner-btn">
+            <div class="arena-info-left">
+                <div class="arena-badge">Live Игра</div>
+                <div class="arena-banner-title">Арена Полигонов</div>
+                <div class="arena-banner-desc">Многопользовательская битва в реальном времени</div>
+            </div>
+            <div class="arena-live-preview">
+                <canvas id="arena-mini-canvas" width="70" height="70"></canvas>
+            </div>
         </div>
 
-        <!-- Модальные окна -->
-        <div id="custom-modal" class="modal-overlay hidden">
-            <div class="modal-card">
-                <button id="modal-close-btn" class="modal-close-x">&times;</button>
-                <div id="modal-icon" class="modal-icon-glow">🎁</div>
-                <h3 id="modal-title">Поздравляем!</h3>
-                <p id="modal-message">Вы выиграли подарок!</p>
-                <div id="modal-actions" class="modal-buttons-layout"></div>
+        <h2 class="section-title">Кейсы</h2>
+        
+        <!-- СЕТКА КЕЙСОВ В 2 СТОЛБИКА -->
+        <div class="cases-grid-layout" id="banners-container">
+            <!-- Ежедневный бесплатный кейс -->
+            <div class="case-card" id="daily-case-banner">
+                <div class="case-badge free">Бесплатно</div>
+                <div class="case-image-wrapper">
+                    <img src="/Images/Items/rare_bird.jpg" alt="Ежедневный кейс" onerror="this.src='https://img.icons8.com/color/96/gift.png'">
+                </div>
+                <div class="case-info">
+                    <span class="case-name">Ежедневный</span>
+                    <span class="case-arrow">&rarr;</span>
+                </div>
+            </div>
+
+            <!-- Кейс новичка -->
+            <div class="case-card" id="newbie-case-banner">
+                <div class="case-badge paid">0.1 GRAM</div>
+                <div class="case-image-wrapper">
+                    <img src="/Images/Items/bearpink.png" alt="Кейс новичка" onerror="this.src='https://img.icons8.com/color/96/gift.png'">
+                </div>
+                <div class="case-info">
+                    <span class="case-name">Кейс новичка</span>
+                    <span class="case-arrow">&rarr;</span>
+                </div>
+            </div>
+
+            <!-- Кейс бомжа (в разработке) -->
+            <div class="case-card locked" id="bomzh-case-banner">
+                <div class="case-badge locked-badge">Скоро</div>
+                <div class="case-image-wrapper">
+                    <img src="https://img.icons8.com/color/96/beggar.png" alt="Кейс бомжа">
+                </div>
+                <div class="case-info">
+                    <span class="case-name">Кейс бомжа</span>
+                    <span class="case-arrow">&larr;</span>
+                </div>
+            </div>
+
+            <!-- Кейс крутого (в разработке) -->
+            <div class="case-card locked" id="krutoy-case-banner">
+                <div class="case-badge locked-badge">Скоро</div>
+                <div class="case-image-wrapper">
+                    <img src="https://img.icons8.com/color/96/cool.png" alt="Кейс крутого">
+                </div>
+                <div class="case-info">
+                    <span class="case-name">Кейс крутого</span>
+                    <span class="case-arrow">&larr;</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ================= 2. ЭКРАН ИГРЫ "АРЕНА" ================= -->
+    <section id="arena-section" class="app-section arena-screen hidden">
+        <div class="arena-header-row">
+            <button class="arena-back-btn" id="arena-back-home">&larr;</button>
+            <div class="arena-game-id" id="arena-game-id-text">Игра #0</div>
+            <div style="width:40px;"></div>
+        </div>
+        
+        <!-- Арена (Игровое поле) -->
+        <div class="arena-main-box">
+            <canvas id="arena-main-canvas" class="arena-canvas" width="300" height="300"></canvas>
+            <div id="arena-status" class="arena-status-text">Ждем ставки...</div>
+            <div id="arena-countdown" class="arena-countdown-timer hidden">15</div>
+        </div>
+
+        <!-- Кнопки быстрых ставок -->
+        <div class="arena-controls">
+            <button class="arena-ctrl-btn arena-ctrl-btn-edit" id="arena-btn-edit">✏️</button>
+            <button class="arena-ctrl-btn" id="arena-bet-1">1.0 GRAM</button>
+            <button class="arena-ctrl-btn" id="arena-bet-2">2.0 GRAM</button>
+            <button class="arena-ctrl-btn" id="arena-bet-3">3.0 GRAM</button>
+        </div>
+
+        <!-- Таблица участников -->
+        <div class="arena-players-container">
+            <div class="arena-players-title" id="arena-players-title-count">Игроки · 0</div>
+            <div class="arena-players-list" id="arena-players-list-container"></div>
+        </div>
+    </section>
+
+    <!-- ================= 3. ЭКРАН КЕЙСА (ОТКРЫТИЕ) ================= -->
+    <section id="case-section" class="app-section hidden">
+        <div class="case-open-header">
+            <button class="back-btn" id="back-to-home-button">&larr;</button>
+            <h1 id="case-page-main-title" class="case-title">Ежедневный кейс</h1>
+            <div style="width:40px;"></div>
+        </div>
+
+        <!-- Рулетка прокрутки -->
+        <div class="roulette-viewport">
+            <div class="roulette-marker"></div>
+            <div class="roulette-track" id="roulette-track"></div>
+        </div>
+
+        <!-- Кнопка вращения -->
+        <div class="spin-controls">
+            <button class="spin-btn" id="spin-case-button">Запустить</button>
+            <!-- Таймер ежедневного кейса -->
+            <div id="timer-container" class="timer-box hidden">
+                Доступен через: <span id="daily-case-timer">24:00:00</span>
             </div>
         </div>
 
-        <!-- ГЛАВНЫЙ ЭКРАН -->
-        <section id="home-section">
-            <header class="header">
-                <div class="brand-title">🎁 BestGifts</div>
-                <div class="user-profile">
-                    <img id="user-avatar" class="user-avatar" src="https://img.icons8.com/color/96/user.png" alt=" ">
-                    <div class="user-info">
-                        <span id="user-username" class="user-username">Загрузка...</span>
-                    </div>
-                </div>
-            </header>
+        <!-- Список наград -->
+        <div id="rewards-section-container" class="rewards-section">
+            <h3 id="rewards-grid-title" class="sub-title">Возможные награды</h3>
+            <div class="rewards-grid" id="rewards-grid"></div>
+        </div>
+    </section>
 
-            <main class="main-content">
-                <div class="welcome-banner">
-                    <h2>Добро пожаловать в BestGifts!</h2>
-                </div>
+    <!-- ================= 4. ЭКРАН ИНВЕНТАРЯ ================= -->
+    <section id="inventory-section" class="app-section hidden">
+        <div class="inventory-profile-header">
+            <img id="inv-user-avatar" src="https://img.icons8.com/color/96/user.png" alt="Avatar" class="inv-profile-avatar">
+            <h2 id="inv-user-username" class="inv-profile-username">Загрузка...</h2>
+            <p class="inv-desc">Здесь хранятся ваши выигранные подарки</p>
+        </div>
 
-                <div class="section-divider-title">Кейсы</div>
-                
-                <div class="cases-layout">
-                    <!-- Ежедневный кейс -->
-                    <div id="daily-case-banner" class="case-banner-card">
-                        <div class="case-banner-badge">БЕСПЛАТНО</div>
-                        <img src="/Images/Cases/freebox.png" alt="Free Case" class="case-banner-img" onerror="this.src='https://img.icons8.com/color/144/treasure-chest.png'">
-                        <div class="case-banner-info">
-                            <h3>Ежедневный кейс</h3>
-                        </div>
-                        <div class="case-banner-arrow">→</div>
-                    </div>
+        <!-- Сетка предметов -->
+        <div class="inventory-grid" id="inventory-grid"></div>
 
-                    <!-- Кейс новичка -->
-                    <div id="newbie-case-banner" class="case-banner-card newbie-case">
-                        <img src="/Images/Cases/keysnovichka.png" alt="Newbie Case" class="case-banner-img" onerror="this.src='https://img.icons8.com/color/144/gift-box.png'">
-                        <div class="case-banner-info">
-                            <h3>Кейс новичка</h3>
-                        </div>
-                        <div class="case-banner-arrow">→</div>
-                    </div>
-
-                    <!-- Кейс бомжа -->
-                    <div id="bomzh-case-banner" class="case-banner-card">
-                        <img src="/Images/Cases/bomzh.png" alt="Homeless Case" class="case-banner-img" onerror="this.src='https://img.icons8.com/color/144/flea-market.png'">
-                        <div class="case-banner-info">
-                            <h3>Кейс бомжа</h3>
-                        </div>
-                        <div class="case-banner-arrow">→</div>
-                    </div>
-
-                    <!-- Кейс крутого -->
-                    <div id="krutoy-case-banner" class="case-banner-card">
-                        <img src="/Images/Cases/krutoy.png" alt="Cool Case" class="case-banner-img" onerror="this.src='https://img.icons8.com/color/144/vip.png'">
-                        <div class="case-banner-info">
-                            <h3>Кейс крутого</h3>
-                        </div>
-                        <div class="case-banner-arrow">→</div>
-                    </div>
-                </div>
-            </main>
-        </section>
-
-        <!-- ЭКРАН КЕЙСА -->
-        <section id="case-section" class="hidden">
-            <header class="header-nav">
-                <button id="back-to-home-button" class="back-button">← Назад</button>
-                <div class="nav-title" id="case-header-title">🎁 BestGifts</div>
-                <div style="width: 70px;"></div>
-            </header>
-
-            <main class="main-content">
-                <div class="case-page-header">
-                    <div class="case-title-block">
-                        <span class="case-icon-mini">🎁</span>
-                        <div class="case-text-group">
-                            <span id="case-page-main-title" class="case-main-title">Ежедневный кейс</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- РУЛЕТКА -->
-                <div class="roulette-wrapper">
-                    <div class="roulette-pointer pointer-top"></div>
-                    <div class="roulette-pointer pointer-bottom"></div>
-                    <div class="roulette-container">
-                        <div id="roulette-track" class="roulette-track"></div>
-                    </div>
-                </div>
-
-                <div class="case-control-area">
-                    <button id="spin-case-button" class="action-button-gradient">Запустить</button>
-                    <div id="timer-container" class="timer-card hidden">
-                        <span class="timer-title">Возвращайтесь через</span>
-                        <div id="daily-case-timer" class="timer-clock">23h 59m 49s</div>
-                    </div>
-                </div>
-
-                <!-- СЕТКА НАГРАД -->
-                <div id="rewards-section-container" class="rewards-section">
-                    <div class="rewards-header">
-                        <span class="rewards-header-icon">🏆</span>
-                        <h3 id="rewards-grid-title">Ежедневные награды</h3>
-                    </div>
-                    <div id="rewards-grid" class="rewards-grid"></div>
-                </div>
-            </main>
-        </section>
-
-        <!-- ЭКРАН ИНВЕНТАРЯ -->
-        <section id="inventory-section" class="hidden">
-            <header class="header">
-                <div class="brand-title">🎒 Ваш Инвентарь</div>
-                <div class="user-profile">
-                    <img id="inv-user-avatar" class="user-avatar" src="https://img.icons8.com/color/96/user.png" alt="Avatar">
-                    <div class="user-info">
-                        <span id="inv-user-username" class="user-username">Загрузка...</span>
-                    </div>
-                </div>
-            </header>
-
-            <main class="main-content">
-                <div class="section-divider-title">Мои Подарки</div>
-                <div id="inventory-grid" class="rewards-grid" style="margin-bottom: 25px;"></div>
-
-                <div class="deposit-panel">
-                    <h3>📥 Ввод подарков NFT</h3>
-                    <p class="deposit-desc">1. Отправьте ваш NFT-подарок в Telegram на аккаунт:</p>
-                    <a href="https://t.me/Sintopa" class="deposit-telegram-link" target="_blank">✈️ Отправить на @Sintopa</a>
-                    <p class="deposit-desc" style="margin-top: 10px;">2. Выберите отправленный подарок ниже и подтвердите отправку:</p>
-                    
-                    <div class="deposit-form-row">
-                        <select id="deposit-item-select" class="deposit-select">--</select>
-                        <button id="deposit-confirm-button" class="deposit-btn-confirm">Подтвердить передачу</button>
-                    </div>
-                </div>
-            </main>
-        </section>
-
-        <!-- ЭКРАН РЕЙТИНГА -->
-        <section id="rating-section" class="hidden">
-            <header class="header">
-                <div class="brand-title">🏆 Рейтинг Лидеров</div>
-            </header>
-            <main class="main-content">
-                <div class="empty-inventory">
-                    👑 Таблица лидеров находится в разработке.<br>Скоро...
-                </div>
-            </main>
-        </section>
-
-        <!-- ЭКРАН БАЛАНСА -->
-        <section id="balance-section" class="hidden">
-            <header class="header-nav">
-                <button id="back-to-home-from-balance" class="back-button">← Назад</button>
-                <div class="nav-title">💎 Мой Баланс</div>
-                <div style="width: 70px;"></div>
-            </header>
-            <main class="main-content">
-                <div class="balance-screen-content">
-                    <span class="large-balance-title">Ваш текущий баланс</span>
-                    <div class="large-balance-amount">
-                        <span id="large-balance-value">0.000</span>
-                        <img src="/Images/Items/gram_popolnenie.png" alt="Gram" onerror="this.src='https://img.icons8.com/color/96/diamond.png'">
-                    </div>
-                    <p class="balance-screen-desc">Принимайте участие в розыгрышах и выводите ценные NFT призы прямо на свой кошелек!</p>
-                    
-                    <!-- КНОПКА ПРИВЯЗКИ -->
-                    <button id="connect-wallet-btn" class="action-button-gradient" style="background: linear-gradient(135deg, #0088cc, #00a2ff); margin-bottom: 12px; box-shadow: 0 4px 15px rgba(0, 136, 204, 0.4);">
-                        Привязать кошелёк
-                    </button>
-
-                    <!-- ДИНАМИЧЕСКАЯ КНОПКА ПОПОЛНЕНИЯ (СТАНОВИТСЯ АКТИВНОЙ ПОСЛЕ ПРИВЯЗКИ) -->
-                    <button id="deposit-balance-btn" class="action-button-gradient" style="background: linear-gradient(135deg, #28a745, #218838); opacity: 0.5; cursor: not-allowed;" disabled>
-                        Пополнить баланс
-                    </button>
-                    <p id="deposit-notice-text" style="font-size: 0.8rem; color: var(--light-text-color); margin-top: 4px;">Пополнение доступно после привязки кошелька</p>
-                </div>
-            </main>
-        </section>
-
-        <!-- ПАРЯЩЕЕ МЕНЮ -->
-        <nav id="bottom-navigation" class="bottom-nav">
-            <div class="nav-tab" data-target="inventory">
-                <div class="nav-tab-icon-wrapper">
-                    <svg class="nav-tab-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
-                        <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
-                        <line x1="12" y1="22.08" x2="12" y2="12"/>
-                    </svg>
-                </div>
-                <span class="nav-text">Инвентарь</span>
-                <div class="active-indicator"></div>
+        <!-- Раздел ввода подарков в игру -->
+        <div class="deposit-gift-box">
+            <h3>📥 Пополнить инвентарь подарком</h3>
+            <p class="deposit-gift-desc">Передайте ваш подарок игроку <b>@Sintopa</b> в Telegram, выберите его ниже и подтвердите отправку:</p>
+            <div class="deposit-select-row">
+                <select id="deposit-item-select" class="deposit-select-field"></select>
+                <button id="deposit-confirm-button" class="deposit-confirm-btn">Отправить</button>
             </div>
+        </div>
+    </section>
 
-            <div class="nav-tab active" data-target="home">
-                <div class="nav-tab-icon-wrapper">
-                    <svg class="nav-tab-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
-                        <polyline points="9 22 9 12 15 12 15 22"/>
-                    </svg>
-                </div>
-                <span class="nav-text">Меню</span>
-                <div class="active-indicator"></div>
+    <!-- ================= 5. ЭКРАН РЕЙТИНГА ================= -->
+    <section id="rating-section" class="app-section hidden">
+        <div class="rating-header">
+            <h2>🏆 Таблица лидеров</h2>
+            <p>Топ игроков по ценности инвентаря и выигрышам</p>
+        </div>
+        <div class="leaderboard-list">
+            <!-- Пример статичных строк, заполняется через JS или бэкенд -->
+            <div class="leader-row current-user">
+                <span class="leader-rank">1</span>
+                <img src="https://img.icons8.com/color/96/user.png" class="leader-avatar">
+                <span class="leader-name">Вы (@Sintopa)</span>
+                <span class="leader-score">150.0 GRAM</span>
             </div>
+            <div class="leader-row">
+                <span class="leader-rank">2</span>
+                <img src="https://img.icons8.com/color/96/user.png" class="leader-avatar">
+                <span class="leader-name">Игрок_2</span>
+                <span class="leader-score">124.5 GRAM</span>
+            </div>
+            <div class="leader-row">
+                <span class="leader-rank">3</span>
+                <img src="https://img.icons8.com/color/96/user.png" class="leader-avatar">
+                <span class="leader-name">Игрок_3</span>
+                <span class="leader-score">98.1 GRAM</span>
+            </div>
+        </div>
+    </section>
 
-            <div class="nav-tab" data-target="rating">
-                <div class="nav-tab-icon-wrapper">
-                    <svg class="nav-tab-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6M18 9h1.5a2.5 2.5 0 0 0 0-5H18M4 22h16M10 14.66V17c0 .55-.45 1-1 1H4v2h16v-2h-5c-.55 0-1-.45-1-1v-2.34M12 2a4 4 0 0 1 4 4v5c0 .55-.45 1-1 1H9c-.55 0-1-.45-1-1V6a4 4 0 0 1 4-4z"/>
-                    </svg>
-                </div>
-                <span class="nav-text">Рейтинг</span>
-                <div class="active-indicator"></div>
+    <!-- ================= 6. ЭКРАН КОШЕЛЬКА (БАЛАНС) ================= -->
+    <section id="balance-section" class="app-section hidden">
+        <div class="balance-header">
+            <button class="back-btn-header" id="back-to-home-from-balance">&larr; Назад</button>
+            <h2>Кошелек</h2>
+        </div>
+
+        <div class="large-balance-card">
+            <span class="balance-card-label">Игровой баланс</span>
+            <div class="balance-card-value">
+                <span id="large-balance-value">0.000</span>
+                <span class="currency-text">GRAM</span>
             </div>
-        </nav>
+        </div>
+
+        <div class="wallet-actions-container">
+            <!-- Кнопка привязки TON кошелька (TON Connect) -->
+            <button id="connect-wallet-btn" class="connect-wallet-btn">Привязать кошелёк</button>
+            <!-- Пополнение баланса -->
+            <button id="deposit-balance-btn" class="deposit-balance-btn" disabled>Пополнить баланс</button>
+            <p id="deposit-notice-text" class="deposit-notice">Пополнение доступно после привязки кошелька</p>
+        </div>
+
+        <div class="wallet-faq-section">
+            <h3>Часто задаваемые вопросы</h3>
+            <div class="faq-item">
+                <span class="faq-q">Что такое валюта GRAM?</span>
+                <span class="faq-a">Это внутриигровая монета, эквивалентная криптовалюте TON (1 GRAM = 1 TON).</span>
+            </div>
+            <div class="faq-item">
+                <span class="faq-q">Как работает пополнение?</span>
+                <span class="faq-a">После привязки кошелька и указания суммы транзакция запрашивает одобрение в вашем TON-кошельке.</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- ================= НИЖНЕЕ МЕНЮ НАВИГАЦИИ ================= -->
+    <nav class="bottom-nav" id="bottom-navigation">
+        <button class="nav-tab active" data-target="home">
+            <span class="nav-icon">🏠</span>
+            <span class="nav-label">Меню</span>
+        </button>
+        <button class="nav-tab" data-target="inventory">
+            <span class="nav-icon">🎒</span>
+            <span class="nav-label">Инвентарь</span>
+        </button>
+        <button class="nav-tab" data-target="rating">
+            <span class="nav-icon">🏆</span>
+            <span class="nav-label">Рейтинг</span>
+        </button>
+    </nav>
+
+    <!-- ================= МОДАЛКИ И УВЕДОМЛЕНИЯ ================= -->
+    <!-- Контейнер для всплывающих тостов (Toast Notifications) -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- Кастомное модальное окно -->
+    <div id="custom-modal" class="modal-overlay hidden">
+        <div class="modal-card">
+            <button class="modal-close-x" id="modal-close-btn">&times;</button>
+            <div class="modal-icon" id="modal-icon">🎁</div>
+            <h2 class="modal-title" id="modal-title">Заголовок</h2>
+            <p class="modal-message" id="modal-message">Описание действия...</p>
+            <div class="modal-actions" id="modal-actions"></div>
+        </div>
     </div>
 
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <script src="/js/app.js?v=9.10"></script>
+    <!-- Подключение главного JS логики -->
+    <script src="js/app.js"></script>
 </body>
     </html>
