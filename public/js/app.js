@@ -94,7 +94,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     try {
         const lastSavedUser = localStorage.getItem('last_logged_tg_user');
         if (lastSavedUser !== String(userId)) {
-            // Если аккаунт сменился — полностью вычищаем старый кэш TON Connect
             for (let i = localStorage.length - 1; i >= 0; i--) {
                 const key = localStorage.key(i);
                 if (key && (key.includes('ton-connect') || key.includes('ton_connect'))) {
@@ -107,7 +106,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         console.error("Ошибка сброса кэша аккаунтов:", err);
     }
 
-    // --- ИНИЦИАЛИЗАЦИЯ TON CONNECT SDK С ВЫДЕЛЕННЫМ ХРАНИЛИЩЕМ ---
+    // --- ИНИЦИАЛИЗАЦИЯ TON CONNECT SDK ---
     let tonConnectUI = null;
     try {
         const manifestUrl = `${API_BASE_URL}/tonconnect-manifest.json`;
@@ -378,7 +377,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    // --- 100% ВАЛИДНЫЙ СБОРЩИК BOC ДЛЯ ТЕКСТОВЫХ КОММЕНТАРИЕВ TON (ЧИСТЫЙ JS) ---
+    // --- 100% ВАЛИДНЫЙ СБОРЩИК BOC ДЛЯ ТЕКСТОВЫХ КОММЕНТАРИЕВ TON ---
     function buildCommentPayload(text) {
         const encoder = new TextEncoder();
         const textBytes = encoder.encode(text);
