@@ -392,15 +392,18 @@ document.addEventListener('DOMContentLoaded', async () => {
                 return;
             }
 
-            const minTonAmount = 0.01; // Соответствует 0.1 GRAM (1 TON = 10 GRAM)
-            const amountStr = prompt(`Введите сумму пополнения в TON (минимум ${minTonAmount} TON = 0.1 GRAM):`, minTonAmount.toString());
+            const minGramAmount = 0.1; // Минималка 0.1 GRAM
+            const amountStr = prompt(`Введите сумму пополнения в GRAM (минимальное пополнение: ${minGramAmount} GRAM):`, minGramAmount.toString());
             if (!amountStr) return;
 
-            const amountFloat = parseFloat(amountStr);
-            if (isNaN(amountFloat) || amountFloat < minTonAmount) {
-                showNotification(`Неверно указана сумма! Минимальное пополнение ${minTonAmount} TON (0.1 GRAM)`, "⚠️");
+            const gramAmount = parseFloat(amountStr);
+            if (isNaN(gramAmount) || gramAmount < minGramAmount) {
+                showNotification(`Ошибка! Минимальное пополнение ${minGramAmount} GRAM.`, "⚠️");
                 return;
             }
+
+            // Переводим GRAM в TON по курсу (1 TON = 10 GRAM) для проведения транзакции в блокчейне
+            const amountFloat = gramAmount / 10.0; 
 
             try {
                 const addrRes = await fetch(`${API_BASE_URL}/api/deposit_address`);
@@ -432,14 +435,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                     await tonConnectUI.sendTransaction(transaction);
                     showNotification("Транзакция отправлена в блокчейн! Ожидаем подтверждения...", "⌛");
                     
-                    // Запуск автоматического фонового опроса сервера до победного конца
+                    // Запуск автоматического фонового опроса сервера
                     startPaymentPolling(amountFloat);
                 } catch (sendError) {
                     console.warn("Транзакция отменена или не удалась:", sendError);
                     if (sendError.message && sendError.message.includes("cancelled")) {
                          showNotification("Оплата отменена пользователем.", "ℹ️");
                     } else {
-                         showNotification("Ошибка при отправке. Попробуем проверить статус...", "⌛");
+                         showNotification("Ошибка при отправке. Пробуем проверить статус...", "⌛");
                          startPaymentPolling(amountFloat);
                     }
                 }
