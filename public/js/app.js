@@ -2,292 +2,6 @@ const tg = window.Telegram.WebApp;
 tg.expand();
 tg.ready();
 
-// Инъекция красивых стилей для новой игры "Арена"
-const arenaStyle = document.createElement('style');
-arenaStyle.innerHTML = `
-    /* Кнопка-баннер новой игры на главном экране */
-    .arena-banner-btn {
-        width: 100%;
-        background: linear-gradient(135deg, #1c1c1e 0%, #0c0c0e 100%);
-        border: 1px solid #2c2c2e;
-        border-radius: 20px;
-        padding: 16px;
-        margin-bottom: 24px;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        position: relative;
-        overflow: hidden;
-        cursor: pointer;
-        box-sizing: border-box;
-        transition: transform 0.2s, border-color 0.2s;
-    }
-    .arena-banner-btn:active {
-        transform: scale(0.98);
-    }
-    .arena-banner-btn:hover {
-        border-color: #0088cc;
-    }
-    .arena-info-left {
-        z-index: 2;
-        text-align: left;
-    }
-    .arena-badge {
-        background: linear-gradient(135deg, #ff9500, #ffcc00);
-        color: #000;
-        font-size: 10px;
-        font-weight: 900;
-        text-transform: uppercase;
-        padding: 4px 8px;
-        border-radius: 20px;
-        display: inline-block;
-        margin-bottom: 6px;
-    }
-    .arena-banner-title {
-        color: #fff;
-        font-size: 18px;
-        font-weight: bold;
-        margin-bottom: 4px;
-    }
-    .arena-banner-desc {
-        color: #8e8e93;
-        font-size: 12px;
-    }
-    .arena-live-preview {
-        width: 70px;
-        height: 70px;
-        background: #1c1c1e;
-        border-radius: 12px;
-        border: 1.5px solid #3a3a3c;
-        overflow: hidden;
-        position: relative;
-    }
-
-    /* Экран игры "Арена" */
-    .arena-screen {
-        padding: 16px;
-        box-sizing: border-box;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-    }
-    .arena-header-row {
-        width: 100%;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 16px;
-    }
-    .arena-back-btn {
-        background: #2c2c2e;
-        border: none;
-        border-radius: 50%;
-        width: 40px;
-        height: 40px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: #fff;
-        font-size: 20px;
-        cursor: pointer;
-    }
-    .arena-game-id {
-        color: #8e8e93;
-        font-size: 13px;
-    }
-    .arena-main-box {
-        width: 100%;
-        max-width: 330px;
-        aspect-ratio: 1;
-        background: #121214;
-        border-radius: 24px;
-        border: 2px solid #2c2c2e;
-        position: relative;
-        overflow: hidden;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-    }
-    .arena-canvas {
-        width: 100%;
-        height: 100%;
-        display: block;
-    }
-    .arena-status-text {
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        color: rgba(255, 255, 255, 0.4);
-        font-size: 16px;
-        font-weight: bold;
-        text-transform: uppercase;
-        letter-spacing: 1px;
-        animation: pulseText 1.5s infinite;
-        pointer-events: none;
-        text-align: center;
-        z-index: 5;
-    }
-    .arena-countdown-timer {
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        color: #fff;
-        font-size: 48px;
-        font-weight: 900;
-        z-index: 5;
-        pointer-events: none;
-        text-shadow: 0 4px 12px rgba(0,0,0,0.5);
-    }
-    @keyframes pulseText {
-        0% { opacity: 0.3; }
-        50% { opacity: 0.8; }
-        100% { opacity: 0.3; }
-    }
-
-    /* Сетка кейсов - 2 столбика */
-    .cases-grid-layout {
-        display: grid;
-        grid-template-columns: repeat(2, 1fr);
-        gap: 12px;
-        width: 100%;
-        box-sizing: border-box;
-    }
-
-    /* Нижняя панель управления ставками */
-    .arena-controls {
-        width: 100%;
-        max-width: 330px;
-        margin-top: 16px;
-        display: flex;
-        gap: 8px;
-        align-items: center;
-    }
-    .arena-ctrl-btn {
-        flex: 1;
-        background: #2c2c2e;
-        border: 1px solid #3a3a3c;
-        border-radius: 14px;
-        padding: 12px 0;
-        color: #fff;
-        font-size: 14px;
-        font-weight: bold;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 4px;
-        transition: transform 0.1s, border-color 0.2s;
-    }
-    .arena-ctrl-btn:active {
-        transform: scale(0.95);
-    }
-    .arena-ctrl-btn-edit {
-        flex: 0 0 50px;
-        background: #1c1c1e;
-        border-color: #2c2c2e;
-        font-size: 18px;
-    }
-    .arena-ctrl-btn-edit img {
-        width: 18px;
-        height: 18px;
-        filter: invert(1);
-    }
-
-    /* Модальное окно редактирования сумм */
-    .arena-edit-modal {
-        position: fixed;
-        top: 0; left: 0; width: 100%; height: 100%;
-        background: rgba(0, 0, 0, 0.85);
-        display: flex; align-items: center; justify-content: center;
-        z-index: 20000;
-        opacity: 0; pointer-events: none;
-        transition: opacity 0.3s ease;
-    }
-    .arena-edit-modal.show {
-        opacity: 1; pointer-events: auto;
-    }
-    .arena-edit-content {
-        background: #1c1c1e;
-        border: 1px solid #2c2c2e;
-        border-radius: 20px;
-        padding: 24px;
-        width: 90%; max-width: 300px;
-        text-align: center;
-        box-shadow: 0 10px 25px rgba(0,0,0,0.5);
-    }
-    .arena-edit-inputs {
-        display: flex;
-        flex-direction: column;
-        gap: 12px;
-        margin: 16px 0;
-    }
-    .arena-edit-input {
-        width: 100%;
-        padding: 12px;
-        background: #2c2c2e;
-        border: 1px solid #3a3a3c;
-        border-radius: 10px;
-        color: #fff;
-        font-size: 15px;
-        text-align: center;
-        box-sizing: border-box;
-    }
-
-    /* Список игроков под ареной */
-    .arena-players-container {
-        width: 100%;
-        max-width: 330px;
-        margin-top: 20px;
-        text-align: left;
-    }
-    .arena-players-title {
-        color: #fff;
-        font-size: 15px;
-        font-weight: bold;
-        margin-bottom: 10px;
-    }
-    .arena-players-list {
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-    }
-    .arena-player-row {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        background: #1c1c1e;
-        border: 1px solid #2c2c2e;
-        border-radius: 12px;
-        padding: 8px 12px;
-    }
-    .arena-player-info {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-    }
-    .arena-player-avatar {
-        width: 28px;
-        height: 28px;
-        border-radius: 50%;
-        object-fit: cover;
-    }
-    .arena-player-name {
-        color: #fff;
-        font-size: 13px;
-        font-weight: 500;
-    }
-    .arena-player-bet {
-        color: #8e8e93;
-        font-size: 12px;
-    }
-    .arena-player-chance {
-        color: #28a745;
-        font-size: 13px;
-        font-weight: bold;
-    }
-`;
-document.head.appendChild(arenaStyle);
-
 document.addEventListener('DOMContentLoaded', async () => {
     const API_BASE_URL = window.location.origin;
     let currentUser = {};
@@ -295,20 +9,17 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const GRAMCOIN_ICON_URL = "/Images/Items/gram_popolnenie.png"; 
 
-    // Безопасно получаем Telegram ID пользователя
     let userId = tg.initDataUnsafe?.user?.id;
     if (!userId) {
         try {
             const params = new URLSearchParams(tg.initData);
             const userRaw = params.get('user');
-            if (userRaw) {
-                userId = JSON.parse(userRaw).id;
-            }
+            if (userRaw) userId = JSON.parse(userRaw).id;
         } catch (e) {}
     }
     if (!userId) userId = "guest_user_id";
 
-    // Сброс кэша для мультиаккаунтов
+    // Очистка кэша аккаунтов
     try {
         const lastSavedUser = localStorage.getItem('last_logged_tg_user');
         if (lastSavedUser !== String(userId)) {
@@ -322,7 +33,38 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     } catch (err) {}
 
-    // Инициализация TON CONNECT
+    // Элементы интерфейса (БЕЗОПАСНАЯ ИНИЦИАЛИЗАЦИЯ)
+    const elements = {
+        homeSection: document.getElementById('home-section'),
+        caseSection: document.getElementById('case-section'),
+        inventorySection: document.getElementById('inventory-section'),
+        ratingSection: document.getElementById('rating-section'), 
+        balanceSection: document.getElementById('balance-section'), 
+        rouletteTrack: document.getElementById('roulette-track'),
+        spinBtn: document.getElementById('spin-case-button'),
+        balanceDisplayPill: document.getElementById('user-balance-pill-value'),
+        largeBalanceDisplay: document.getElementById('large-balance-value'), 
+        rewardsGrid: document.getElementById('rewards-grid'),
+        inventoryGrid: document.getElementById('inventory-grid'),
+        bottomNavigation: document.getElementById('bottom-navigation'),
+        navTabs: document.querySelectorAll('.nav-tab'),
+        dailyCaseBanner: document.getElementById('daily-case-banner'),
+        newbieCaseBanner: document.getElementById('newbie-case-banner'),
+        bomzhCaseBanner: document.getElementById('bomzh-case-banner'),
+        krutoyCaseBanner: document.getElementById('krutoy-case-banner'),
+        rewardsSectionContainer: document.getElementById('rewards-section-container'),
+        rewardsGridTitle: document.getElementById('rewards-grid-title'),
+        casePageMainTitle: document.getElementById('case-page-main-title'),
+        connectWalletBtn: document.getElementById('connect-wallet-btn'),
+        depositBalanceBtn: document.getElementById('deposit-balance-btn'),
+        depositNoticeText: document.getElementById('deposit-notice-text')
+    };
+
+    // Точечная защита: если какого-то элемента нет на странице, JS не ломается!
+    const safeSetText = (el, val) => { if (el) el.innerText = val; };
+    const safeSetStyle = (el, styleProp, val) => { if (el) el.style[styleProp] = val; };
+
+    // Инициализация TON Connect
     let tonConnectUI = null;
     try {
         const manifestUrl = `${API_BASE_URL}/tonconnect-manifest.json`;
@@ -336,194 +78,118 @@ document.addEventListener('DOMContentLoaded', async () => {
         } else if (window.TonConnectUI) {
             tonConnectUI = new window.TonConnectUI({ manifestUrl, storage: customStorage });
         }
-    } catch (err) {}
-
-    // Добавляем верстку для новой игры Арена и перенастраиваем сетку кейсов на 2 столбика
-    const bannerContainer = document.getElementById('banners-container') || document.querySelector('.cases-container');
-    if (bannerContainer) {
-        // Создаем кнопку живой игры над кейсами
-        const liveBtnHtml = `
-            <div class="arena-banner-btn" id="arena-banner-btn">
-                <div class="arena-info-left">
-                    <div class="arena-badge">Live Игра</div>
-                    <div class="arena-banner-title">Арена Полигонов</div>
-                    <div class="arena-banner-desc">Многопользовательское поле битвы</div>
-                </div>
-                <div class="arena-live-preview">
-                    <canvas id="arena-mini-canvas" width="70" height="70"></canvas>
-                </div>
-            </div>
-        `;
-        bannerContainer.insertAdjacentHTML('beforebegin', liveBtnHtml);
-
-        // Пересобираем кейсы в сетку из 2 столбиков
-        const originalBanners = document.getElementById('banners-container');
-        if (originalBanners) {
-            originalBanners.className = "cases-grid-layout";
-        }
+    } catch (err) {
+        console.error("TON Connect Error:", err);
     }
 
-    // Создаем окно игры "Арена" в HTML
-    const mainContainer = document.querySelector('.container') || document.body;
-    const arenaSectionHtml = `
-        <div id="arena-section" class="arena-screen hidden">
-            <div class="arena-header-row">
-                <button class="arena-back-btn" id="arena-back-home">&larr;</button>
-                <div class="arena-game-id" id="arena-game-id-text">Игра #0</div>
-                <div style="width:40px;"></div>
-            </div>
-            
-            <div class="arena-main-box">
-                <canvas id="arena-main-canvas" class="arena-canvas" width="300" height="300"></canvas>
-                <div id="arena-status" class="arena-status-text">Ждем ставки...</div>
-                <div id="arena-countdown" class="arena-countdown-timer hidden">15</div>
-            </div>
-
-            <!-- Управление ставками -->
-            <div class="arena-controls">
-                <button class="arena-ctrl-btn arena-ctrl-btn-edit" id="arena-btn-edit">✏️</button>
-                <button class="arena-ctrl-btn" id="arena-bet-1">1.000 GRAM</button>
-                <button class="arena-ctrl-btn" id="arena-bet-2">2.000 GRAM</button>
-                <button class="arena-ctrl-btn" id="arena-bet-3">3.000 GRAM</button>
-            </div>
-
-            <!-- Список участников -->
-            <div class="arena-players-container">
-                <div class="arena-players-title" id="arena-players-title-count">Игроки · 0</div>
-                <div class="arena-players-list" id="arena-players-list-container"></div>
-            </div>
-        </div>
-    `;
-    mainContainer.insertAdjacentHTML('beforeend', arenaSectionHtml);
-
-    // Модалка настройки сумм ставок
-    const editModalHtml = `
-        <div class="arena-edit-modal" id="arena-edit-modal">
-            <div class="arena-edit-content">
-                <h3 style="color:#fff;margin:0 0 10px 0;font-size:16px;">Настройка быстрых ставок</h3>
-                <div class="arena-edit-inputs">
-                    <input type="number" step="0.1" min="0.1" class="arena-edit-input" id="edit-val-1" value="1.0">
-                    <input type="number" step="0.1" min="0.1" class="arena-edit-input" id="edit-val-2" value="2.0">
-                    <input type="number" step="0.1" min="0.1" class="arena-edit-input" id="edit-val-3" value="3.0">
-                </div>
-                <div style="display:flex;gap:10px;">
-                    <button class="deposit-btn deposit-btn-cancel" style="padding:10px;" id="arena-edit-cancel">Отмена</button>
-                    <button class="deposit-btn deposit-btn-pay" style="padding:10px;" id="arena-edit-save">Сохранить</button>
-                </div>
-            </div>
-        </div>
-    `;
-    document.body.insertAdjacentHTML('beforeend', editModalHtml);
-
-    // Инициализация кастомных кнопок ставок из localStorage
+    // Настройка кастомных сумм Арены
     let betValues = [1.0, 2.0, 3.0];
     try {
         const saved = localStorage.getItem(`arena_bets_custom_${userId}`);
-        if (saved) {
-            betValues = JSON.parse(saved);
-        }
+        if (saved) betValues = JSON.parse(saved);
     } catch(e){}
 
-    function updateBetButtonsUI() {
-        document.getElementById('arena-bet-1').innerText = `${parseFloat(betValues[0]).toFixed(1)} GRAM`;
-        document.getElementById('arena-bet-2').innerText = `${parseFloat(betValues[1]).toFixed(1)} GRAM`;
-        document.getElementById('arena-bet-3').innerText = `${parseFloat(betValues[3] || betValues[2]).toFixed(1)} GRAM`;
-    }
+    const updateBetButtonsUI = () => {
+        const b1 = document.getElementById('arena-bet-1');
+        const b2 = document.getElementById('arena-bet-2');
+        const b3 = document.getElementById('arena-bet-3');
+        if (b1) b1.innerText = `${parseFloat(betValues[0]).toFixed(1)} GRAM`;
+        if (b2) b2.innerText = `${parseFloat(betValues[1]).toFixed(1)} GRAM`;
+        if (b3) b3.innerText = `${parseFloat(betValues[2]).toFixed(1)} GRAM`;
+    };
     updateBetButtonsUI();
 
-    // Логика кастомных кнопок редактирования
-    document.getElementById('arena-btn-edit').addEventListener('click', () => {
-        document.getElementById('edit-val-1').value = betValues[0];
-        document.getElementById('edit-val-2').value = betValues[1];
-        document.getElementById('edit-val-3').value = betValues[2] || 3.0;
-        document.getElementById('arena-edit-modal').classList.add('show');
-    });
-
-    document.getElementById('arena-edit-cancel').addEventListener('click', () => {
-        document.getElementById('arena-edit-modal').classList.remove('show');
-    });
-
-    document.getElementById('arena-edit-save').addEventListener('click', () => {
-        const v1 = parseFloat(document.getElementById('edit-val-1').value);
-        const v2 = parseFloat(document.getElementById('edit-val-2').value);
-        const v3 = parseFloat(document.getElementById('edit-val-3').value);
-        if (v1 >= 0.1 && v2 >= 0.1 && v3 >= 0.1) {
-            betValues = [v1, v2, v3];
-            localStorage.setItem(`arena_bets_custom_${userId}`, JSON.stringify(betValues));
-            updateBetButtonsUI();
-            document.getElementById('arena-edit-modal').classList.remove('show');
-            showNotification("Быстрые ставки успешно настроены!", "⚙️");
-        } else {
-            showNotification("Минимальная ставка 0.1 GRAM!", "⚠️");
-        }
-    });
-
-    // ----------------- ЖИВОЕ МИНИ-ПОЛЕ НА ГЛАВНОМ ЭКРАНЕ -----------------
-    const miniCanvas = document.getElementById('arena-mini-canvas');
-    if (miniCanvas) {
-        const ctx = miniCanvas.getContext('2d');
-        let ballX = 35, ballY = 35;
-        let vx = 0.8, vy = 1.1;
-        
-        function animateMini() {
-            ctx.fillStyle = '#1c1c1e';
-            ctx.fillRect(0, 0, 70, 70);
-            
-            // Сетка шахматная
-            ctx.strokeStyle = '#2c2c2e';
-            ctx.lineWidth = 1;
-            for(let i=0; i<70; i+=14){
-                ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, 70); ctx.stroke();
-                ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(70, i); ctx.stroke();
-            }
-            
-            ballX += vx; ballY += vy;
-            if (ballX < 4 || ballX > 66) vx = -vx;
-            if (ballY < 4 || ballY > 66) vy = -vy;
-            
-            ctx.beginPath();
-            ctx.arc(ballX, ballY, 4, 0, Math.PI*2);
-            ctx.fillStyle = '#0088cc';
-            ctx.fill();
-            requestAnimationFrame(animateMini);
-        }
-        animateMini();
+    // Открытие модалки редактирования
+    const btnEdit = document.getElementById('arena-btn-edit');
+    if (btnEdit) {
+        btnEdit.addEventListener('click', () => {
+            const ev1 = document.getElementById('edit-val-1');
+            const ev2 = document.getElementById('edit-val-2');
+            const ev3 = document.getElementById('edit-val-3');
+            if (ev1) ev1.value = betValues[0];
+            if (ev2) ev2.value = betValues[1];
+            if (ev3) ev3.value = betValues[2];
+            const modal = document.getElementById('arena-edit-modal');
+            if (modal) modal.classList.add('show');
+        });
     }
 
-    // ----------------- РЕНДЕРИНГ И ЛОГИКА ОСНОВНОЙ ИГРЫ АРЕНЫ -----------------
+    const btnCancel = document.getElementById('arena-edit-cancel');
+    if (btnCancel) {
+        btnCancel.addEventListener('click', () => {
+            const modal = document.getElementById('arena-edit-modal');
+            if (modal) modal.classList.remove('show');
+        });
+    }
+
+    const btnSave = document.getElementById('arena-edit-save');
+    if (btnSave) {
+        btnSave.addEventListener('click', () => {
+            const v1 = parseFloat(document.getElementById('edit-val-1')?.value || 1);
+            const v2 = parseFloat(document.getElementById('edit-val-2')?.value || 2);
+            const v3 = parseFloat(document.getElementById('edit-val-3')?.value || 3);
+            if (v1 >= 0.1 && v2 >= 0.1 && v3 >= 0.1) {
+                betValues = [v1, v2, v3];
+                localStorage.setItem(`arena_bets_custom_${userId}`, JSON.stringify(betValues));
+                updateBetButtonsUI();
+                const modal = document.getElementById('arena-edit-modal');
+                if (modal) modal.classList.remove('show');
+                showNotification("Ставки успешно изменены!", "⚙️");
+            } else {
+                showNotification("Минимальная ставка — 0.1 GRAM", "⚠️");
+            }
+        });
+    }
+
+    // ----------------- ЖИВАЯ МИНИ-ИГРА НА БАННЕРЕ -----------------
+    const miniCanvas = document.getElementById('arena-mini-canvas');
+    if (miniCanvas) {
+        const miniCtx = miniCanvas.getContext('2d');
+        let bx = 35, by = 35, vx = 0.9, vy = 1.1;
+        function renderMini() {
+            miniCtx.fillStyle = '#1c1c1e';
+            miniCtx.fillRect(0,0,70,70);
+            miniCtx.strokeStyle = '#2c2c2e';
+            miniCtx.lineWidth = 1;
+            for(let i=0; i<70; i+=14){
+                miniCtx.beginPath(); miniCtx.moveTo(i, 0); miniCtx.lineTo(i, 70); miniCtx.stroke();
+                miniCtx.beginPath(); miniCtx.moveTo(0, i); miniCtx.lineTo(70, i); miniCtx.stroke();
+            }
+            bx += vx; by += vy;
+            if(bx < 4 || bx > 66) vx = -vx;
+            if(by < 4 || by > 66) vy = -vy;
+            miniCtx.beginPath();
+            miniCtx.arc(bx, by, 4, 0, Math.PI*2);
+            miniCtx.fillStyle = '#0088cc';
+            miniCtx.fill();
+            requestAnimationFrame(renderMini);
+        }
+        renderMini();
+    }
+
+    // ----------------- ЛОГИКА АРЕНЫ И РИСОВАНИЯ -----------------
     const canvas = document.getElementById('arena-main-canvas');
-    const ctx = canvas.getContext('2d');
+    const mainCtx = canvas ? canvas.getContext('2d') : null;
     const statusText = document.getElementById('arena-status');
     const countdownText = document.getElementById('arena-countdown');
 
     let arenaData = {
-        state: 'waiting',
-        roundId: 0,
-        bets: [],
-        countdownLeft: 15,
-        ballAngle: 0,
-        ballSpeed: 0,
-        ballX: 150,
-        ballY: 150,
-        arrowAlpha: 0,
-        arrowAngle: 0,
-        showArrow: false,
-        endedTriggered: false
+        state: 'waiting', roundId: 0, bets: [], countdownLeft: 15,
+        ballAngle: 0, ballSpeed: 0, ballX: 150, ballY: 150,
+        showArrow: false, arrowAngle: 0, endedTriggered: false
     };
 
-    // Подготовка полигонов по периметру
     function getPerimeterPoint(d) {
+        d = d % 1200; if (d < 0) d += 1200;
         if (d <= 300) return { x: d, y: 0 };
         if (d <= 600) return { x: 300, y: d - 300 };
         if (d <= 900) return { x: 900 - d, y: 300 };
         return { x: 0, y: 1200 - d };
     }
 
-    // Генерация полигонов секторов пропорционально ставкам игроков
     function buildPlayerSectors() {
         const sectors = [];
         if (arenaData.bets.length === 0) return sectors;
-
         const totalBets = arenaData.bets.reduce((sum, b) => sum + parseFloat(b.amount), 0);
         let currentPerimeter = 0;
 
@@ -532,21 +198,15 @@ document.addEventListener('DOMContentLoaded', async () => {
             const size = playerWeight * 1200;
             const startD = currentPerimeter;
             const endD = (currentPerimeter + size) % 1200;
-
             const polyPoints = [{ x: 150, y: 150 }];
-            
-            // Начальная точка
             polyPoints.push(getPerimeterPoint(startD));
 
-            // Захватываем углы
             const corners = [300, 600, 900, 1200];
             corners.forEach(corner => {
                 if (startD < corner && (startD + size) >= corner) {
                     polyPoints.push(getPerimeterPoint(corner));
                 }
             });
-
-            // Конечная точка
             polyPoints.push(getPerimeterPoint(endD));
 
             sectors.push({
@@ -555,57 +215,52 @@ document.addEventListener('DOMContentLoaded', async () => {
                 points: polyPoints,
                 bet: bet
             });
-
             currentPerimeter += size;
         });
-
         return sectors;
     }
 
-    // Рендеринг сцены
     function drawArena() {
-        ctx.clearRect(0,0,300,300);
+        if (!mainCtx) return;
+        mainCtx.clearRect(0,0,300,300);
 
         if (arenaData.bets.length === 0) {
-            // Шахматная клетка (пустое поле)
-            ctx.fillStyle = '#121214';
-            ctx.fillRect(0,0,300,300);
-            ctx.strokeStyle = '#1c1c1f';
-            ctx.lineWidth = 1;
+            mainCtx.fillStyle = '#121214';
+            mainCtx.fillRect(0,0,300,300);
+            mainCtx.strokeStyle = '#1c1c1f';
+            mainCtx.lineWidth = 1;
             for(let i=0; i<300; i+=30) {
-                ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, 300); ctx.stroke();
-                ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(300, i); ctx.stroke();
+                mainCtx.beginPath(); mainCtx.moveTo(i, 0); mainCtx.lineTo(i, 300); mainCtx.stroke();
+                mainCtx.beginPath(); mainCtx.moveTo(0, i); mainCtx.lineTo(300, i); mainCtx.stroke();
             }
             return;
         }
 
         const sectors = buildPlayerSectors();
 
-        // 1. Отрисовка секторов
         sectors.forEach(sector => {
-            ctx.beginPath();
-            ctx.moveTo(sector.points[0].x, sector.points[0].y);
+            mainCtx.beginPath();
+            mainCtx.moveTo(sector.points[0].x, sector.points[0].y);
             for(let i=1; i<sector.points.length; i++) {
-                ctx.lineTo(sector.points[i].x, sector.points[i].y);
+                mainCtx.lineTo(sector.points[i].x, sector.points[i].y);
             }
-            ctx.closePath();
-            ctx.fillStyle = sector.color;
-            ctx.fill();
+            mainCtx.closePath();
+            mainCtx.fillStyle = sector.color;
+            mainCtx.fill();
 
-            // Если сектор принадлежит текущему игроку, подсвечиваем его белой неоновой обводкой!
+            // Белая неоновая обводка поля ТЕКУЩЕГО игрока
             if (String(sector.userId) === String(userId)) {
-                ctx.strokeStyle = '#ffffff';
-                ctx.shadowColor = '#ffffff';
-                ctx.shadowBlur = 10;
-                ctx.lineWidth = 3;
-                ctx.stroke();
-                ctx.shadowBlur = 0; // Сбрасываем тень
+                mainCtx.strokeStyle = '#ffffff';
+                mainCtx.shadowColor = '#ffffff';
+                mainCtx.shadowBlur = 10;
+                mainCtx.lineWidth = 3;
+                mainCtx.stroke();
+                mainCtx.shadowBlur = 0;
             }
         });
 
-        // 2. Рисуем аватарки участников в центре полигонов
+        // Рисуем аватарки по центру секторов
         sectors.forEach(sector => {
-            // Ищем визуальный центр полигона (среднее арифметическое всех точек кроме центра)
             let avgX = 0, avgY = 0;
             const pts = sector.points;
             for(let i=1; i<pts.length; i++) {
@@ -614,65 +269,62 @@ document.addEventListener('DOMContentLoaded', async () => {
             avgX = (avgX / (pts.length - 1) + 150) / 2;
             avgY = (avgY / (pts.length - 1) + 150) / 2;
 
-            ctx.save();
-            ctx.beginPath();
-            ctx.arc(avgX, avgY, 14, 0, Math.PI*2);
-            ctx.clip();
+            mainCtx.save();
+            mainCtx.beginPath();
+            mainCtx.arc(avgX, avgY, 14, 0, Math.PI*2);
+            mainCtx.clip();
             const img = new Image();
             img.src = sector.bet.avatarUrl || "https://img.icons8.com/color/96/user.png";
-            ctx.drawImage(img, avgX-14, avgY-14, 28, 28);
-            ctx.restore();
+            mainCtx.drawImage(img, avgX-14, avgY-14, 28, 28);
+            mainCtx.restore();
 
-            // Белая каемка вокруг авы
-            ctx.strokeStyle = '#fff';
-            ctx.lineWidth = 1.5;
-            ctx.beginPath();
-            ctx.arc(avgX, avgY, 14, 0, Math.PI*2);
-            ctx.stroke();
+            mainCtx.strokeStyle = '#fff';
+            mainCtx.lineWidth = 1.5;
+            mainCtx.beginPath();
+            mainCtx.arc(avgX, avgY, 14, 0, Math.PI*2);
+            mainCtx.stroke();
         });
 
-        // 3. Стрелка-указатель
+        // Стрелка направления
         if (arenaData.showArrow) {
-            ctx.save();
-            ctx.translate(arenaData.ballX, arenaData.ballY);
-            ctx.rotate(arenaData.arrowAngle);
-            ctx.beginPath();
-            ctx.moveTo(0,0);
-            ctx.lineTo(25, 0);
-            ctx.lineTo(20, -5);
-            ctx.moveTo(25, 0);
-            ctx.lineTo(20, 5);
-            ctx.strokeStyle = '#ffffff';
-            ctx.lineWidth = 3.5;
-            ctx.stroke();
-            ctx.restore();
+            mainCtx.save();
+            mainCtx.translate(arenaData.ballX, arenaData.ballY);
+            mainCtx.rotate(arenaData.arrowAngle);
+            mainCtx.beginPath();
+            mainCtx.moveTo(0,0);
+            mainCtx.lineTo(25, 0);
+            mainCtx.lineTo(20, -5);
+            mainCtx.moveTo(25, 0);
+            mainCtx.lineTo(20, 5);
+            mainCtx.strokeStyle = '#ffffff';
+            mainCtx.lineWidth = 3.5;
+            mainCtx.stroke();
+            mainCtx.restore();
         }
 
-        // 4. Отрисовка шарика
+        // Рисуем шарик
         if (arenaData.state === 'running' && !arenaData.showArrow) {
-            ctx.beginPath();
-            ctx.arc(arenaData.ballX, arenaData.ballY, 8, 0, Math.PI*2);
-            ctx.fillStyle = '#ffffff';
-            ctx.shadowColor = 'rgba(255,255,255,0.8)';
-            ctx.shadowBlur = 8;
-            ctx.fill();
-            ctx.shadowBlur = 0;
+            mainCtx.beginPath();
+            mainCtx.arc(arenaData.ballX, arenaData.ballY, 8, 0, Math.PI*2);
+            mainCtx.fillStyle = '#ffffff';
+            mainCtx.shadowColor = 'rgba(255,255,255,0.8)';
+            mainCtx.shadowBlur = 8;
+            mainCtx.fill();
+            mainCtx.shadowBlur = 0;
         }
     }
 
-    // Физическая симуляция полета шарика с постепенным замедлением
     let physicsInterval = null;
     function runBallPhysics() {
         let speed = 11.5;
         let angle = arenaData.ballAngle;
         let vx = speed * Math.cos(angle);
         let vy = speed * Math.sin(angle);
-        const friction = 0.985; // Идеальное плавное замедление
+        const friction = 0.985;
 
         arenaData.showArrow = true;
         arenaData.arrowAngle = 0;
 
-        // Фаза вращения стрелки направления (1.5 сек)
         let rotTime = 0;
         const arrowRotTimer = setInterval(() => {
             arenaData.arrowAngle += 0.25;
@@ -680,19 +332,15 @@ document.addEventListener('DOMContentLoaded', async () => {
             rotTime += 50;
             if (rotTime >= 1500) {
                 clearInterval(arrowRotTimer);
-                arenaData.arrowAngle = angle; // Ставим строго по выигрышному направлению
+                arenaData.arrowAngle = angle;
                 drawArena();
 
-                // Ждем 1 секунду
                 setTimeout(() => {
                     arenaData.showArrow = false;
-
-                    // Запускаем физику движения
                     physicsInterval = setInterval(() => {
                         arenaData.ballX += vx;
                         arenaData.ballY += vy;
 
-                        // Рикошет от краев
                         if (arenaData.ballX < 8) { arenaData.ballX = 8; vx = -vx; }
                         if (arenaData.ballX > 292) { arenaData.ballX = 292; vx = -vx; }
                         if (arenaData.ballY < 8) { arenaData.ballY = 8; vy = -vy; }
@@ -701,15 +349,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                         vx *= friction;
                         vy *= friction;
                         speed = Math.sqrt(vx*vx + vy*vy);
-
                         drawArena();
 
                         if (speed < 0.08) {
                             clearInterval(physicsInterval);
-                            // Шарик замер на 1 секунду перед объявлением результатов
-                            setTimeout(() => {
-                                triggerWinnerAnnouncement();
-                            }, 1000);
+                            setTimeout(() => { triggerWinnerAnnouncement(); }, 1000);
                         }
                     }, 1000 / 60);
                 }, 1000);
@@ -717,11 +361,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         }, 50);
     }
 
-    // Получаем сектор, в котором сейчас находится точка (x, y)
     function getWinningUser(x, y) {
         const sectors = buildPlayerSectors();
         let winningId = "guest_user_id";
-
         function isPointInPolygon(px, py, vertices) {
             let collision = false;
             for (let i = 0, j = vertices.length - 1; i < vertices.length; j = i++) {
@@ -732,16 +374,12 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
             return collision;
         }
-
         sectors.forEach(sec => {
-            if (isPointInPolygon(x, y, sec.points)) {
-                winningId = sec.userId;
-            }
+            if (isPointInPolygon(x, y, sec.points)) winningId = sec.userId;
         });
         return winningId;
     }
 
-    // Объявляем победителя в кастомной модалке
     function triggerWinnerAnnouncement() {
         if (arenaData.endedTriggered) return;
         arenaData.endedTriggered = true;
@@ -752,29 +390,25 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (winPlayer) {
             const totalBets = arenaData.bets.reduce((sum, b) => sum + parseFloat(b.amount), 0);
             const winChance = ((parseFloat(winPlayer.amount) / totalBets) * 100).toFixed(1);
-            
-            // Вычисляем чистый выигрыш с комиссией 15%
             const pureWin = totalBets - parseFloat(winPlayer.amount);
             const finalProfit = parseFloat(winPlayer.amount) + (pureWin * 0.85);
 
             showCustomModal({
                 icon: `<img src="${winPlayer.avatarUrl}" style="width:74px;height:74px;border-radius:50%;object-fit:cover;border:2px solid #ff9500;">`,
                 title: 'Победитель Арены!',
-                message: `👑 Победил: @${winPlayer.username}\n💰 Выигрыш: ${finalProfit.toFixed(2)} GRAM\n🎯 Шанс на победу: ${winChance}%`,
-                buttons: [{ text: 'Ура!', primary: true }]
+                message: `👑 Победил: @${winPlayer.username}\n💰 Выиграно: ${finalProfit.toFixed(2)} GRAM\n🎯 Шанс: ${winChance}%`,
+                buttons: [{ text: 'Отлично!', primary: true }]
             });
         }
         fetchUserData();
     }
 
-    // ----------------- ИГРОВОЙ ОПРОС СЕРВЕРА (POLLING 1 SEC) -----------------
     async function pollArenaState() {
         try {
             const res = await fetch(`${API_BASE_URL}/api/arena/state`);
             if (!res.ok) return;
             const data = await res.json();
 
-            // Если раунд сменился — сбрасываем локальную анимацию
             if (data.roundId !== arenaData.roundId) {
                 arenaData.roundId = data.roundId;
                 arenaData.endedTriggered = false;
@@ -788,107 +422,92 @@ document.addEventListener('DOMContentLoaded', async () => {
             arenaData.countdownLeft = data.countdownLeft;
             arenaData.ballAngle = data.ballAngle;
 
-            // Рендер статусов
-            if (arenaData.state === 'waiting') {
-                statusText.innerText = "Ждем ставки...";
-                statusText.classList.remove('hidden');
-                countdownText.classList.add('hidden');
-            } else if (arenaData.state === 'countdown') {
-                statusText.classList.add('hidden');
-                countdownText.classList.remove('hidden');
-                countdownText.innerText = arenaData.countdownLeft;
-            } else if (arenaData.state === 'running') {
-                statusText.classList.add('hidden');
-                countdownText.classList.add('hidden');
-                if (arenaData.ballX === 150 && arenaData.ballY === 150) {
-                    runBallPhysics();
+            if (statusText && countdownText) {
+                if (arenaData.state === 'waiting') {
+                    statusText.innerText = "Ждем ставки...";
+                    statusText.classList.remove('hidden');
+                    countdownText.classList.add('hidden');
+                } else if (arenaData.state === 'countdown') {
+                    statusText.classList.add('hidden');
+                    countdownText.classList.remove('hidden');
+                    countdownText.innerText = arenaData.countdownLeft;
+                } else if (arenaData.state === 'running') {
+                    statusText.classList.add('hidden');
+                    countdownText.classList.add('hidden');
+                    if (arenaData.ballX === 150 && arenaData.ballY === 150) runBallPhysics();
+                } else if (arenaData.state === 'ended') {
+                    statusText.classList.add('hidden');
+                    countdownText.classList.add('hidden');
                 }
-            } else if (arenaData.state === 'ended') {
-                statusText.classList.add('hidden');
-                countdownText.classList.add('hidden');
             }
 
-            // Обновляем список участников
             const countLabel = document.getElementById('arena-players-title-count');
-            countLabel.innerText = `Игроки · ${arenaData.bets.length}`;
+            if (countLabel) countLabel.innerText = `Игроки · ${arenaData.bets.length}`;
 
             const totalBets = arenaData.bets.reduce((sum, b) => sum + parseFloat(b.amount), 0);
             const listContainer = document.getElementById('arena-players-list-container');
-            listContainer.innerHTML = '';
-
-            arenaData.bets.forEach(b => {
-                const chance = ((parseFloat(b.amount) / totalBets) * 100).toFixed(1);
-                const row = document.createElement('div');
-                row.className = 'arena-player-row';
-                row.innerHTML = `
-                    <div class="arena-player-info">
-                        <img class="arena-player-avatar" src="${b.avatarUrl}" onerror="this.src='https://img.icons8.com/color/96/user.png'">
-                        <div>
-                            <div class="arena-player-name">@${b.username}</div>
-                            <div class="arena-player-bet">Ставка: ${parseFloat(b.amount).toFixed(1)} GRAM</div>
+            if (listContainer) {
+                listContainer.innerHTML = '';
+                arenaData.bets.forEach(b => {
+                    const chance = ((parseFloat(b.amount) / totalBets) * 100).toFixed(1);
+                    const row = document.createElement('div');
+                    row.className = 'arena-player-row';
+                    row.innerHTML = `
+                        <div class="arena-player-info">
+                            <img class="arena-player-avatar" src="${b.avatarUrl}" onerror="this.src='https://img.icons8.com/color/96/user.png'">
+                            <div>
+                                <div class="arena-player-name">@${b.username}</div>
+                                <div class="arena-player-bet">Ставка: ${parseFloat(b.amount).toFixed(1)} GRAM</div>
+                            </div>
                         </div>
-                    </div>
-                    <div class="arena-player-chance">${chance}%</div>
-                `;
-                listContainer.appendChild(row);
-            });
-
-            document.getElementById('arena-game-id-text').innerText = `Игра #${arenaData.roundId}`;
+                        <div class="arena-player-chance">${chance}%</div>
+                    `;
+                    listContainer.appendChild(row);
+                });
+            }
+            const idText = document.getElementById('arena-game-id-text');
+            if (idText) idText.innerText = `Игра #${arenaData.roundId}`;
             drawArena();
-
-        } catch (e) {
-            console.error("Ошибка опроса арены:", e);
-        }
+        } catch (e) {}
     }
 
-    // Делаем ставку
     async function placeArenaBet(amount) {
         if (parseFloat(currentUser.balance || 0) < amount) {
             showNotification("Недостаточно баланса для ставки!", "⚠️");
             return;
         }
-
         try {
             const res = await fetch(`${API_BASE_URL}/api/arena/bet`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-Telegram-Init-Data': tg.initData || ""
-                },
+                headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': tg.initData || "" },
                 body: JSON.stringify({ amount })
             });
-
             if (res.ok) {
-                showNotification(`Ставка ${amount.toFixed(1)} GRAM успешно принята!`, "🎯");
-                fetchUserData();
-                pollArenaState();
+                showNotification(`Ставка ${amount.toFixed(1)} GRAM принята!`, "🎯");
+                fetchUserData(); pollArenaState();
             } else {
                 const err = await res.json();
-                showNotification(err.error || "Ошибка принятия ставки", "⚠️");
+                showNotification(err.error || "Ошибка", "⚠️");
             }
-        } catch (e) {
-            showNotification("Ошибка связи с сервером.", "⚠️");
-        }
+        } catch (e) {}
     }
 
-    // Назначаем кнопки ставок
-    document.getElementById('arena-bet-1').addEventListener('click', () => placeArenaBet(betValues[0]));
-    document.getElementById('arena-bet-2').addEventListener('click', () => placeArenaBet(betValues[1]));
-    document.getElementById('arena-bet-3').addEventListener('click', () => placeArenaBet(betValues[2]));
+    // Обработчики кнопок быстрых ставок
+    const b1 = document.getElementById('arena-bet-1');
+    const b2 = document.getElementById('arena-bet-2');
+    const b3 = document.getElementById('arena-bet-3');
+    if (b1) b1.addEventListener('click', () => placeArenaBet(betValues[0]));
+    if (b2) b2.addEventListener('click', () => placeArenaBet(betValues[1]));
+    if (b3) b3.addEventListener('click', () => placeArenaBet(betValues[2]));
 
-    // Запуск цикла опроса сервера игры (раз в 1 секунду)
     setInterval(pollArenaState, 1000);
 
-    // Переходы между вкладками
-    document.getElementById('arena-banner-btn').addEventListener('click', () => {
-        navigateTo('arena');
-    });
+    const bannerBtn = document.getElementById('arena-banner-btn');
+    if (bannerBtn) bannerBtn.addEventListener('click', () => navigateTo('arena'));
+    const backBtn = document.getElementById('arena-back-home');
+    if (backBtn) backBtn.addEventListener('click', () => navigateTo('home'));
 
-    document.getElementById('arena-back-home').addEventListener('click', () => {
-        navigateTo('home');
-    });
-
-    // --- СТАРЫЙ ФУНКЦИОНАЛ ПРИЛОЖЕНИЯ (НАВИГАЦИЯ, КЕЙСЫ, ИНВЕНТАРЬ) ---
+    // ----------------- СТАРЫЙ ФУНКЦИОНАЛ ПРИЛОЖЕНИЯ -----------------
     const GIFT_POOL = [
         { id: 1, name: "Статуя птицы серая", icon: "/Images/Items/rare_bird.jpg", price: "20 GRAM", rawPrice: 20.0, isGold: true, type: "gift" },
         { id: 2, name: "Тыква", icon: "/Images/Items/pumpkin.jpg", price: "8 GRAM", rawPrice: 8.0, isGold: true, type: "gift" },
@@ -934,29 +553,30 @@ document.addEventListener('DOMContentLoaded', async () => {
         ];
         sections.forEach(s => { if (s) s.classList.add('hidden'); });
         
-        elements.bottomNavigation.classList.remove('hidden');
+        if (elements.bottomNavigation) elements.bottomNavigation.classList.remove('hidden');
 
         if (target === 'home') {
-            elements.homeSection.classList.remove('hidden');
+            if (elements.homeSection) elements.homeSection.classList.remove('hidden');
             setActiveTab('home');
         } else if (target === 'inventory') {
-            elements.inventorySection.classList.remove('hidden');
+            if (elements.inventorySection) elements.inventorySection.classList.remove('hidden');
             setActiveTab('inventory');
             fetchInventory(); 
             initDepositSelect();
         } else if (target === 'rating') {
-            elements.ratingSection.classList.remove('hidden');
+            if (elements.ratingSection) elements.ratingSection.classList.remove('hidden');
             setActiveTab('rating');
         } else if (target === 'balance') {
-            elements.balanceSection.classList.remove('hidden');
+            if (elements.balanceSection) elements.balanceSection.classList.remove('hidden');
             elements.navTabs.forEach(tab => tab.classList.remove('active'));
         } else if (target === 'case') { 
-            elements.caseSection.classList.remove('hidden');
-            elements.bottomNavigation.classList.add('hidden'); 
+            if (elements.caseSection) elements.caseSection.classList.remove('hidden');
+            if (elements.bottomNavigation) elements.bottomNavigation.classList.add('hidden'); 
             initRouletteTrack();
         } else if (target === 'arena') {
-            document.getElementById('arena-section').classList.remove('hidden');
-            elements.bottomNavigation.classList.add('hidden');
+            const arena = document.getElementById('arena-section');
+            if (arena) arena.classList.remove('hidden');
+            if (elements.bottomNavigation) elements.bottomNavigation.classList.add('hidden');
         }
     }
 
@@ -971,39 +591,39 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     const backFromBal = document.getElementById('back-to-home-from-balance');
-    if (backFromBal) {
-        backFromBal.addEventListener('click', () => navigateTo('home'));
+    if (backFromBal) backFromBal.addEventListener('click', () => navigateTo('home'));
+
+    if (elements.dailyCaseBanner) {
+        elements.dailyCaseBanner.addEventListener('click', () => {
+            isNewbieCaseMode = false;
+            if (elements.rewardsSectionContainer) elements.rewardsSectionContainer.classList.remove('hidden');
+            safeSetText(elements.casePageMainTitle, "Ежедневный кейс");
+            safeSetText(elements.rewardsGridTitle, "Ежедневные награды");
+            safeSetText(elements.spinBtn, "Запустить");
+            renderRewardsGrid();
+            updateDailyCaseTimer(); 
+            navigateTo('case');
+        });
     }
 
-    elements.dailyCaseBanner.addEventListener('click', () => {
-        isNewbieCaseMode = false;
-        elements.rewardsSectionContainer.classList.remove('hidden');
-        elements.casePageMainTitle.innerText = "Ежедневный кейс";
-        elements.rewardsGridTitle.innerText = "Ежедневные награды";
-        elements.spinBtn.innerText = "Запустить";
-        renderRewardsGrid();
-        updateDailyCaseTimer(); 
-        navigateTo('case');
-    });
+    if (elements.newbieCaseBanner) {
+        elements.newbieCaseBanner.addEventListener('click', () => {
+            isNewbieCaseMode = true;
+            if (elements.rewardsSectionContainer) elements.rewardsSectionContainer.classList.remove('hidden'); 
+            safeSetText(elements.casePageMainTitle, "Кейс новичка");
+            safeSetText(elements.rewardsGridTitle, "Содержимое кейса");
+            safeSetText(elements.spinBtn, "Открыть (0.1 GRAM)");
+            renderRewardsGrid();
+            updateDailyCaseTimer(); 
+            navigateTo('case');
+        });
+    }
 
-    elements.newbieCaseBanner.addEventListener('click', () => {
-        isNewbieCaseMode = true;
-        elements.rewardsSectionContainer.classList.remove('hidden'); 
-        elements.casePageMainTitle.innerText = "Кейс новичка";
-        elements.rewardsGridTitle.innerText = "Содержимое кейса";
-        elements.spinBtn.innerText = "Открыть (0.1 GRAM)";
-        renderRewardsGrid();
-        updateDailyCaseTimer(); 
-        navigateTo('case');
-    });
-
-    elements.bomzhCaseBanner.addEventListener('click', () => { showNotification("Кейс бомжа скоро появится в игре!", "🎒"); });
-    elements.krutoyCaseBanner.addEventListener('click', () => { showNotification("Кейс крутого в разработке!", "😎"); });
+    if (elements.bomzhCaseBanner) elements.bomzhCaseBanner.addEventListener('click', () => { showNotification("Кейс бомжа скоро появится в игре!", "🎒"); });
+    if (elements.krutoyCaseBanner) elements.krutoyCaseBanner.addEventListener('click', () => { showNotification("Кейс крутого в разработке!", "😎"); });
 
     const backToHome = document.getElementById('back-to-home-button');
-    if (backToHome) {
-        backToHome.addEventListener('click', () => navigateTo('home'));
-    }
+    if (backToHome) backToHome.addEventListener('click', () => navigateTo('home'));
 
     function initDepositSelect() {
         const select = document.getElementById('deposit-item-select');
@@ -1045,10 +665,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                             try {
                                 const res = await fetch(`${API_BASE_URL}/api/deposit_gift_request`, {
                                     method: 'POST',
-                                    headers: {
-                                        'Content-Type': 'application/json',
-                                        'X-Telegram-Init-Data': tg.initData || ""
-                                    },
+                                    headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': tg.initData || "" },
                                     body: JSON.stringify({ itemId: itemId })
                                 });
                                 if (res.ok) {
@@ -1069,6 +686,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     function renderRewardsGrid() {
+        if (!elements.rewardsGrid) return;
         elements.rewardsGrid.innerHTML = '';
         const currentPool = isNewbieCaseMode ? NEWBIE_GIFT_POOL : GIFT_POOL;
         currentPool.forEach(gift => {
@@ -1114,33 +732,31 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
         const rawName = currentUser.username || currentUser.first_name || "Пользователь";
         const truncatedName = formatUsername(rawName);
-        const uNode = document.getElementById('user-username');
-        if (uNode) uNode.innerText = truncatedName;
-        const iNode = document.getElementById('inv-user-username');
-        if (iNode) iNode.innerText = truncatedName;
+        safeSetText(document.getElementById('user-username'), truncatedName);
+        safeSetText(document.getElementById('inv-user-username'), truncatedName);
         updateDailyCaseTimer();
     }
 
     function updateBalanceUI(forcedValue = null) {
         const val = forcedValue !== null ? parseFloat(forcedValue) : parseFloat(currentUser.balance || 0);
         const balVal = val.toFixed(3);
-        if (elements.balanceDisplayPill) elements.balanceDisplayPill.innerText = balVal;
-        if (elements.largeBalanceDisplay) elements.largeBalanceDisplay.innerText = balVal;
+        safeSetText(elements.balanceDisplayPill, balVal);
+        safeSetText(elements.largeBalanceDisplay, balVal);
     }
 
     let dailyCaseTimerInterval;
     function updateDailyCaseTimer() {
         clearInterval(dailyCaseTimerInterval); 
         if (isNewbieCaseMode) {
-            elements.spinBtn.classList.remove('hidden');
-            elements.spinBtn.disabled = false;
-            document.getElementById('timer-container').classList.add('hidden');
+            if (elements.spinBtn) elements.spinBtn.classList.remove('hidden');
+            if (elements.spinBtn) elements.spinBtn.disabled = false;
+            const t = document.getElementById('timer-container'); if (t) t.classList.add('hidden');
             return;
         }
         if (currentUser.is_admin || !currentUser.last_daily_case_open) {
-            elements.spinBtn.classList.remove('hidden');
-            elements.spinBtn.disabled = false;
-            document.getElementById('timer-container').classList.add('hidden');
+            if (elements.spinBtn) elements.spinBtn.classList.remove('hidden');
+            if (elements.spinBtn) elements.spinBtn.disabled = false;
+            const t = document.getElementById('timer-container'); if (t) t.classList.add('hidden');
             return;
         }
         const lastOpen = new Date(currentUser.last_daily_case_open);
@@ -1150,13 +766,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         const timeLeftMs = nextOpenTime.getTime() - now.getTime();
 
         if (timeLeftMs <= 0) {
-            elements.spinBtn.classList.remove('hidden');
-            elements.spinBtn.disabled = false;
-            document.getElementById('timer-container').classList.add('hidden');
+            if (elements.spinBtn) elements.spinBtn.classList.remove('hidden');
+            if (elements.spinBtn) elements.spinBtn.disabled = false;
+            const t = document.getElementById('timer-container'); if (t) t.classList.add('hidden');
         } else {
-            elements.spinBtn.classList.add('hidden');
-            elements.spinBtn.disabled = true;
-            document.getElementById('timer-container').classList.remove('hidden');
+            if (elements.spinBtn) elements.spinBtn.classList.add('hidden');
+            if (elements.spinBtn) elements.spinBtn.disabled = true;
+            const t = document.getElementById('timer-container'); if (t) t.classList.remove('hidden');
             const tick = () => {
                 const nowTick = new Date();
                 const diff = nextOpenTime.getTime() - nowTick.getTime();
@@ -1168,7 +784,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const hours = Math.floor(diff / (1000 * 60 * 60));
                 const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
                 const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-                document.getElementById('daily-case-timer').innerText = `${hours}ч ${minutes}м ${seconds}с`;
+                safeSetText(document.getElementById('daily-case-timer'), `${hours}ч ${minutes}м ${seconds}с`);
             };
             tick();
             dailyCaseTimerInterval = setInterval(tick, 1000); 
@@ -1176,6 +792,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     async function fetchInventory() {
+        if (!elements.inventoryGrid) return;
         try {
             const res = await fetch(`${API_BASE_URL}/api/inventory`, { 
                 headers: { 'X-Telegram-Init-Data': tg.initData || "" }
@@ -1222,10 +839,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                                     try {
                                         const withdrawRes = await fetch(`${API_BASE_URL}/api/withdraw_gift`, {
                                             method: 'POST',
-                                            headers: {
-                                                'Content-Type': 'application/json',
-                                                'X-Telegram-Init-Data': tg.initData || ""
-                                            },
+                                            headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': tg.initData || "" },
                                             body: JSON.stringify({ itemId: item.item_id })
                                         });
                                         if (withdrawRes.ok) {
@@ -1258,10 +872,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                                     try {
                                         const sellRes = await fetch(`${API_BASE_URL}/api/sell_gift`, {
                                             method: 'POST',
-                                            headers: {
-                                                'Content-Type': 'application/json',
-                                                'X-Telegram-Init-Data': tg.initData || ""
-                                            },
+                                            headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': tg.initData || "" },
                                             body: JSON.stringify({ itemId: item.item_id, price: item.value })
                                         });
                                         if (sellRes.ok) {
@@ -1285,6 +896,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     function initRouletteTrack() {
+        if (!elements.rouletteTrack) return;
         elements.rouletteTrack.style.transition = 'none';
         elements.rouletteTrack.style.transform = 'translateX(0px)';
         void elements.rouletteTrack.offsetWidth; 
@@ -1303,6 +915,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     function spinRoulette(winningItem, onComplete) {
+        if (!elements.rouletteTrack) return;
         const itemWidth = 96; 
         const gap = 8; 
         const itemFullWidth = itemWidth + gap; 
@@ -1329,7 +942,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             currentUser.balance = apiNewBalance;
             updateBalanceUI();
         }
-        if (isNewbieCaseMode) elements.spinBtn.disabled = false;
+        if (isNewbieCaseMode && elements.spinBtn) elements.spinBtn.disabled = false;
 
         if (isBalance) {
             showCustomModal({
@@ -1339,7 +952,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 buttons: [{ text: 'Отлично!', primary: true }]
             });
             fetchUserData();
-            if (!isNewbieCaseMode) elements.spinBtn.disabled = false;
+            if (!isNewbieCaseMode && elements.spinBtn) elements.spinBtn.disabled = false;
         } else { 
             showCustomModal({
                 icon: `<img src="${winningGift.icon}" style="width:70px;height:70px;object-fit:contain;" onerror="this.src='https://img.icons8.com/color/96/gift.png'">`,
@@ -1375,59 +988,61 @@ document.addEventListener('DOMContentLoaded', async () => {
                     }
                 ]
             });
-            if (!isNewbieCaseMode) elements.spinBtn.disabled = false;
+            if (!isNewbieCaseMode && elements.spinBtn) elements.spinBtn.disabled = false;
         }
     }
 
-    elements.spinBtn.addEventListener('click', async () => {
-        const spinCost = 0.1;
-        if (isNewbieCaseMode && parseFloat(currentUser.balance || 0) < spinCost) {
-            showNotification('Недостаточно баланса! (0.1 GRAM)', '⚠️');
-            return;
-        }
-        elements.spinBtn.disabled = true;
-        if (isNewbieCaseMode) {
-            updateBalanceUI(Math.max(0, parseFloat(currentUser.balance || 0) - spinCost));
-        }
-        initRouletteTrack();
-
-        setTimeout(async () => {
-            try {
-                const endpoint = isNewbieCaseMode ? `${API_BASE_URL}/api/open_newbie_case` : `${API_BASE_URL}/api/open_daily_case`;
-                const response = await fetch(endpoint, {
-                    method: 'POST',
-                    headers: { 'X-Telegram-Init-Data': tg.initData || "" }
-                });
-                const data = await response.json();
-
-                if (response.ok) {
-                    const currentPool = isNewbieCaseMode ? NEWBIE_GIFT_POOL : GIFT_POOL;
-                    let winningGift = currentPool.find(g => g.id === data.wonItem.id);
-                    if (!winningGift) winningGift = currentPool.find(g => g.name.toLowerCase() === data.wonItem.name.toLowerCase());
-                    
-                    spinRoulette(winningGift, () => { processWinning(winningGift, data.newBalance); });
-                } else {
-                    fetchUserData(); 
-                    if (data.error && data.error.includes('подписчиком канала')) {
-                        const infoRes = await fetch(`${API_BASE_URL}/api/daily_case_info`, { headers: { 'X-Telegram-Init-Data': tg.initData || "" } });
-                        const infoData = await infoRes.json();
-                        showCustomModal({
-                            icon: '📢',
-                            title: 'Нужна подписка',
-                            message: 'Пожалуйста, подпишитесь на канал!',
-                            buttons: [{ text: 'Подписаться', primary: true, onClick: () => { tg.openLink(`https://t.me/${infoData.channel_username}`); elements.spinBtn.disabled = false; } }],
-                            onClose: () => { elements.spinBtn.disabled = false; }
-                        });
-                    } else {
-                        showNotification(data.error || 'Ошибка.', '⚠️');
-                        elements.spinBtn.disabled = false;
-                    }
-                }
-            } catch (error) {
-                fetchUserData(); elements.spinBtn.disabled = false;
+    if (elements.spinBtn) {
+        elements.spinBtn.addEventListener('click', async () => {
+            const spinCost = 0.1;
+            if (isNewbieCaseMode && parseFloat(currentUser.balance || 0) < spinCost) {
+                showNotification('Недостаточно баланса! (0.1 GRAM)', '⚠️');
+                return;
             }
-        }, 50);
-    });
+            elements.spinBtn.disabled = true;
+            if (isNewbieCaseMode) {
+                updateBalanceUI(Math.max(0, parseFloat(currentUser.balance || 0) - spinCost));
+            }
+            initRouletteTrack();
+
+            setTimeout(async () => {
+                try {
+                    const endpoint = isNewbieCaseMode ? `${API_BASE_URL}/api/open_newbie_case` : `${API_BASE_URL}/api/open_daily_case`;
+                    const response = await fetch(endpoint, {
+                        method: 'POST',
+                        headers: { 'X-Telegram-Init-Data': tg.initData || "" }
+                    });
+                    const data = await response.json();
+
+                    if (response.ok) {
+                        const currentPool = isNewbieCaseMode ? NEWBIE_GIFT_POOL : GIFT_POOL;
+                        let winningGift = currentPool.find(g => g.id === data.wonItem.id);
+                        if (!winningGift) winningGift = currentPool.find(g => g.name.toLowerCase() === data.wonItem.name.toLowerCase());
+                        
+                        spinRoulette(winningGift, () => { processWinning(winningGift, data.newBalance); });
+                    } else {
+                        fetchUserData(); 
+                        if (data.error && data.error.includes('подписчиком канала')) {
+                            const infoRes = await fetch(`${API_BASE_URL}/api/daily_case_info`, { headers: { 'X-Telegram-Init-Data': tg.initData || "" } });
+                            const infoData = await infoRes.json();
+                            showCustomModal({
+                                icon: '📢',
+                                title: 'Нужна подписка',
+                                message: 'Пожалуйста, подпишитесь на канал!',
+                                buttons: [{ text: 'Подписаться', primary: true, onClick: () => { tg.openLink(`https://t.me/${infoData.channel_username}`); elements.spinBtn.disabled = false; } }],
+                                onClose: () => { elements.spinBtn.disabled = false; }
+                            });
+                        } else {
+                            showNotification(data.error || 'Ошибка.', '⚠️');
+                            elements.spinBtn.disabled = false;
+                        }
+                    }
+                } catch (error) {
+                    fetchUserData(); elements.spinBtn.disabled = false;
+                }
+            }, 50);
+        });
+    }
 
     renderRewardsGrid();
     fetchUserData(); 
