@@ -248,7 +248,7 @@ app.post('/api/verify-payment', async (req, res) => {
                 await client.query('COMMIT');
                 console.log(`verify-payment: Баланс пользователя ${userId} пополнен на +${gramAmount} GRAM.`);
 
-                // ОТПРАВЛЯЕМ УВЕДОМЛЕНИЕ ТОЛЬКО ПОЛЬЗОВАТЕЛЮ (АДМИНУ БОЛЬШЕ НЕ ПРИХОДИТ СПАМ)
+                // ОТПРАВЛЯЕМ УВЕДОМЛЕНИЕ ТОЛЬКО ПОЛЬЗОВАТЕЛЮ
                 if (bot && userId) {
                     const msg = `🎉 *Баланс успешно пополнен!*\n\n` +
                                 `💰 На ваш игровой счет зачислено: *${gramAmount.toFixed(2)} GRAM*\n\n` +
@@ -424,9 +424,10 @@ app.post('/api/open_daily_case', async (req, res) => {
         if (adminId && bot && wonItem.type !== 'balance') {
             const userMention = user.username ? `@${user.username}` : user.first_name;
             const adminMsg = `🎉 *Выигран подарок в Ежедневном кейсе!*\n\n` +
-                             `👤 Пользователь: ${user.first_name} (${userMention})\n` +
                              `🎁 Подарок: *${wonItem.name}* (ID: ${wonItem.item_id}, Цена: ${wonItem.value} GRAM)\n` +
-                             `🔗 Ссылка на чат: [Открыть чат](tg://user?id=${userId})`;
+                             `👤 Пользователь: ${user.first_name} (${userMention})\n` +
+                             `🆔 Telegram ID: `${userId}`\n\n` +
+                             `💬 [Открыть чат](tg://user?id=${userId})`;
             bot.sendMessage(adminId, adminMsg, { parse_mode: 'Markdown' }).catch(console.error);
         }
 
@@ -512,9 +513,10 @@ app.post('/api/open_newbie_case', async (req, res) => {
         if (adminId && bot && wonItem.type !== 'balance') {
             const userMention = user.username ? `@${user.username}` : user.first_name;
             const adminMsg = `🎉 *Выигран подарок в Кейсе Новичка!*\n\n` +
-                             `👤 Пользователь: ${user.first_name} (${userMention})\n` +
                              `🎁 Подарок: *${wonItem.name}* (ID: ${wonItem.item_id}, Цена: ${wonItem.value} GRAM)\n` +
-                             `🔗 Ссылка на чат: [Открыть чат](tg://user?id=${userId})`;
+                             `👤 Пользователь: ${user.first_name} (${userMention})\n` +
+                             `🆔 Telegram ID: `${userId}`\n\n` +
+                             `💬 [Открыть чат](tg://user?id=${userId})`;
             bot.sendMessage(adminId, adminMsg, { parse_mode: 'Markdown' }).catch(console.error);
         }
 
@@ -565,7 +567,7 @@ app.post('/api/sell_gift', async (req, res) => {
     }
 });
 
-// Вывод подарка
+// Вывод подарка (КРАСИВЫЙ ШАБЛОН ДЛЯ АДМИНИСТРАТОРА)
 app.post('/api/withdraw_gift', async (req, res) => {
     if (!req.telegramUser || !req.telegramUser.id) return res.status(401).json({ error: 'Unauthorized' });
     const userId = req.telegramUser.id;
@@ -587,16 +589,21 @@ app.post('/api/withdraw_gift', async (req, res) => {
         await client.query('COMMIT');
 
         const itemDetails = (await query('SELECT name, value FROM items WHERE id = $1', [itemId])).rows[0];
-        const userRes = await query('SELECT username, first_name FROM users WHERE id = $1', [userId]);
+        const userRes = await query('SELECT username, first_name, last_name FROM users WHERE id = $1', [userId]);
         const user = userRes.rows[0];
 
         const adminId = process.env.ADMIN_TELEGRAM_ID;
         if (adminId && bot) {
-            const userMention = user.username ? `@${user.username}` : user.first_name;
-            const msg = `📤 *Запрос на вывод подарка!*\n\n` +
-                        `👤 Пользователь: ${user.first_name} (${userMention})\n` +
-                        `🎁 Подарок: *${itemDetails.name}* (ID: ${itemId}, Цена: ${itemDetails.value} GRAM)\n` +
-                        `🔗 Ссылка на чат: [Открыть чат](tg://user?id=${userId})`;
+            const userMention = user.username ? `@${user.username}` : '';
+            const fullName = [user.first_name, user.last_name].filter(Boolean).join(' ') || 'Пользователь';
+            const userProfileStr = `${fullName} ${userMention ? '(' + userMention + ')' : ''}`.trim();
+
+            const msg = `🚨 *Новая заявка на вывод подарка!*\n\n` +
+                        `🎁 Подарок: *${itemDetails.name}* (${parseFloat(itemDetails.value).toFixed(3)} TON)\n` +
+                        `👤 Пользователь: *${userProfileStr}*\n` +
+                        `🆔 Telegram ID: `${userId}`\n\n` +
+                        `💬 [Открыть чат](tg://user?id=${userId})\n` +
+                        (user.username ? `🔗 [Ссылка t.me](https://t.me/${user.username})` : `🔗 [Ссылка t.me](tg://user?id=${userId})`);
 
             bot.sendMessage(adminId, msg, { parse_mode: 'Markdown' }).catch(console.error);
         }
@@ -611,7 +618,7 @@ app.post('/api/withdraw_gift', async (req, res) => {
     }
 });
 
-// Запрос на ввод подарка NFT
+// Запрос на ввод подарка NFT (КРАСИВЫЙ ШАБЛОН ДЛЯ ДЕПОЗИТА)
 app.post('/api/deposit_gift_request', async (req, res) => {
     if (!req.telegramUser || !req.telegramUser.id) return res.status(401).json({ error: 'Unauthorized' });
     const userId = req.telegramUser.id;
@@ -621,16 +628,21 @@ app.post('/api/deposit_gift_request', async (req, res) => {
         const itemDetails = (await query('SELECT name, value, type FROM items WHERE id = $1', [itemId])).rows[0];
         if (!itemDetails) return res.status(400).json({ error: 'Предмет не найден.' });
 
-        const userRes = await query('SELECT username, first_name FROM users WHERE id = $1', [userId]);
+        const userRes = await query('SELECT username, first_name, last_name FROM users WHERE id = $1', [userId]);
         const user = userRes.rows[0];
 
         const adminId = process.env.ADMIN_TELEGRAM_ID;
         if (adminId && bot) {
-            const userMention = user.username ? `@${user.username}` : user.first_name;
-            const msg = `📥 *Новый запрос на депозит!*\n\n` +
-                        `👤 Пользователь: ${user.first_name} (${userMention})\n` +
-                        `🎁 Предмет: *${itemDetails.name}* (ID: ${itemId})\n` +
-                        `🔗 Ссылка на чат: [Открыть чат](tg://user?id=${userId})`;
+            const userMention = user.username ? `@${user.username}` : '';
+            const fullName = [user.first_name, user.last_name].filter(Boolean).join(' ') || 'Пользователь';
+            const userProfileStr = `${fullName} ${userMention ? '(' + userMention + ')' : ''}`.trim();
+
+            const msg = `🚨 *Новая заявка на ввод подарка!*\n\n` +
+                        `🎁 Подарок: *${itemDetails.name}* (${parseFloat(itemDetails.value).toFixed(3)} TON)\n` +
+                        `👤 Пользователь: *${userProfileStr}*\n` +
+                        `🆔 Telegram ID: `${userId}`\n\n` +
+                        `💬 [Открыть чат](tg://user?id=${userId})\n` +
+                        (user.username ? `🔗 [Ссылка t.me](https://t.me/${user.username})` : `🔗 [Ссылка t.me](tg://user?id=${userId})`);
 
             bot.sendMessage(adminId, msg, {
                 parse_mode: 'Markdown',
