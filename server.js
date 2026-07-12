@@ -34,10 +34,10 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ---------------------------------------------------------------------------
-// MIDDLEWARE АВТОРИЗАЦИИ TELEGRAM (ПЕРЕНЕСЕН НАВЕРХ ДЛЯ ВСЕХ РОУТОВ)
+// MIDDLEWARE АВТОРИЗАЦИИ TELEGRAM (РАБОТАЕТ ПЕРВЫМ ДЛЯ ВСЕХ ЗАПРОСОВ)
 // ---------------------------------------------------------------------------
 app.use(async (req, res, next) => {
-    // Безопасно проверяем initData в body (избавляет от сбоев UTF-8 в заголовках), в заголовках или в query
+    // Безопасно парсим initData из Body (для JSON-запросов), из заголовков или из query
     const initData = req.body?.initData || req.headers['x-telegram-init-data'] || req.query.initData;
 
     if (!initData) {
@@ -96,7 +96,7 @@ app.use(async (req, res, next) => {
 });
 
 // ---------------------------------------------------------------------------
-// API ЭНДПОИНТЫ (ТЕПЕРЬ НАДЕЖНО ЗАЩИЩЕНЫ MIDDLEWARE СВЕРХУ)
+// ВСЕ РОУТЫ (ЗАЩИЩЕНЫ АВТОРИЗАЦИЕЙ СВЕРХУ)
 // ---------------------------------------------------------------------------
 
 app.get('/api/deposit_address', (req, res) => {
@@ -115,6 +115,40 @@ app.get('/tonconnect-manifest.json', (req, res) => {
         iconUrl: `${appUrl}/Images/Items/gram_popolnenie.png`
     });
 });
+
+// ВСЕСТОРОННИЙ ДЕКОДЕР КОММЕНТАРИЕВ ДЛЯ НАДЕЖНОЙ ВЕРИФИКАЦИИ ТРАНЗАКЦИЙ
+function matchTransactionComment(tx, userId) {
+    const targetPattern = `deposit_${userId}`;
+    const candidates = [];
+
+    if (tx.in_msg) {
+        if (tx.in_msg.message) candidates.push(tx.in_msg.message);
+        if (tx.in_msg.msg_data) {
+            if (tx.in_msg.msg_data.text) candidates.push(tx.in_msg.msg_data.text);
+            if (tx.in_msg.msg_data.body) candidates.push(tx.in_msg.msg_data.body);
+        }
+    }
+
+    for (const val of candidates) {
+        if (!val) continue;
+        
+        // 1. Проверка прямого совпадения (если текст чистый)
+        if (val.includes(targetPattern)) return true;
+
+        // 2. Декодирование Base64 (стандартно для Wallet API / TonCenter)
+        try {
+            const fromBase64 = Buffer.from(val, 'base64').toString('utf8');
+            if (fromBase64.includes(targetPattern)) return true;
+        } catch (e) {}
+
+        // 3. Декодирование Hex (шестнадцатеричное представление комментариев)
+        try {
+            const fromHex = Buffer.from(val, 'hex').toString('utf8');
+            if (fromHex.includes(targetPattern)) return true;
+        } catch (e) {}
+    }
+    return false;
+}
 
 // АВТОМАТИЧЕСКАЯ ПРОВЕРКА ПЛАТЕЖЕЙ TON CONNECT
 app.post('/api/verify-payment', async (req, res) => {
@@ -158,21 +192,15 @@ app.post('/api/verify-payment', async (req, res) => {
         const expectedNano = Math.floor(parseFloat(amount) * 1000000000);
 
         for (const tx of transactions) {
-            if (tx.in_msg && tx.in_msg.value && tx.in_msg.message) {
+            if (tx.in_msg && tx.in_msg.value) {
                 const valNano = parseInt(tx.in_msg.value);
                 
                 // Сумма совпадает с погрешностью до 0.001 TON
                 if (Math.abs(valNano - expectedNano) < 1000000) {
-                    let decodedComment = "";
-                    try {
-                        decodedComment = Buffer.from(tx.in_msg.message, 'base64').toString('utf8');
-                    } catch (e) {
-                        console.warn("Ошибка декодирования комментария:", e);
-                    }
-
-                    // Нашли нужный комментарий deposit_USERID
-                    if (decodedComment.includes(`deposit_${userId}`)) {
-                        console.log(`verify-payment: Транзакция успешно найдена в TON! Hash: ${tx.transaction_id.hash}`);
+                    
+                    // Запуск умного мульти-декодирования
+                    if (matchTransactionComment(tx, userId)) {
+                        console.log(`verify-payment: Транзакция найдена в TON! Hash: ${tx.transaction_id.hash}`);
                         foundTransaction = tx;
                         break;
                     }
