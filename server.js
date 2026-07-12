@@ -93,10 +93,6 @@ app.use(async (req, res, next) => {
     next();
 });
 
-// ---------------------------------------------------------------------------
-// ВСЕ РОУТЫ (ЗАЩИЩЕНЫ АВТОРИЗАЦИЕЙ СВЕРХУ)
-// ---------------------------------------------------------------------------
-
 app.get('/api/deposit_address', (req, res) => {
     res.json({ address: ADMIN_TON_ADDRESS });
 });
@@ -129,11 +125,8 @@ function matchTransactionComment(tx, userId) {
 
     for (const val of candidates) {
         if (!val) continue;
-        
-        // 1. Поиск прямого совпадения
         if (val.includes(targetPattern)) return true;
 
-        // 2. Декодирование стандартного Base64 из блокчейна TON
         try {
             const fromBase64 = Buffer.from(val, 'base64');
             if (fromBase64.length > 4 && fromBase64.readUInt32BE(0) === 0) {
@@ -143,7 +136,6 @@ function matchTransactionComment(tx, userId) {
             if (fromBase64.toString('utf8').includes(targetPattern)) return true;
         } catch (e) {}
 
-        // 3. Декодирование Hex
         try {
             const fromHex = Buffer.from(val, 'hex');
             if (fromHex.length > 4 && fromHex.readUInt32BE(0) === 0) {
@@ -159,13 +151,11 @@ function matchTransactionComment(tx, userId) {
 // АВТОМАТИЧЕСКАЯ ПРОВЕРКА ПЛАТЕЖЕЙ (1 TON = 1 GRAM)
 app.post('/api/verify-payment', async (req, res) => {
     if (!req.telegramUser || !req.telegramUser.id) {
-        console.warn("verify-payment: Отклонено (нет telegramUser.id в сессии)");
         return res.status(401).json({ error: 'Unauthorized' });
     }
     const { amount, userId } = req.body;
 
     if (!TONCENTER_API_KEY) {
-        console.error("verify-payment: TONCENTER_API_KEY отсутствует.");
         return res.status(500).json({ error: "Ошибка сервера: API-ключ TON не настроен." });
     }
 
@@ -175,42 +165,30 @@ app.post('/api/verify-payment', async (req, res) => {
 
     try {
         const TONCENTER_BASE_URL = "https://toncenter.com/api/v2/jsonRPC";
-        const exchangeRate = 1.0; // Курс 1:1
+        const exchangeRate = 1.0; 
 
-        console.log(`verify-payment: Запрос транзакций для кошелька ${ADMIN_TON_ADDRESS}...`);
         const getTxsResponse = await axios.post(TONCENTER_BASE_URL, {
             jsonrpc: "2.0",
             id: 1,
             method: "getTransactions",
-            params: {
-                address: ADMIN_TON_ADDRESS,
-                limit: 20
-            }
+            params: { address: ADMIN_TON_ADDRESS, limit: 20 }
         }, {
             headers: { 'X-API-Key': TONCENTER_API_KEY }
         });
 
         if (getTxsResponse.data.error) {
-            console.error("TonCenter API error:", getTxsResponse.data.error);
             return res.status(500).json({ error: "Ошибка TonCenter API: " + getTxsResponse.data.error.message });
         }
 
         const transactions = getTxsResponse.data.result || [];
-        console.log(`verify-payment: Получено ${transactions.length} транзакций. Проверка суммы ${amount} TON от игрока ${userId}.`);
-        
         let foundTransaction = null;
         const expectedNano = Math.floor(parseFloat(amount) * 1000000000);
 
         for (const tx of transactions) {
             if (tx.in_msg && tx.in_msg.value) {
                 const valNano = parseInt(tx.in_msg.value);
-                
-                // Сумма совпадает с погрешностью до 0.001 TON
                 if (Math.abs(valNano - expectedNano) < 1000000) {
-                    
-                    // Мульти-декодирование комментария
                     if (matchTransactionComment(tx, userId)) {
-                        console.log(`verify-payment: Найдена транзакция! Hash: ${tx.transaction_id.hash}`);
                         foundTransaction = tx;
                         break;
                     }
@@ -225,7 +203,6 @@ app.post('/api/verify-payment', async (req, res) => {
                 client = await pool.connect();
                 await client.query('BEGIN');
 
-                // Проверяем на повторное зачисление по хешу транзакции
                 const existingTx = await client.query(
                     'SELECT id FROM transactions WHERE user_id = $1 AND type = $2 AND details LIKE $3',
                     [userId, 'deposit_ton', `%${foundTransaction.transaction_id.hash}%`]
@@ -233,26 +210,20 @@ app.post('/api/verify-payment', async (req, res) => {
                 
                 if (existingTx.rows.length > 0) {
                     await client.query('ROLLBACK');
-                    console.warn(`verify-payment: Транзакция ${foundTransaction.transaction_id.hash} уже зачислялась.`);
                     return res.json({ success: true, newBalance: gramAmount, message: "Платеж уже зачислен." });
                 }
 
-                // Зачисление баланса
                 await client.query('UPDATE users SET balance = balance + $1 WHERE id = $2', [gramAmount, userId]);
-
-                // Пишем в историю
                 await client.query(
                     'INSERT INTO transactions (user_id, type, amount, details) VALUES ($1, $2, $3, $4)',
-                    [userId, 'deposit_ton', amount, `Пополнение через TON Connect на +${amount} TON (+${gramAmount} GRAM). Хэш: ${foundTransaction.transaction_id.hash}`]
+                    [userId, 'deposit_ton', amount, `Пополнение через TON Connect на +${amount} TON. Хэш: ${foundTransaction.transaction_id.hash}`]
                 );
                 await client.query('COMMIT');
-                console.log(`verify-payment: Баланс пользователя ${userId} пополнен на +${gramAmount} GRAM.`);
 
-                // ОТПРАВЛЯЕМ УВЕДОМЛЕНИЕ ТОЛЬКО ПОЛЬЗОВАТЕЛЮ
                 if (bot && userId) {
                     const msg = `🎉 *Баланс успешно пополнен!*\n\n` +
-                                `💰 На ваш игровой счет зачислено: *${gramAmount.toFixed(2)} GRAM*\n\n` +
-                                `🎈 Спасибо за покупку и приятной игры!`;
+                                `💰 На игровой счет зачислено: *${gramAmount.toFixed(2)} GRAM*\n\n` +
+                                `🎈 Приятной игры!`;
                     bot.sendMessage(userId, msg, { parse_mode: 'Markdown' }).catch(console.error);
                 }
 
@@ -260,19 +231,15 @@ app.post('/api/verify-payment', async (req, res) => {
 
             } catch (dbError) {
                 if (client) await client.query('ROLLBACK');
-                console.error("verify-payment: Ошибка БД при зачислении:", dbError);
-                return res.status(500).json({ success: false, error: "Ошибка БД при обработке начислений." });
+                return res.status(500).json({ success: false, error: "Ошибка БД." });
             } finally {
                 if (client) client.release();
             }
-
         } else {
-            console.log(`verify-payment: Транзакция для ${userId} на сумму ${amount} TON пока отсутствует в блоке.`);
-            return res.json({ success: false, message: "Ожидаем подтверждения транзакции сетью TON." });
+            return res.json({ success: false, message: "Ожидаем подтверждения транзакции." });
         }
     } catch (err) {
-        console.error("verify-payment: Критическая ошибка TonCenter:", err.message);
-        res.status(500).json({ error: "Сервер TON временно перегружен. Пожалуйста, подождите." });
+        res.status(500).json({ error: "Сервер TON временно перегружен." });
     }
 });
 
@@ -304,7 +271,6 @@ app.get('/api/user', async (req, res) => {
         }
         res.json(user);
     } catch (error) {
-        console.error("Ошибка получения данных пользователя:", error);
         res.status(500).json({ error: 'Internal server error' });
     }
 });
@@ -338,7 +304,6 @@ app.get('/api/inventory', async (req, res) => {
         }
         res.json(inventoryFlat);
     } catch (error) {
-        console.error("Ошибка получения инвентаря:", error);
         res.status(500).json({ error: 'Internal server error' });
     }
 });
@@ -422,12 +387,16 @@ app.post('/api/open_daily_case', async (req, res) => {
 
         const adminId = process.env.ADMIN_TELEGRAM_ID;
         if (adminId && bot && wonItem.type !== 'balance') {
-            const userMention = user.username ? `@${user.username}` : user.first_name;
+            const userMention = user.username ? `@${user.username}` : '';
+            const fullName = [user.first_name, user.last_name].filter(Boolean).join(' ') || 'Пользователь';
+            const userProfileStr = `${fullName} ${userMention ? '(' + userMention + ')' : ''}`.trim();
+
             const adminMsg = `🎉 *Выигран подарок в Ежедневном кейсе!*\n\n` +
                              `🎁 Подарок: *${wonItem.name}* (ID: ${wonItem.item_id}, Цена: ${wonItem.value} GRAM)\n` +
-                             `👤 Пользователь: ${user.first_name} (${userMention})\n` +
+                             `👤 Пользователь: *${userProfileStr}*\n` +
                              `🆔 Telegram ID: `${userId}`\n\n` +
-                             `💬 [Открыть чат](tg://user?id=${userId})`;
+                             `💬 [Открыть чат (Вечная ссылка)](tg://user?id=${userId})\n` +
+                             (user.username ? `🔗 [Ссылка t.me](https://t.me/${user.username})` : `🔗 [Ссылка t.me](tg://user?id=${userId})`);
             bot.sendMessage(adminId, adminMsg, { parse_mode: 'Markdown' }).catch(console.error);
         }
 
@@ -435,7 +404,6 @@ app.post('/api/open_daily_case', async (req, res) => {
 
     } catch (error) {
         if (client) await client.query('ROLLBACK');
-        console.error("Ошибка при открытии ежедневного кейса:", error);
         res.status(500).json({ error: 'Произошла ошибка при открытии.' });
     } finally {
         if (client) client.release(); 
@@ -511,12 +479,16 @@ app.post('/api/open_newbie_case', async (req, res) => {
 
         const adminId = process.env.ADMIN_TELEGRAM_ID;
         if (adminId && bot && wonItem.type !== 'balance') {
-            const userMention = user.username ? `@${user.username}` : user.first_name;
+            const userMention = user.username ? `@${user.username}` : '';
+            const fullName = [user.first_name, user.last_name].filter(Boolean).join(' ') || 'Пользователь';
+            const userProfileStr = `${fullName} ${userMention ? '(' + userMention + ')' : ''}`.trim();
+
             const adminMsg = `🎉 *Выигран подарок в Кейсе Новичка!*\n\n` +
                              `🎁 Подарок: *${wonItem.name}* (ID: ${wonItem.item_id}, Цена: ${wonItem.value} GRAM)\n` +
-                             `👤 Пользователь: ${user.first_name} (${userMention})\n` +
+                             `👤 Пользователь: *${userProfileStr}*\n` +
                              `🆔 Telegram ID: `${userId}`\n\n` +
-                             `💬 [Открыть чат](tg://user?id=${userId})`;
+                             `💬 [Открыть чат (Вечная ссылка)](tg://user?id=${userId})\n` +
+                             (user.username ? `🔗 [Ссылка t.me](https://t.me/${user.username})` : `🔗 [Ссылка t.me](tg://user?id=${userId})`);
             bot.sendMessage(adminId, adminMsg, { parse_mode: 'Markdown' }).catch(console.error);
         }
 
@@ -524,7 +496,6 @@ app.post('/api/open_newbie_case', async (req, res) => {
 
     } catch (error) {
         if (client) await client.query('ROLLBACK');
-        console.error("Ошибка при открытии кейса новичка:", error);
         res.status(500).json({ error: 'Произошла ошибка при открытии.' });
     } finally {
         if (client) client.release();
@@ -560,14 +531,13 @@ app.post('/api/sell_gift', async (req, res) => {
         res.json({ success: true, newBalance: newBalance });
     } catch (error) {
         if (client) await client.query('ROLLBACK');
-        console.error("Ошибка при продаже подарка:", error);
         res.status(500).json({ error: 'Ошибка при продаже.' });
     } finally {
         if (client) client.release();
     }
 });
 
-// Вывод подарка (КРАСИВЫЙ ШАБЛОН ДЛЯ АДМИНИСТРАТОРА)
+// Вывод подарка (ФОРМАТ СООБЩЕНИЯ С ВЕЧНОЙ ССЫЛКОЙ)
 app.post('/api/withdraw_gift', async (req, res) => {
     if (!req.telegramUser || !req.telegramUser.id) return res.status(401).json({ error: 'Unauthorized' });
     const userId = req.telegramUser.id;
@@ -602,7 +572,7 @@ app.post('/api/withdraw_gift', async (req, res) => {
                         `🎁 Подарок: *${itemDetails.name}* (${parseFloat(itemDetails.value).toFixed(3)} TON)\n` +
                         `👤 Пользователь: *${userProfileStr}*\n` +
                         `🆔 Telegram ID: `${userId}`\n\n` +
-                        `💬 [Открыть чат](tg://user?id=${userId})\n` +
+                        `💬 [Открыть чат (Вечная ссылка)](tg://user?id=${userId})\n` +
                         (user.username ? `🔗 [Ссылка t.me](https://t.me/${user.username})` : `🔗 [Ссылка t.me](tg://user?id=${userId})`);
 
             bot.sendMessage(adminId, msg, { parse_mode: 'Markdown' }).catch(console.error);
@@ -611,14 +581,13 @@ app.post('/api/withdraw_gift', async (req, res) => {
         res.json({ success: true });
     } catch (error) {
         if (client) await client.query('ROLLBACK');
-        console.error("Ошибка при выводе подарка:", error);
         res.status(500).json({ error: 'Ошибка сервера при выводе.' });
     } finally {
         if (client) client.release();
     }
 });
 
-// Запрос на ввод подарка NFT (КРАСИВЫЙ ШАБЛОН ДЛЯ ДЕПОЗИТА)
+// Запрос на ввод подарка (ФОРМАТ СООБЩЕНИЯ С ВЕЧНОЙ ССЫЛКОЙ)
 app.post('/api/deposit_gift_request', async (req, res) => {
     if (!req.telegramUser || !req.telegramUser.id) return res.status(401).json({ error: 'Unauthorized' });
     const userId = req.telegramUser.id;
@@ -641,7 +610,7 @@ app.post('/api/deposit_gift_request', async (req, res) => {
                         `🎁 Подарок: *${itemDetails.name}* (${parseFloat(itemDetails.value).toFixed(3)} TON)\n` +
                         `👤 Пользователь: *${userProfileStr}*\n` +
                         `🆔 Telegram ID: `${userId}`\n\n` +
-                        `💬 [Открыть чат](tg://user?id=${userId})\n` +
+                        `💬 [Открыть чат (Вечная ссылка)](tg://user?id=${userId})\n` +
                         (user.username ? `🔗 [Ссылка t.me](https://t.me/${user.username})` : `🔗 [Ссылка t.me](tg://user?id=${userId})`);
 
             bot.sendMessage(adminId, msg, {
@@ -659,7 +628,6 @@ app.post('/api/deposit_gift_request', async (req, res) => {
 
         res.json({ success: true });
     } catch (error) {
-        console.error("Ошибка при запросе на депозит подарка:", error);
         res.status(500).json({ error: 'Ошибка сервера.' });
     }
 });
