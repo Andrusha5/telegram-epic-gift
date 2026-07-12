@@ -36,7 +36,6 @@ app.use(express.static(path.join(__dirname, 'public')));
 // MIDDLEWARE АВТОРИЗАЦИИ TELEGRAM (РАБОТАЕТ ПЕРВЫМ ДЛЯ ВСЕХ ЗАПРОСОВ)
 // ---------------------------------------------------------------------------
 app.use(async (req, res, next) => {
-    // Безопасно парсим initData из Body (для JSON-запросов), из заголовков или из query
     const initData = req.body?.initData || req.headers['x-telegram-init-data'] || req.query.initData;
 
     if (!initData) {
@@ -115,7 +114,7 @@ app.get('/tonconnect-manifest.json', (req, res) => {
     });
 });
 
-// ВСЕСТОРОННИЙ ДЕКОДЕР КОММЕНТАРИЕВ ДЛЯ НАДЕЖНОЙ ВЕРИФИКАЦИИ ТРАНЗАКЦИЙ
+// УЛЬТРА-СОВМЕСТИМЫЙ МУЛЬТИ-ДЕКОДЕР КОММЕНТАРИЕВ ДЛЯ TON
 function matchTransactionComment(tx, userId) {
     const targetPattern = `deposit_${userId}`;
     const candidates = [];
@@ -131,28 +130,38 @@ function matchTransactionComment(tx, userId) {
     for (const val of candidates) {
         if (!val) continue;
         
-        // 1. Проверка прямого совпадения
+        // 1. Поиск прямого совпадения
         if (val.includes(targetPattern)) return true;
 
-        // 2. Декодирование Base64
+        // 2. Декодирование стандартного Base64 из блокчейна TON
         try {
-            const fromBase64 = Buffer.from(val, 'base64').toString('utf8');
-            if (fromBase64.includes(targetPattern)) return true;
+            const fromBase64 = Buffer.from(val, 'base64');
+            // Если транзакция отправлена правильно, первые 4 байта равны 0 (op-code для комментария)
+            if (fromBase64.length > 4 && fromBase64.readUInt32BE(0) === 0) {
+                const textPart = fromBase64.slice(4).toString('utf8');
+                if (textPart.includes(targetPattern)) return true;
+            }
+            // Дополнительная проверка на случай если op-code отсутствовал
+            if (fromBase64.toString('utf8').includes(targetPattern)) return true;
         } catch (e) {}
 
         // 3. Декодирование Hex
         try {
-            const fromHex = Buffer.from(val, 'hex').toString('utf8');
-            if (fromHex.includes(targetPattern)) return true;
+            const fromHex = Buffer.from(val, 'hex');
+            if (fromHex.length > 4 && fromHex.readUInt32BE(0) === 0) {
+                const textPart = fromHex.slice(4).toString('utf8');
+                if (textPart.includes(targetPattern)) return true;
+            }
+            if (fromHex.toString('utf8').includes(targetPattern)) return true;
         } catch (e) {}
     }
     return false;
 }
 
-// АВТОМАТИЧЕСКАЯ ПРОВЕРКА ПЛАТЕЖЕЙ TON CONNECT (1 TON = 1 GRAM)
+// АВТОМАТИЧЕСКАЯ ПРОВЕРКА ПЛАТЕЖЕЙ (1 TON = 1 GRAM)
 app.post('/api/verify-payment', async (req, res) => {
     if (!req.telegramUser || !req.telegramUser.id) {
-        console.warn("verify-payment: Запрос отклонен (нет telegramUser.id в сессии)");
+        console.warn("verify-payment: Отклонено (нет telegramUser.id в сессии)");
         return res.status(401).json({ error: 'Unauthorized' });
     }
     const { amount, userId } = req.body;
@@ -162,16 +171,13 @@ app.post('/api/verify-payment', async (req, res) => {
         return res.status(500).json({ error: "Ошибка сервера: API-ключ TON не настроен." });
     }
 
-    // Минимальный лимит на депозит на бэкенде
     if (parseFloat(amount) < 0.1) {
          return res.status(400).json({ error: "Ошибка: минимальная сумма 0.1 GRAM" });
     }
 
     try {
         const TONCENTER_BASE_URL = "https://toncenter.com/api/v2/jsonRPC";
-        
-        // Курс обмена установлен как 1:1 (1 TON = 1 GRAM)
-        const exchangeRate = 1.0; 
+        const exchangeRate = 1.0; // Курс 1:1
 
         console.log(`verify-payment: Запрос транзакций для кошелька ${ADMIN_TON_ADDRESS}...`);
         const getTxsResponse = await axios.post(TONCENTER_BASE_URL, {
@@ -204,9 +210,9 @@ app.post('/api/verify-payment', async (req, res) => {
                 // Сумма совпадает с погрешностью до 0.001 TON
                 if (Math.abs(valNano - expectedNano) < 1000000) {
                     
-                    // Запуск умного мульти-декодирования
+                    // Мульти-декодирование комментария
                     if (matchTransactionComment(tx, userId)) {
-                        console.log(`verify-payment: Транзакция успешно найдена! Hash: ${tx.transaction_id.hash}`);
+                        console.log(`verify-payment: Найдена транзакция! Hash: ${tx.transaction_id.hash}`);
                         foundTransaction = tx;
                         break;
                     }
@@ -229,14 +235,14 @@ app.post('/api/verify-payment', async (req, res) => {
                 
                 if (existingTx.rows.length > 0) {
                     await client.query('ROLLBACK');
-                    console.warn(`verify-payment: Транзакция ${foundTransaction.transaction_id.hash} уже зачислялась ранее.`);
+                    console.warn(`verify-payment: Транзакция ${foundTransaction.transaction_id.hash} уже зачислялась.`);
                     return res.json({ success: true, newBalance: gramAmount, message: "Платеж уже зачислен." });
                 }
 
                 // Зачисление баланса
                 await client.query('UPDATE users SET balance = balance + $1 WHERE id = $2', [gramAmount, userId]);
 
-                // Запись в базу истории транзакций
+                // Пишем в историю
                 await client.query(
                     'INSERT INTO transactions (user_id, type, amount, details) VALUES ($1, $2, $3, $4)',
                     [userId, 'deposit_ton', amount, `Пополнение через TON Connect на +${amount} TON (+${gramAmount} GRAM). Хэш: ${foundTransaction.transaction_id.hash}`]
@@ -244,7 +250,7 @@ app.post('/api/verify-payment', async (req, res) => {
                 await client.query('COMMIT');
                 console.log(`verify-payment: Баланс пользователя ${userId} пополнен на +${gramAmount} GRAM.`);
 
-                // Отправка автоматического уведомления ТОЛЬКО ИГРОКУ, сделавшему перевод (Админу НЕ шлет)
+                // ОТПРАВЛЯЕМ УВЕДОМЛЕНИЕ ТОЛЬКО ПОЛЬЗОВАТЕЛЮ (АДМИНУ БОЛЬШЕ НЕ ПРИХОДИТ СПАМ)
                 if (bot && userId) {
                     const msg = `🎉 *Баланс успешно пополнен!*\n\n` +
                                 `💰 На ваш игровой счет зачислено: *${gramAmount.toFixed(2)} GRAM*\n\n` +
@@ -339,7 +345,7 @@ app.get('/api/inventory', async (req, res) => {
     }
 });
 
-// Открытие Ежедневного бесплатного кейса (С ТАЙМЕРОМ 24 ЧАСА)
+// Открытие Ежедневного бесплатного кейса
 app.post('/api/open_daily_case', async (req, res) => {
     if (!req.telegramUser || !req.telegramUser.id) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -416,7 +422,6 @@ app.post('/api/open_daily_case', async (req, res) => {
         await client.query('UPDATE users SET last_daily_case_open = NOW(), daily_case_notified = false WHERE id = $1', [userId]);
         await client.query('COMMIT');
 
-        // ОТПРАВЛЯЕМ УВЕДОМЛЕНИЕ АДМИНУ ЕСЛИ ВЫПАЛ ИМЕННО ПОДАРК (GIFT)
         const adminId = process.env.ADMIN_TELEGRAM_ID;
         if (adminId && bot && wonItem.type !== 'balance') {
             const userMention = user.username ? `@${user.username}` : user.first_name;
@@ -438,7 +443,7 @@ app.post('/api/open_daily_case', async (req, res) => {
     }
 });
 
-// Открытие Кейса Новичка (БЕЗ ТАЙМЕРОВ)
+// Открытие Кейса Новичка
 app.post('/api/open_newbie_case', async (req, res) => {
     if (!req.telegramUser || !req.telegramUser.id) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -505,7 +510,6 @@ app.post('/api/open_newbie_case', async (req, res) => {
 
         await client.query('COMMIT');
 
-        // ОТПРАВЛЯЕМ УВЕДОМЛЕНИЕ АДМИНУ ЕСЛИ ВЫПАЛ ИМЕННО ПОДАРК (GIFT) В КЕЙСЕ НОВИЧКА
         const adminId = process.env.ADMIN_TELEGRAM_ID;
         if (adminId && bot && wonItem.type !== 'balance') {
             const userMention = user.username ? `@${user.username}` : user.first_name;
@@ -563,7 +567,7 @@ app.post('/api/sell_gift', async (req, res) => {
     }
 });
 
-// Вывод подарка (УВЕДОМЛЕНИЕ АДМИНУ С ПРЯМОЙ ССЫЛКОЙ НА ЮЗЕРА)
+// Вывод подарка
 app.post('/api/withdraw_gift', async (req, res) => {
     if (!req.telegramUser || !req.telegramUser.id) return res.status(401).json({ error: 'Unauthorized' });
     const userId = req.telegramUser.id;
@@ -584,7 +588,6 @@ app.post('/api/withdraw_gift', async (req, res) => {
         await client.query('UPDATE user_inventory SET quantity = quantity - 1 WHERE user_id = $1 AND item_id = $2', [userId, itemId]);
         await client.query('COMMIT');
 
-        // Получаем информацию о предмете и пользователе для отправки уведомления админу
         const itemDetails = (await query('SELECT name, value FROM items WHERE id = $1', [itemId])).rows[0];
         const userRes = await query('SELECT username, first_name FROM users WHERE id = $1', [userId]);
         const user = userRes.rows[0];
@@ -610,7 +613,7 @@ app.post('/api/withdraw_gift', async (req, res) => {
     }
 });
 
-// Запрос на ввод подарка NFT (УВЕДОМЛЕНИЕ АДМИНУ С ПРЯМОЙ ССЫЛКОЙ)
+// Запрос на ввод подарка NFT
 app.post('/api/deposit_gift_request', async (req, res) => {
     if (!req.telegramUser || !req.telegramUser.id) return res.status(401).json({ error: 'Unauthorized' });
     const userId = req.telegramUser.id;
