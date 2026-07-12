@@ -33,7 +33,7 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ---------------------------------------------------------------------------
-// MIDDLEWARE АВТОРИЗАЦИИ TELEGRAM (РАБОТАЕТ ПЕРВЫМ ДЛЯ ВСЕХ ЗАПРОСОВ)
+// MIDDLEWARE АВТОРИЗАЦИИ TELEGRAM
 // ---------------------------------------------------------------------------
 app.use(async (req, res, next) => {
     const initData = req.body?.initData || req.headers['x-telegram-init-data'] || req.query.initData;
@@ -308,7 +308,7 @@ app.get('/api/inventory', async (req, res) => {
     }
 });
 
-// Открытие Ежедневного бесплатного кейса
+// Открытие Ежедневного бесплатного кейса (ВЕЧНАЯ ССЫЛКА НА ПРОФИЛЬ)
 app.post('/api/open_daily_case', async (req, res) => {
     if (!req.telegramUser || !req.telegramUser.id) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -387,15 +387,13 @@ app.post('/api/open_daily_case', async (req, res) => {
 
         const adminId = process.env.ADMIN_TELEGRAM_ID;
         if (adminId && bot && wonItem.type !== 'balance') {
-            const userMention = user.username ? `@${user.username}` : 'нет юзернейма';
             const fullName = [user.first_name, user.last_name].filter(Boolean).join(' ') || 'Пользователь';
 
             const adminMsg = `🎉 <b>Выигран подарок в Ежедневном кейсе!</b>\n\n` +
                              `🎁 <b>Подарок:</b> ${wonItem.name} (ID: ${wonItem.item_id}, Цена: ${wonItem.value} GRAM)\n` +
-                             `👤 <b>Пользователь:</b> ${fullName} (${userMention})\n` +
+                             `👤 <b>Пользователь:</b> <a href="tg://user?id=${userId}">${fullName}</a>\n` +
                              `🆔 <b>Telegram ID:</b> <code>${userId}</code>\n\n` +
-                             `💬 <a href="tg://user?id=${userId}">Открыть чат (Вечная ссылка)</a>\n` +
-                             (user.username ? `🔗 <a href="https://t.me/${user.username}">Ссылка t.me</a>` : `🔗 <a href="tg://user?id=${userId}">Ссылка t.me</a>`);
+                             `💬 <a href="tg://user?id=${userId}">Открыть чат (Вечная ссылка)</a>`;
             bot.sendMessage(adminId, adminMsg, { parse_mode: 'HTML' }).catch(console.error);
         }
 
@@ -409,7 +407,7 @@ app.post('/api/open_daily_case', async (req, res) => {
     }
 });
 
-// Открытие Кейса Новичка
+// Открытие Кейса Новичка (ВЕЧНАЯ ССЫЛКА НА ПРОФИЛЬ)
 app.post('/api/open_newbie_case', async (req, res) => {
     if (!req.telegramUser || !req.telegramUser.id) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -478,15 +476,13 @@ app.post('/api/open_newbie_case', async (req, res) => {
 
         const adminId = process.env.ADMIN_TELEGRAM_ID;
         if (adminId && bot && wonItem.type !== 'balance') {
-            const userMention = user.username ? `@${user.username}` : 'нет юзернейма';
             const fullName = [user.first_name, user.last_name].filter(Boolean).join(' ') || 'Пользователь';
 
             const adminMsg = `🎉 <b>Выигран подарок в Кейсе Новичка!</b>\n\n` +
                              `🎁 <b>Подарок:</b> ${wonItem.name} (ID: ${wonItem.item_id}, Цена: ${wonItem.value} GRAM)\n` +
-                             `👤 <b>Пользователь:</b> ${fullName} (${userMention})\n` +
+                             `👤 <b>Пользователь:</b> <a href="tg://user?id=${userId}">${fullName}</a>\n` +
                              `🆔 <b>Telegram ID:</b> <code>${userId}</code>\n\n` +
-                             `💬 <a href="tg://user?id=${userId}">Открыть чат (Вечная ссылка)</a>\n` +
-                             (user.username ? `🔗 <a href="https://t.me/${user.username}">Ссылка t.me</a>` : `🔗 <a href="tg://user?id=${userId}">Ссылка t.me</a>`);
+                             `💬 <a href="tg://user?id=${userId}">Открыть чат (Вечная ссылка)</a>`;
             bot.sendMessage(adminId, adminMsg, { parse_mode: 'HTML' }).catch(console.error);
         }
 
@@ -535,7 +531,7 @@ app.post('/api/sell_gift', async (req, res) => {
     }
 });
 
-// Вывод подарка (HTML ШАБЛОН С ВЕЧНОЙ ССЫЛКОЙ)
+// Вывод подарка (ТОЛЬКО ВЕЧНЫЕ ССЫЛКИ ПО ID)
 app.post('/api/withdraw_gift', async (req, res) => {
     if (!req.telegramUser || !req.telegramUser.id) return res.status(401).json({ error: 'Unauthorized' });
     const userId = req.telegramUser.id;
@@ -562,15 +558,13 @@ app.post('/api/withdraw_gift', async (req, res) => {
 
         const adminId = process.env.ADMIN_TELEGRAM_ID;
         if (adminId && bot) {
-            const userMention = user.username ? `@${user.username}` : 'нет юзернейма';
             const fullName = [user.first_name, user.last_name].filter(Boolean).join(' ') || 'Пользователь';
 
-            const msg = `📤 <b>Запрос на вывод подарка!</b>\n\n` +
+            const msg = `🚨 <b>Новая заявка на вывод подарка!</b>\n\n` +
                         `🎁 <b>Подарок:</b> ${itemDetails.name} (${parseFloat(itemDetails.value).toFixed(3)} GRAM)\n` +
-                        `👤 <b>Пользователь:</b> ${fullName} (${userMention})\n` +
+                        `👤 <b>Пользователь:</b> <a href="tg://user?id=${userId}">${fullName}</a>\n` +
                         `🆔 <b>Telegram ID:</b> <code>${userId}</code>\n\n` +
-                        `💬 <a href="tg://user?id=${userId}">Открыть чат (Вечная ссылка)</a>\n` +
-                        (user.username ? `🔗 <a href="https://t.me/${user.username}">Ссылка t.me</a>` : `🔗 <a href="tg://user?id=${userId}">Ссылка t.me</a>`);
+                        `💬 <a href="tg://user?id=${userId}">Открыть чат (Вечная ссылка)</a>`;
 
             bot.sendMessage(adminId, msg, { parse_mode: 'HTML' }).catch(console.error);
         }
@@ -584,7 +578,7 @@ app.post('/api/withdraw_gift', async (req, res) => {
     }
 });
 
-// Запрос на ввод подарка NFT (HTML ШАБЛОН С ВЕЧНОЙ ССЫЛКОЙ)
+// Запрос на ввод подарка (ТОЛЬКО ВЕЧНЫЕ ССЫЛКИ ПО ID)
 app.post('/api/deposit_gift_request', async (req, res) => {
     if (!req.telegramUser || !req.telegramUser.id) return res.status(401).json({ error: 'Unauthorized' });
     const userId = req.telegramUser.id;
@@ -599,15 +593,13 @@ app.post('/api/deposit_gift_request', async (req, res) => {
 
         const adminId = process.env.ADMIN_TELEGRAM_ID;
         if (adminId && bot) {
-            const userMention = user.username ? `@${user.username}` : 'нет юзернейма';
             const fullName = [user.first_name, user.last_name].filter(Boolean).join(' ') || 'Пользователь';
 
             const msg = `📥 <b>Новый запрос на депозит!</b>\n\n` +
                         `🎁 <b>Предмет:</b> ${itemDetails.name} (ID: ${itemId})\n` +
-                        `👤 <b>Пользователь:</b> ${fullName} (${userMention})\n` +
+                        `👤 <b>Пользователь:</b> <a href="tg://user?id=${userId}">${fullName}</a>\n` +
                         `🆔 <b>Telegram ID:</b> <code>${userId}</code>\n\n` +
-                        `💬 <a href="tg://user?id=${userId}">Открыть чат (Вечная ссылка)</a>\n` +
-                        (user.username ? `🔗 <a href="https://t.me/${user.username}">Ссылка t.me</a>` : `🔗 <a href="tg://user?id=${userId}">Ссылка t.me</a>`);
+                        `💬 <a href="tg://user?id=${userId}">Открыть чат (Вечная ссылка)</a>`;
 
             bot.sendMessage(adminId, msg, {
                 parse_mode: 'HTML',
