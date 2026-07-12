@@ -3,7 +3,7 @@ const tg = window.Telegram.WebApp;
 tg.expand();
 tg.ready();
 
-// Добавляем красивый CSS стиль для кастомного окна ввода
+// Подключаем стили для кастомного окна ввода и красивого ярлыка кошелька под балансом
 const customStyle = document.createElement('style');
 customStyle.innerHTML = `
     .custom-deposit-modal {
@@ -69,25 +69,34 @@ customStyle.innerHTML = `
         opacity: 0.8;
     }
     .sub-wallet-address-badge {
-        font-size: 11px;
-        color: #a1a1a5;
-        text-align: center;
+        font-size: 10px;
+        color: #0088cc;
+        text-align: right;
         margin-top: 4px;
         font-family: monospace;
-        background: rgba(255, 255, 255, 0.07);
-        padding: 2px 10px;
-        border-radius: 20px;
+        background: rgba(0, 136, 204, 0.12);
+        padding: 3px 10px;
+        border-radius: 12px;
         display: inline-block;
+        border: 1px solid rgba(0, 136, 204, 0.2);
+        font-weight: bold;
     }
 `;
 document.head.appendChild(customStyle);
+
+// Автоматически подключаем официальную библиотеку TonWeb для идеальной упаковки комментариев
+if (!window.TonWeb) {
+    const tonWebScript = document.createElement('script');
+    tonWebScript.src = "https://cdnjs.cloudflare.com/ajax/libs/tonweb/0.0.66/tonweb.min.js";
+    document.head.appendChild(tonWebScript);
+}
 
 document.addEventListener('DOMContentLoaded', async () => {
     const API_BASE_URL = window.location.origin;
     let currentUser = {};
     let isNewbieCaseMode = false; 
-    let currentWalletAddress = null; // Храним текущий кошелек
-    let currentActiveTab = 'home';  // Храним текущую вкладку
+    let currentWalletAddress = null; 
+    let currentActiveTab = 'home';  
 
     const GRAMCOIN_ICON_URL = "/Images/Items/gram_popolnenie.png"; 
     const userId = tg.initDataUnsafe?.user?.id || "guest_user_id";
@@ -304,22 +313,30 @@ document.addEventListener('DOMContentLoaded', async () => {
         };
     }
 
-    // --- ОТОБРАЖЕНИЕ СОКРАЩЕННОГО АДРЕСА ПОД БАЛАНСОМ ---
+    // --- ОТОБРАЖЕНИЕ СОКРАЩЕННОГО АДРЕСА СТРОГО ПОД БАЛАНСОМ ---
     function updateWalletBadgeVisibility(activeTab, walletAddress) {
         document.querySelectorAll('.sub-wallet-address-badge').forEach(el => el.remove());
 
         if (!walletAddress) return;
 
-        const allowedTabs = ['home', 'inventory', 'rating'];
+        // Показывать везде кроме кейсов
+        const allowedTabs = ['home', 'inventory', 'rating', 'balance'];
         if (!allowedTabs.includes(activeTab)) return;
 
         const shortAddr = walletAddress.slice(0, 6) + '...' + walletAddress.slice(-4);
         const balancePill = document.getElementById('balance-pill');
         if (balancePill) {
+            const parent = balancePill.parentElement;
+            if (parent) {
+                parent.style.display = 'flex';
+                parent.style.flexDirection = 'column';
+                parent.style.alignItems = 'flex-end';
+            }
+            
             const badge = document.createElement('div');
             badge.className = 'sub-wallet-address-badge';
             badge.innerText = `👛 ${shortAddr}`;
-            balancePill.parentNode.insertBefore(badge, balancePill.nextSibling);
+            balancePill.after(badge);
         }
     }
 
@@ -379,8 +396,27 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    // --- ОФИЦИАЛЬНАЯ СБОРКА КОММЕНТАРИЯ К ТРАНЗАКЦИИ (СОВМЕСТИМОСТЬ 100%) ---
-    function buildCommentPayload(text) {
+    // --- ОФИЦИАЛЬНАЯ СБОРКА КОММЕНТАРИЯ К ТРАНЗАКЦИИ ЧЕРЕЗ TONWEB ---
+    async function buildCommentPayload(text) {
+        if (!window.TonWeb) {
+            // Фолбек на случай если библиотека не прогрузилась
+            console.warn("TonWeb не готов, используем фолбек сборщик BOC");
+            return buildCommentPayloadLegacy(text);
+        }
+        try {
+            const tonweb = new window.TonWeb();
+            const cell = new window.TonWeb.boc.Cell();
+            cell.bits.writeUint(0, 32); // Opcode 0 (текстовый коммент)
+            cell.bits.writeBytes(new TextEncoder().encode(text));
+            const bocBytes = await cell.toBoc(false);
+            return window.TonWeb.utils.bytesToBase64(bocBytes);
+        } catch (e) {
+            console.error("Ошибка при сборке BOC через TonWeb:", e);
+            return buildCommentPayloadLegacy(text);
+        }
+    }
+
+    function buildCommentPayloadLegacy(text) {
         const encoder = new TextEncoder();
         const textBytes = encoder.encode(text);
         const MAX_COMMENT_LENGTH = 120;
@@ -482,7 +518,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 elements.depositNoticeText.innerText = "Пополнение кошелька полностью разблокировано";
                 elements.depositNoticeText.style.color = "var(--green-success)";
                 
-                // Рисуем кошелек под балансом на разрешенных страницах
                 updateWalletBadgeVisibility(currentActiveTab, currentWalletAddress);
             } else {
                 currentWalletAddress = null;
@@ -500,32 +535,44 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         });
 
-        // КЛИК ПРИВЯЗАТЬ
+        // КЛИК ПРИВЯЗАТЬ (БЕЗОПАСНАЯ ИНИЦИАЛИЗАЦИЯ И СБРОС ЗАВИСШИХ СЕССИЙ)
         elements.connectWalletBtn.addEventListener('click', async () => {
-            if (!tonConnectUI) return;
-            if (tonConnectUI.connected) {
-                showCustomModal({
-                    icon: '💎',
-                    title: 'Отключить кошелек?',
-                    message: 'Вы уверены, что хотите отвязать текущий TON кошелек?',
-                    buttons: [
-                        {
-                            text: 'Да, отключить',
-                            primary: true,
-                            onClick: async () => {
-                                await tonConnectUI.disconnect();
-                                showNotification("Кошелек успешно отключен.", "ℹ️");
-                            }
-                        },
-                        { text: 'Отмена', primary: false }
-                    ]
-                });
-            } else {
-                try {
+            if (!tonConnectUI) {
+                showNotification("Пожалуйста, подождите. TON Connect загружается...", "⚠️");
+                return;
+            }
+            try {
+                if (tonConnectUI.connected) {
+                    showCustomModal({
+                        icon: '💎',
+                        title: 'Отключить кошелек?',
+                        message: 'Вы уверены, что хотите отвязать текущий TON кошелек?',
+                        buttons: [
+                            {
+                                text: 'Да, отключить',
+                                primary: true,
+                                onClick: async () => {
+                                    await tonConnectUI.disconnect();
+                                    showNotification("Кошелек успешно отключен.", "ℹ️");
+                                }
+                            },
+                            { text: 'Отмена', primary: false }
+                        ]
+                    });
+                } else {
+                    // Принудительно очищаем зависшие сессии перед входом
+                    try {
+                        await tonConnectUI.disconnect(); 
+                    } catch (e) {}
                     await tonConnectUI.openModal();
-                } catch (e) {
-                    showNotification("Не удалось запустить подключение.", "❌");
                 }
+            } catch (e) {
+                console.error("Connection error:", e);
+                // Очистка принудительно если все зависло
+                try {
+                    localStorage.clear();
+                    showNotification("Сессия сброшена. Пожалуйста, попробуйте еще раз.", "🔄");
+                } catch (err) {}
             }
         });
 
@@ -538,7 +585,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             // Открываем кастомное красивое диалоговое окно
             showDepositModal(async (gramAmount) => {
-                // Курс 1:1, значит количество GRAM равно количеству TON для блокчейн транзакции
+                // Курс 1:1, GRAM = TON
                 const amountFloat = gramAmount; 
 
                 try {
@@ -552,7 +599,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                     }
 
                     const nanoAmount = Math.floor(amountFloat * 1000000000).toString();
-                    const compiledPayload = buildCommentPayload(`deposit_${currentUser.id || "0"}`);
+                    
+                    // Собираем 100% валидный комментарий через TonWeb
+                    const compiledPayload = await buildCommentPayload(`deposit_${currentUser.id || "0"}`);
 
                     const transaction = {
                         validUntil: Math.floor(Date.now() / 1000) + 360, 
@@ -571,7 +620,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         await tonConnectUI.sendTransaction(transaction);
                         showNotification("Транзакция отправлена в сеть! Ожидаем зачисления...", "⌛");
                         
-                        // Запуск умного автоматического обновления баланса
+                        // Запуск автоматического фонового опроса
                         startPaymentPolling(amountFloat);
                     } catch (sendError) {
                         showNotification("Ошибка: Оплата не прошла или была отменена.", "❌");
