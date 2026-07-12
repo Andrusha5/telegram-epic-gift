@@ -1,9 +1,8 @@
-// ВЫЗЫВАЕМ СРАЗУ ЖЕ ДЛЯ СТАБИЛЬНОГО ВХОДА И ПРЕДОТВРАЩЕНИЯ СТАРТОВОГО ЗАВИСАНИЯ!
 const tg = window.Telegram.WebApp;
 tg.expand();
 tg.ready();
 
-// Красивое кастомное окно ввода суммы пополнения
+// Стили для кастомного окна ввода пополнения
 const customStyle = document.createElement('style');
 customStyle.innerHTML = `
     .custom-deposit-modal {
@@ -91,19 +90,24 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     if (!userId) userId = "guest_user_id";
 
-    // --- УМНАЯ ОЧИСТКА КОНФЛИКТНЫХ СЕССИЙ ДЛЯ СТАБИЛЬНОЙ ПРИВЯЗКИ НА РАЗНЫХ АККАУНТАХ ---
+    // --- УЛЬТРА-ОЧИСТКА ДЛЯ СТАБИЛЬНОЙ СМЕНЫ АККАУНТОВ В ОДНОМ TELEGRAM CLIENT ---
     try {
-        for (let i = localStorage.length - 1; i >= 0; i--) {
-            const key = localStorage.key(i);
-            if (key && key.startsWith('ton-connect') && !key.includes(String(userId))) {
-                localStorage.removeItem(key);
+        const lastSavedUser = localStorage.getItem('last_logged_tg_user');
+        if (lastSavedUser !== String(userId)) {
+            // Если аккаунт сменился — полностью вычищаем старый кэш TON Connect
+            for (let i = localStorage.length - 1; i >= 0; i--) {
+                const key = localStorage.key(i);
+                if (key && (key.includes('ton-connect') || key.includes('ton_connect'))) {
+                    localStorage.removeItem(key);
+                }
             }
+            localStorage.setItem('last_logged_tg_user', String(userId));
         }
     } catch (err) {
-        console.error("Ошибка очистки сессий:", err);
+        console.error("Ошибка сброса кэша аккаунтов:", err);
     }
 
-    // --- ИНИЦИАЛИЗАЦИЯ TON CONNECT SDK ---
+    // --- ИНИЦИАЛИЗАЦИЯ TON CONNECT SDK С ВЫДЕЛЕННЫМ ХРАНИЛИЩЕМ ---
     let tonConnectUI = null;
     try {
         const manifestUrl = `${API_BASE_URL}/tonconnect-manifest.json`;
@@ -655,7 +659,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (item.type === 'gift' && !map.has(item.name)) {
                 map.set(item.name, true);
                 uniqueGifts.push(item);
-                
             }
         }
 
