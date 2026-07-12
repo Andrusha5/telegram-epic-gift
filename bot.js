@@ -15,6 +15,9 @@ bot.on('callback_query', async (callbackQuery) => {
         return; 
     }
 
+    // Мгновенно шлём ответ Telegram, чтобы кнопка сразу же «отвисла» и не крутился индикатор!
+    bot.answerCallbackQuery(queryId).catch(() => {});
+
     const parts = actionData.split('_');
     const action = parts[1]; // "app" (одобрить) или "rej" (отклонить)
     const targetUserId = String(parts[2]); 
@@ -25,62 +28,73 @@ bot.on('callback_query', async (callbackQuery) => {
         client = await pool.connect();
         await client.query('BEGIN');
 
-        // Получаем точное имя предмета из базы данных
+        // 1. Получаем информацию о предмете
         const itemRes = await client.query('SELECT name, value FROM items WHERE id = $1', [targetItemId]);
         const item = itemRes.rows[0];
 
         if (!item) {
              await client.query('ROLLBACK');
-             await bot.answerCallbackQuery(queryId, { text: "Ошибка: Предмет удален или не найден в БД!", show_alert: true }).catch(() => {});
+             console.error(`Предмет с ID ${targetItemId} не найден в базе данных.`);
              return;
         }
 
         if (action === 'app') {
-            // ОДОБРЕНО: Зачисляем подарок в инвентарь ( quantity = quantity + 1 )
+            // 2. БЕЗОПАСНЫЙ INSERT: Гарантируем, что пользователь создан в users во избежание Foreign Key ошибок!
             await client.query(
-                'INSERT INTO user_inventory (user_id, item_id, quantity) VALUES ($1, $2, 1) ' +
-                'ON CONFLICT (user_id, item_id) DO UPDATE SET quantity = user_inventory.quantity + 1',
+                `INSERT INTO users (id, first_name, balance) VALUES ($1, $2, 0) ON CONFLICT (id) DO NOTHING`,
+                [targetUserId, 'Пользователь']
+            );
+
+            // 3. БЕЗОПАСНАЯ ПРОВЕРКА И ДОБАВЛЕНИЕ: Избегаем сбоев с ON CONFLICT
+            const checkInv = await client.query(
+                'SELECT quantity FROM user_inventory WHERE user_id = $1 AND item_id = $2',
                 [targetUserId, targetItemId]
             );
+
+            if (checkInv.rows.length > 0) {
+                await client.query(
+                    'UPDATE user_inventory SET quantity = quantity + 1 WHERE user_id = $1 AND item_id = $2',
+                    [targetUserId, targetItemId]
+                );
+            } else {
+                await client.query(
+                    'INSERT INTO user_inventory (user_id, item_id, quantity) VALUES ($1, $2, 1)',
+                    [targetUserId, targetItemId]
+                );
+            }
+
             await client.query('COMMIT');
+            console.log(`[УСПЕХ] Предмет ${item.name} успешно зачислен игроку ${targetUserId}.`);
 
-            // МГНОВЕННО КУПИРУЕМ ЗАВИСАНИЕ КНОПКИ
-            await bot.answerCallbackQuery(queryId, { text: "✅ Заявка одобрена! Предмет зачислен пользователю." }).catch(() => {});
-
-            // Обновляем сообщение в чате админа (статус)
+            // Обновляем сообщение в вашем чате (указываем статус)
             await bot.editMessageText(
-                message.text + `\n\n🟢 *Статус:* ЗАЯВКА ОДОБРЕНА (Предмет успешно зачислен)`,
-                { chat_id: message.chat.id, message_id: message.message_id, parse_mode: 'Markdown' }
+                message.text + `\n\n🟢 <b>Статус:</b> ЗАЯВКА ОДОБРЕНА (Предмет передан)`,
+                { chat_id: message.chat.id, message_id: message.message_id, parse_mode: 'HTML' }
             ).catch(() => {});
 
-            // Отправляем теплое поздравление игроку в ЛС от лица бота
-            const userMsg = `📥 *Ваш депозит подтвержден!*\n\n` +
-                            `🎁 Подарок *${item.name}* зачислен в ваш инвентарь.\n` +
-                            `🎒 Вы можете продать или забрать его во вкладке «Инвентарь»!`;
-            bot.sendMessage(targetUserId, userMsg, { parse_mode: 'Markdown' }).catch(() => {});
+            // Сразу же пишем игроку в ЛС заветную новость
+            const userMsg = `📥 <b>Ваш депозит подтвержден!</b>\n\n` +
+                            `🎁 Подарок <b>${item.name}</b> успешно добавлен в ваш инвентарь.\n` +
+                            `🎒 Откройте «Инвентарь» в приложении, чтобы распорядиться им!`;
+            bot.sendMessage(targetUserId, userMsg, { parse_mode: 'HTML' }).catch(() => {});
 
         } else if (action === 'rej') {
             // ОТКЛОНЕНО
             await client.query('COMMIT');
 
-            await bot.answerCallbackQuery(queryId, { text: "❌ Заявка отклонена." }).catch(() => {});
-
             await bot.editMessageText(
-                message.text + `\n\n🔴 *Статус:* ЗАЯВКА ОТКЛОНЕНА АДМИНИСТРАТОРОМ`,
-                { chat_id: message.chat.id, message_id: message.message_id, parse_mode: 'Markdown' }
+                message.text + `\n\n🔴 <b>Статус:</b> ЗАЯВКА ОТКЛОНЕНА АДМИНИСТРАТОРОМ`,
+                { chat_id: message.chat.id, message_id: message.message_id, parse_mode: 'HTML' }
             ).catch(() => {});
 
-            // Отправляем уведомление игроку в ЛС
-            const userMsg = `⚠️ *Ваш запрос на депозит подарка был отклонен.*\n\n` +
-                            `Пожалуйста, свяжитесь с поддержкой @Sintopa для решения вопроса.`;
-            bot.sendMessage(targetUserId, userMsg, { parse_mode: 'Markdown' }).catch(() => {});
+            const userMsg = `⚠️ <b>Ваш запрос на депозит подарка был отклонен.</b>\n\n` +
+                            `Пожалуйста, свяжитесь с поддержкой @Sintopa для уточнения деталей.`;
+            bot.sendMessage(targetUserId, userMsg, { parse_mode: 'HTML' }).catch(() => {});
         }
 
     } catch (err) {
         if (client) await client.query('ROLLBACK');
-        console.error("Ошибка при обработке callback_query:", err);
-        // Безопасный фолбек для отвисания кнопки в случае сбоя БД
-        bot.answerCallbackQuery(queryId, { text: "Произошла внутренняя ошибка сервера!", show_alert: true }).catch(() => {});
+        console.error("Критическая ошибка при обработке callback кнопки:", err);
     } finally {
         if (client) client.release();
     }
