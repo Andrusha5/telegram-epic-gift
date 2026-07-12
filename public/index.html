@@ -27,12 +27,12 @@
 
     <!-- ================= 1. ГЛАВНЫЙ ЭКРАН (МЕНЮ) ================= -->
     <section id="home-section" class="app-section">
-        <!-- ЖИВАЯ ИГРА "АРЕНА" (НА САМОМ ВЕРХУ) -->
+        <!-- ЖИВАЯ ИГРА "BEST ARENA" (НА САМОМ ВЕРХУ) -->
         <div class="arena-banner-btn" id="arena-banner-btn">
             <div class="arena-info-left">
                 <div class="arena-badge">Live Игра</div>
-                <div class="arena-banner-title">Арена Полигонов</div>
-                <div class="arena-banner-desc">Многопользовательская битва в реальном времени</div>
+                <div class="arena-banner-title">Best Arena</div>
+                <div class="arena-banner-desc">Многопользовательское поле битвы полигонов</div>
             </div>
             <div class="arena-live-preview">
                 <canvas id="arena-mini-canvas" width="70" height="70"></canvas>
@@ -41,13 +41,13 @@
 
         <h2 class="section-title">Кейсы</h2>
         
-        <!-- СЕТКА КЕЙСОВ В 2 СТОЛБИКА -->
+        <!-- СЕТКА КЕЙСОВ В 2 СТОЛБИКА С ОРИГИНАЛЬНЫМИ 3D СУНДУКАМИ -->
         <div class="cases-grid-layout" id="banners-container">
             <!-- Ежедневный бесплатный кейс -->
             <div class="case-card" id="daily-case-banner">
                 <div class="case-badge free">Бесплатно</div>
                 <div class="case-image-wrapper">
-                    <img src="/Images/Items/rare_bird.jpg" alt="Ежедневный кейс" onerror="this.src='https://img.icons8.com/color/96/gift.png'">
+                    <img src="/Images/Cases/daily_case.png" onerror="this.src='/Images/Items/daily_case.png'; this.onerror=function(){this.src='https://img.icons8.com/color/96/gift.png'};" alt="Ежедневный кейс">
                 </div>
                 <div class="case-info">
                     <span class="case-name">Ежедневный</span>
@@ -59,7 +59,7 @@
             <div class="case-card" id="newbie-case-banner">
                 <div class="case-badge paid">0.1 GRAM</div>
                 <div class="case-image-wrapper">
-                    <img src="/Images/Items/bearpink.png" alt="Кейс новичка" onerror="this.src='https://img.icons8.com/color/96/gift.png'">
+                    <img src="/Images/Cases/newbie_case.png" onerror="this.src='/Images/Items/newbie_case.png'; this.onerror=function(){this.src='https://img.icons8.com/color/96/gift.png'};" alt="Кейс новичка">
                 </div>
                 <div class="case-info">
                     <span class="case-name">Кейс новичка</span>
@@ -71,7 +71,7 @@
             <div class="case-card locked" id="bomzh-case-banner">
                 <div class="case-badge locked-badge">Скоро</div>
                 <div class="case-image-wrapper">
-                    <img src="https://img.icons8.com/color/96/beggar.png" alt="Кейс бомжа">
+                    <img src="/Images/Cases/bomzh_case.png" onerror="this.src='/Images/Items/bomzh_case.png'; this.onerror=function(){this.src='https://img.icons8.com/color/96/beggar.png'};" alt="Кейс бомжа">
                 </div>
                 <div class="case-info">
                     <span class="case-name">Кейс бомжа</span>
@@ -83,7 +83,7 @@
             <div class="case-card locked" id="krutoy-case-banner">
                 <div class="case-badge locked-badge">Скоро</div>
                 <div class="case-image-wrapper">
-                    <img src="https://img.icons8.com/color/96/cool.png" alt="Кейс крутого">
+                    <img src="/Images/Cases/krutoy_case.png" onerror="this.src='/Images/Items/krutoy_case.png'; this.onerror=function(){this.src='https://img.icons8.com/color/96/cool.png'};" alt="Кейс крутого">
                 </div>
                 <div class="case-info">
                     <span class="case-name">Кейс крутого</span>
@@ -93,7 +93,7 @@
         </div>
     </section>
 
-    <!-- ================= 2. ЭКРАН ИГРЫ "АРЕНА" ================= -->
+    <!-- ================= 2. ЭКРАН ИГРЫ "BEST ARENA" ================= -->
     <section id="arena-section" class="app-section arena-screen hidden">
         <div class="arena-header-row">
             <button class="arena-back-btn" id="arena-back-home">&larr;</button>
@@ -175,31 +175,16 @@
         </div>
     </section>
 
-    <!-- ================= 5. ЭКРАН РЕЙТИНГА ================= -->
+    <!-- ================= 5. ЭКРАН РЕЙТИНГА (ПУСТОЙ РЕЙТИНГ) ================= -->
     <section id="rating-section" class="app-section hidden">
         <div class="rating-header">
             <h2>🏆 Таблица лидеров</h2>
             <p>Топ игроков по ценности инвентаря и выигрышам</p>
         </div>
-        <div class="leaderboard-list">
-            <!-- Пример статичных строк, заполняется через JS или бэкенд -->
-            <div class="leader-row current-user">
-                <span class="leader-rank">1</span>
-                <img src="https://img.icons8.com/color/96/user.png" class="leader-avatar">
-                <span class="leader-name">Вы (@Sintopa)</span>
-                <span class="leader-score">150.0 GRAM</span>
-            </div>
-            <div class="leader-row">
-                <span class="leader-rank">2</span>
-                <img src="https://img.icons8.com/color/96/user.png" class="leader-avatar">
-                <span class="leader-name">Игрок_2</span>
-                <span class="leader-score">124.5 GRAM</span>
-            </div>
-            <div class="leader-row">
-                <span class="leader-rank">3</span>
-                <img src="https://img.icons8.com/color/96/user.png" class="leader-avatar">
-                <span class="leader-name">Игрок_3</span>
-                <span class="leader-score">98.1 GRAM</span>
+        <div class="leaderboard-list" id="leaderboard-list">
+            <!-- Список пуст, как и требовалось -->
+            <div class="empty-rating-placeholder">
+                🏆 Таблица лидеров пуста. Будьте первым в рейтинге!
             </div>
         </div>
     </section>
@@ -240,15 +225,15 @@
         </div>
     </section>
 
-    <!-- ================= НИЖНЕЕ МЕНЮ НАВИГАЦИИ ================= -->
+    <!-- ================= НИЖНЕЕ МЕНЮ НАВИГАЦИИ (ПОРЯДОК: ИНВЕНТАРЬ | МЕНЮ | РЕЙТИНГ) ================= -->
     <nav class="bottom-nav" id="bottom-navigation">
-        <button class="nav-tab active" data-target="home">
-            <span class="nav-icon">🏠</span>
-            <span class="nav-label">Меню</span>
-        </button>
         <button class="nav-tab" data-target="inventory">
             <span class="nav-icon">🎒</span>
             <span class="nav-label">Инвентарь</span>
+        </button>
+        <button class="nav-tab active" data-target="home">
+            <span class="nav-icon">🏠</span>
+            <span class="nav-label">Меню</span>
         </button>
         <button class="nav-tab" data-target="rating">
             <span class="nav-icon">🏆</span>
