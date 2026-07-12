@@ -2,6 +2,21 @@ const tg = window.Telegram.WebApp;
 tg.expand();
 tg.ready();
 
+// ==========================================================================
+// ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ И ОЧИСТКА ДАННЫХ (КРИТИЧЕСКИ ВАЖНО)
+// ==========================================================================
+function formatItemName(name) {
+    if (!name) return "";
+    let clean = name.replace(/\.(png|jpg|jpeg)$/i, '');
+    clean = clean.replace(/_/g, ' ');
+    return clean.trim();
+}
+
+function formatUsername(name) {
+    if (!name) return "Пользователь";
+    return name.length > 10 ? name.substring(0, 10) + "..." : name;
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
     const API_BASE_URL = window.location.origin;
     let currentUser = {};
@@ -19,7 +34,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     if (!userId) userId = "guest_user_id";
 
-    // Очистка кэша аккаунтов
+    // Сброс кэша для смены аккаунтов
     try {
         const lastSavedUser = localStorage.getItem('last_logged_tg_user');
         if (lastSavedUser !== String(userId)) {
@@ -60,9 +75,71 @@ document.addEventListener('DOMContentLoaded', async () => {
         depositNoticeText: document.getElementById('deposit-notice-text')
     };
 
-    // Точечная защита: если какого-то элемента нет на странице, JS не ломается!
     const safeSetText = (el, val) => { if (el) el.innerText = val; };
     const safeSetStyle = (el, styleProp, val) => { if (el) el.style[styleProp] = val; };
+
+    function showNotification(message, icon = '🎁') {
+        const container = document.getElementById('toast-container');
+        if (!container) return;
+
+        const toast = document.createElement('div');
+        toast.className = 'custom-toast';
+        toast.innerHTML = `
+            <div class="custom-toast-icon">${icon}</div>
+            <div class="custom-toast-content">${message}</div>
+            <button class="custom-toast-close">&times;</button>
+        `;
+        container.appendChild(toast);
+        
+        setTimeout(() => toast.classList.add('show'), 50);
+
+        toast.querySelector('.custom-toast-close').addEventListener('click', () => {
+            toast.classList.remove('show');
+            setTimeout(() => toast.remove(), 400);
+        });
+
+        setTimeout(() => {
+            if (toast.parentNode) {
+                toast.classList.remove('show');
+                setTimeout(() => toast.remove(), 400);
+            }
+        }, 5000);
+    }
+
+    function showCustomModal({ icon = '🎁', title, message, buttons = [], onClose = null }) {
+        const overlay = document.getElementById('custom-modal');
+        const modalIcon = document.getElementById('modal-icon');
+        const modalTitle = document.getElementById('modal-title');
+        const modalMsg = document.getElementById('modal-message');
+        const actionsContainer = document.getElementById('modal-actions');
+        const closeX = document.getElementById('modal-close-btn');
+
+        if (!overlay) return;
+
+        if (modalIcon) modalIcon.innerHTML = icon;
+        if (modalTitle) modalTitle.innerText = title;
+        if (modalMsg) modalMsg.innerText = message;
+        if (actionsContainer) actionsContainer.innerHTML = '';
+
+        buttons.forEach(btnConfig => {
+            const btn = document.createElement('button');
+            btn.className = `modal-btn ${btnConfig.primary ? 'modal-btn-primary' : 'modal-btn-secondary'}`;
+            btn.innerText = btnConfig.text;
+            btn.addEventListener('click', () => {
+                overlay.classList.add('hidden');
+                if (btnConfig.onClick) btnConfig.onClick();
+            });
+            if (actionsContainer) actionsContainer.appendChild(btn);
+        });
+
+        const handleClose = () => {
+            overlay.classList.add('hidden');
+            if (onClose) onClose();
+        };
+
+        if (closeX) closeX.onclick = handleClose;
+        overlay.classList.remove('hidden');
+    }
 
     // Инициализация TON Connect
     let tonConnectUI = null;
@@ -82,7 +159,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         console.error("TON Connect Error:", err);
     }
 
-    // Настройка кастомных сумм Арены
+    // Настройка кастомных сумм Best Arena
     let betValues = [1.0, 2.0, 3.0];
     try {
         const saved = localStorage.getItem(`arena_bets_custom_${userId}`);
@@ -99,7 +176,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     };
     updateBetButtonsUI();
 
-    // Открытие модалки редактирования
+    // Редактирование кнопок ставок
     const btnEdit = document.getElementById('arena-btn-edit');
     if (btnEdit) {
         btnEdit.addEventListener('click', () => {
@@ -167,7 +244,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         renderMini();
     }
 
-    // ----------------- ЛОГИКА АРЕНЫ И РИСОВАНИЯ -----------------
+    // ----------------- ЛОГИКА BEST ARENA И РИСОВАНИЯ -----------------
     const canvas = document.getElementById('arena-main-canvas');
     const mainCtx = canvas ? canvas.getContext('2d') : null;
     const statusText = document.getElementById('arena-status');
@@ -248,7 +325,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             mainCtx.fillStyle = sector.color;
             mainCtx.fill();
 
-            // Белая неоновая обводка поля ТЕКУЩЕГО игрока
+            // Белая неоновая обводка поля текущего игрока
             if (String(sector.userId) === String(userId)) {
                 mainCtx.strokeStyle = '#ffffff';
                 mainCtx.shadowColor = '#ffffff';
@@ -259,7 +336,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         });
 
-        // Рисуем аватарки по центру секторов
+        // Рисуем аватарки участников
         sectors.forEach(sector => {
             let avgX = 0, avgY = 0;
             const pts = sector.points;
@@ -492,7 +569,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         } catch (e) {}
     }
 
-    // Обработчики кнопок быстрых ставок
     const b1 = document.getElementById('arena-bet-1');
     const b2 = document.getElementById('arena-bet-2');
     const b3 = document.getElementById('arena-bet-3');
@@ -1041,6 +1117,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                     fetchUserData(); elements.spinBtn.disabled = false;
                 }
             }, 50);
+        });
+    }
+
+    if (document.getElementById('balance-pill')) {
+        document.getElementById('balance-pill').addEventListener('click', () => {
+            navigateTo('balance');
         });
     }
 
