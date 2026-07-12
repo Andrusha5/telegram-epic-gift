@@ -3,94 +3,6 @@ const tg = window.Telegram.WebApp;
 tg.expand();
 tg.ready();
 
-// Подключаем стили для кастомного окна ввода и красивого ярлыка кошелька под балансом
-const customStyle = document.createElement('style');
-customStyle.innerHTML = `
-    .custom-deposit-modal {
-        position: fixed;
-        top: 0; left: 0; width: 100%; height: 100%;
-        background: rgba(0, 0, 0, 0.85);
-        display: flex; align-items: center; justify-content: center;
-        z-index: 10000;
-        opacity: 0; pointer-events: none;
-        transition: opacity 0.3s ease;
-    }
-    .custom-deposit-modal.show {
-        opacity: 1; pointer-events: auto;
-    }
-    .deposit-modal-content {
-        background: #1c1c1e;
-        border: 1px solid #2c2c2e;
-        border-radius: 20px;
-        padding: 24px;
-        width: 90%; max-width: 320px;
-        text-align: center;
-        box-shadow: 0 10px 25px rgba(0,0,0,0.5);
-        transform: translateY(20px);
-        transition: transform 0.3s ease;
-    }
-    .custom-deposit-modal.show .deposit-modal-content {
-        transform: translateY(0);
-    }
-    .deposit-modal-title {
-        font-size: 18px; font-weight: bold; color: #fff; margin-bottom: 8px;
-    }
-    .deposit-modal-desc {
-        font-size: 13px; color: #8e8e93; margin-bottom: 20px;
-    }
-    .deposit-input-wrapper {
-        position: relative; margin-bottom: 20px;
-    }
-    .deposit-input-field {
-        width: 100%; padding: 14px 16px;
-        background: #2c2c2e; border: 1.5px solid #3a3a3c;
-        border-radius: 12px; color: #fff; font-size: 18px;
-        text-align: center; outline: none; box-sizing: border-box;
-        transition: border-color 0.2s;
-    }
-    .deposit-input-field:focus {
-        border-color: #0088cc;
-    }
-    .deposit-modal-btns {
-        display: flex; gap: 12px;
-    }
-    .deposit-btn {
-        flex: 1; padding: 12px; border: none; border-radius: 12px;
-        font-size: 14px; font-weight: 600; cursor: pointer;
-        transition: opacity 0.2s;
-    }
-    .deposit-btn-pay {
-        background: linear-gradient(135deg, #0088cc, #00a2ff); color: #fff;
-    }
-    .deposit-btn-cancel {
-        background: #2c2c2e; color: #ff3b30;
-    }
-    .deposit-btn:active {
-        opacity: 0.8;
-    }
-    .sub-wallet-address-badge {
-        font-size: 10px;
-        color: #0088cc;
-        text-align: right;
-        margin-top: 4px;
-        font-family: monospace;
-        background: rgba(0, 136, 204, 0.12);
-        padding: 3px 10px;
-        border-radius: 12px;
-        display: inline-block;
-        border: 1px solid rgba(0, 136, 204, 0.2);
-        font-weight: bold;
-    }
-`;
-document.head.appendChild(customStyle);
-
-// Автоматически подключаем официальную библиотеку TonWeb для идеальной упаковки комментариев
-if (!window.TonWeb) {
-    const tonWebScript = document.createElement('script');
-    tonWebScript.src = "https://cdnjs.cloudflare.com/ajax/libs/tonweb/0.0.66/tonweb.min.js";
-    document.head.appendChild(tonWebScript);
-}
-
 document.addEventListener('DOMContentLoaded', async () => {
     const API_BASE_URL = window.location.origin;
     let currentUser = {};
@@ -98,10 +10,94 @@ document.addEventListener('DOMContentLoaded', async () => {
     let currentWalletAddress = null; 
     let currentActiveTab = 'home';  
 
+    // --- ДОБАВЛЕНИЕ СТИЛЕЙ БЕЗОПАСНО ПОСЛЕ ЗАГРУЗКИ DOM ---
+    const customStyle = document.createElement('style');
+    customStyle.innerHTML = `
+        .custom-deposit-modal {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            display: flex; align-items: center; justify-content: center;
+            z-index: 10000;
+            opacity: 0; pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+        .custom-deposit-modal.show {
+            opacity: 1; pointer-events: auto;
+        }
+        .deposit-modal-content {
+            background: #1c1c1e;
+            border: 1px solid #2c2c2e;
+            border-radius: 20px;
+            padding: 24px;
+            width: 90%; max-width: 320px;
+            text-align: center;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            transform: translateY(20px);
+            transition: transform 0.3s ease;
+        }
+        .custom-deposit-modal.show .deposit-modal-content {
+            transform: translateY(0);
+        }
+        .deposit-modal-title {
+            font-size: 18px; font-weight: bold; color: #fff; margin-bottom: 8px;
+        }
+        .deposit-modal-desc {
+            font-size: 13px; color: #8e8e93; margin-bottom: 20px;
+        }
+        .deposit-input-wrapper {
+            position: relative; margin-bottom: 20px;
+        }
+        .deposit-input-field {
+            width: 100%; padding: 14px 16px;
+            background: #2c2c2e; border: 1.5px solid #3a3a3c;
+            border-radius: 12px; color: #fff; font-size: 18px;
+            text-align: center; outline: none; box-sizing: border-box;
+            transition: border-color 0.2s;
+        }
+        .deposit-input-field:focus {
+            border-color: #0088cc;
+        }
+        .deposit-modal-btns {
+            display: flex; gap: 12px;
+        }
+        .deposit-btn {
+            flex: 1; padding: 12px; border: none; border-radius: 12px;
+            font-size: 14px; font-weight: 600; cursor: pointer;
+            transition: opacity 0.2s;
+        }
+        .deposit-btn-pay {
+            background: linear-gradient(135deg, #0088cc, #00a2ff); color: #fff;
+        }
+        .deposit-btn-cancel {
+            background: #2c2c2e; color: #ff3b30;
+        }
+        .deposit-btn:active {
+            opacity: 0.8;
+        }
+        .sub-wallet-address-badge {
+            position: absolute;
+            top: calc(100% + 4px);
+            right: 0;
+            font-size: 10px;
+            color: #00a2ff;
+            background: rgba(28, 28, 30, 0.95);
+            border: 1px solid rgba(0, 136, 204, 0.4);
+            padding: 3px 8px;
+            border-radius: 8px;
+            white-space: nowrap;
+            z-index: 9999;
+            font-family: monospace;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+            font-weight: bold;
+        }
+    `;
+    document.head.appendChild(customStyle);
+
     const GRAMCOIN_ICON_URL = "/Images/Items/gram_popolnenie.png"; 
     const userId = tg.initDataUnsafe?.user?.id || "guest_user_id";
 
-    // --- ИНИЦИАЛИЗАЦИЯ TON CONNECT SDK С УНИКАЛЬНЫМ ХРАНИЛИЩЕМ ---
+    // --- ИНИЦИАЛИЗАЦИЯ TON CONNECT С УНИКАЛЬНЫМ ХРАНИЛИЩЕМ ---
     let tonConnectUI = null;
     try {
         const manifestUrl = `${API_BASE_URL}/tonconnect-manifest.json`;
@@ -125,7 +121,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             tonConnectUI = new window.TonConnectUI({ manifestUrl, storage: customStorage });
         }
     } catch (err) {
-        console.error("Не удалось инициализировать TON Connect SDK:", err);
+        console.error("Не удалось инициализировать TON Connect:", err);
     }
 
     const GIFT_POOL = [
@@ -192,80 +188,28 @@ document.addEventListener('DOMContentLoaded', async () => {
         depositNoticeText: document.getElementById('deposit-notice-text')
     };
 
-    function formatItemName(name) {
-        if (!name) return "";
-        let clean = name.replace(/\.(png|jpg|jpeg)$/i, '');
-        clean = clean.replace(/_/g, ' ');
-        return clean.trim();
+    // --- ПОЗИЦИОНИРОВАНИЕ КОШЕЛЬКА ПОД БАЛАНСОМ ---
+    function updateWalletBadgeVisibility(activeTab, walletAddress) {
+        document.querySelectorAll('.sub-wallet-address-badge').forEach(el => el.remove());
+
+        if (!walletAddress) return;
+
+        // Показываем везде, кроме страницы открытия кейсов
+        const allowedTabs = ['home', 'inventory', 'rating', 'balance'];
+        if (!allowedTabs.includes(activeTab)) return;
+
+        const shortAddr = walletAddress.slice(0, 6) + '...' + walletAddress.slice(-4);
+        const balancePill = document.getElementById('balance-pill');
+        if (balancePill) {
+            balancePill.style.position = 'relative';
+            const badge = document.createElement('div');
+            badge.className = 'sub-wallet-address-badge';
+            badge.innerText = `👛 ${shortAddr}`;
+            balancePill.appendChild(badge);
+        }
     }
 
-    function formatUsername(name) {
-        if (!name) return "Пользователь";
-        return name.length > 10 ? name.substring(0, 10) + "..." : name;
-    }
-
-    function showNotification(message, icon = '🎁') {
-        const container = document.getElementById('toast-container');
-        if (!container) return;
-
-        const toast = document.createElement('div');
-        toast.className = 'custom-toast';
-        toast.innerHTML = `
-            <div class="custom-toast-icon">${icon}</div>
-            <div class="custom-toast-content">${message}</div>
-            <button class="custom-toast-close">&times;</button>
-        `;
-        container.appendChild(toast);
-        
-        setTimeout(() => toast.classList.add('show'), 50);
-
-        toast.querySelector('.custom-toast-close').addEventListener('click', () => {
-            toast.classList.remove('show');
-            setTimeout(() => toast.remove(), 400);
-        });
-
-        setTimeout(() => {
-            if (toast.parentNode) {
-                toast.classList.remove('show');
-                setTimeout(() => toast.remove(), 400);
-            }
-        }, 5000);
-    }
-
-    function showCustomModal({ icon = '🎁', title, message, buttons = [], onClose = null }) {
-        const overlay = document.getElementById('custom-modal');
-        const modalIcon = document.getElementById('modal-icon');
-        const modalTitle = document.getElementById('modal-title');
-        const modalMsg = document.getElementById('modal-message');
-        const actionsContainer = document.getElementById('modal-actions');
-        const closeX = document.getElementById('modal-close-btn');
-
-        modalIcon.innerHTML = icon;
-        modalTitle.innerText = title;
-        modalMsg.innerText = message;
-        actionsContainer.innerHTML = '';
-
-        buttons.forEach(btnConfig => {
-            const btn = document.createElement('button');
-            btn.className = `modal-btn ${btnConfig.primary ? 'modal-btn-primary' : 'modal-btn-secondary'}`;
-            btn.innerText = btnConfig.text;
-            btn.addEventListener('click', () => {
-                overlay.classList.add('hidden');
-                if (btnConfig.onClick) btnConfig.onClick();
-            });
-            actionsContainer.appendChild(btn);
-        });
-
-        const handleClose = () => {
-            overlay.classList.add('hidden');
-            if (onClose) onClose();
-        };
-
-        closeX.onclick = handleClose;
-        overlay.classList.remove('hidden');
-    }
-
-    // --- КРАСИВОЕ КАСТОМНОЕ ОКНО ВВОДА СУММЫ ---
+    // --- КРАСИВОЕ КАСТОМНОЕ ОКНО ДЕПОЗИТА ---
     function showDepositModal(onConfirm) {
         const existing = document.getElementById('custom-dep-input-modal');
         if (existing) existing.remove();
@@ -313,34 +257,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         };
     }
 
-    // --- ОТОБРАЖЕНИЕ СОКРАЩЕННОГО АДРЕСА СТРОГО ПОД БАЛАНСОМ ---
-    function updateWalletBadgeVisibility(activeTab, walletAddress) {
-        document.querySelectorAll('.sub-wallet-address-badge').forEach(el => el.remove());
-
-        if (!walletAddress) return;
-
-        // Показывать везде кроме кейсов
-        const allowedTabs = ['home', 'inventory', 'rating', 'balance'];
-        if (!allowedTabs.includes(activeTab)) return;
-
-        const shortAddr = walletAddress.slice(0, 6) + '...' + walletAddress.slice(-4);
-        const balancePill = document.getElementById('balance-pill');
-        if (balancePill) {
-            const parent = balancePill.parentElement;
-            if (parent) {
-                parent.style.display = 'flex';
-                parent.style.flexDirection = 'column';
-                parent.style.alignItems = 'flex-end';
-            }
-            
-            const badge = document.createElement('div');
-            badge.className = 'sub-wallet-address-badge';
-            badge.innerText = `👛 ${shortAddr}`;
-            balancePill.after(badge);
-        }
-    }
-
-    // --- МАТЕМАТИЧЕСКИ ТОЧНЫЙ КОНВЕРТЕР АДРЕСОВ В ГАРАНТИРОВАННЫЙ СТАНДАРТ UQ... ---
+    // --- МАТЕМАТИЧЕСКИ ТОЧНЫЙ КОНВЕРТЕР АДРЕСОВ (CRC-16/XMODEM) ---
     function crc16Xmodem(data) {
         let crc = 0x0000;
         const polynomial = 0x1021;
@@ -396,65 +313,43 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    // --- ОФИЦИАЛЬНАЯ СБОРКА КОММЕНТАРИЯ К ТРАНЗАКЦИИ ЧЕРЕЗ TONWEB ---
-    async function buildCommentPayload(text) {
-        if (!window.TonWeb) {
-            // Фолбек на случай если библиотека не прогрузилась
-            console.warn("TonWeb не готов, используем фолбек сборщик BOC");
-            return buildCommentPayloadLegacy(text);
-        }
-        try {
-            const tonweb = new window.TonWeb();
-            const cell = new window.TonWeb.boc.Cell();
-            cell.bits.writeUint(0, 32); // Opcode 0 (текстовый коммент)
-            cell.bits.writeBytes(new TextEncoder().encode(text));
-            const bocBytes = await cell.toBoc(false);
-            return window.TonWeb.utils.bytesToBase64(bocBytes);
-        } catch (e) {
-            console.error("Ошибка при сборке BOC через TonWeb:", e);
-            return buildCommentPayloadLegacy(text);
-        }
-    }
-
-    function buildCommentPayloadLegacy(text) {
+    // --- 100% ВАЛИДНЫЙ СБОРЩИК BOC ДЛЯ ТЕКСТОВЫХ КОММЕНТАРИЕВ TON (ЧИСТЫЙ JS) ---
+    function buildCommentPayload(text) {
         const encoder = new TextEncoder();
         const textBytes = encoder.encode(text);
-        const MAX_COMMENT_LENGTH = 120;
-        const effectiveTextBytes = textBytes.slice(0, MAX_COMMENT_LENGTH);
-
-        const dataLength = effectiveTextBytes.length;
-        const bits = 32 + dataLength * 8; 
-        const bytes = Math.ceil(bits / 8);
-
-        const dataBuffer = new Uint8Array(bytes);
-        dataBuffer[0] = 0x00; 
-        dataBuffer[1] = 0x00;
-        dataBuffer[2] = 0x00;
-        dataBuffer[3] = 0x00;
-        dataBuffer.set(effectiveTextBytes, 4); 
-
-        const bocHeader = new Uint8Array([
-            0xB5, 0xEE, 0x9C, 0x72, 
-            0x01,                   
-            0x01,                   
-            0x01,                   
-            0x01,                   
-            0x00,                   
-            (bytes + 2) & 0xFF,     
-            ((bytes + 2) >> 8) & 0xFF, 
-            0x00,                   
-            0x00,                   
-            (dataLength * 2 + 8) & 0xFF, 
-            ((dataLength * 2 + 8) >> 8) & 0xFF 
-        ]);
-
-        const fullBoc = new Uint8Array(bocHeader.length + dataBuffer.length);
-        fullBoc.set(bocHeader, 0);
-        fullBoc.set(dataBuffer, bocHeader.length);
-
+        const N = 4 + textBytes.length; 
+        
+        const bocBytes = new Uint8Array(11 + 2 + N);
+        
+        // BOC Header
+        bocBytes[0] = 0xb5;
+        bocBytes[1] = 0xee;
+        bocBytes[2] = 0x9c;
+        bocBytes[3] = 0x72;
+        bocBytes[4] = 0x01; // flags
+        bocBytes[5] = 0x01; // size_bytes
+        bocBytes[6] = 0x01; // cells_num
+        bocBytes[7] = 0x01; // roots_num
+        bocBytes[8] = 0x00; // complete_num
+        bocBytes[9] = 2 + N; // size of cell data
+        bocBytes[10] = 0x00; // root index
+        
+        // Cell Data Descriptors
+        bocBytes[11] = 0x00;   // d1: 0 references
+        bocBytes[12] = N * 2;  // d2: 2 * N (since it is byte-aligned)
+        
+        // Text comment prefix (0x00000000)
+        bocBytes[13] = 0x00;
+        bocBytes[14] = 0x00;
+        bocBytes[15] = 0x00;
+        bocBytes[16] = 0x00;
+        
+        // Comment text
+        bocBytes.set(textBytes, 17);
+        
         let binary = '';
-        for (let i = 0; i < fullBoc.length; i++) {
-            binary += String.fromCharCode(fullBoc[i]);
+        for (let i = 0; i < bocBytes.length; i++) {
+            binary += String.fromCharCode(bocBytes[i]);
         }
         return btoa(binary);
     }
@@ -500,7 +395,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }, 4000); 
     }
 
-    // --- ПРИВЯЗКА И ДЕПОЗИТ TON CONNECT ---
+    // --- TON CONNECT ИОЗД — ОБРАБОТЧИКИ СОБЫТИЙ ---
     if (tonConnectUI) {
         tonConnectUI.onStatusChange(wallet => {
             if (wallet) {
@@ -535,12 +430,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         });
 
-        // КЛИК ПРИВЯЗАТЬ (БЕЗОПАСНАЯ ИНИЦИАЛИЗАЦИЯ И СБРОС ЗАВИСШИХ СЕССИЙ)
         elements.connectWalletBtn.addEventListener('click', async () => {
-            if (!tonConnectUI) {
-                showNotification("Пожалуйста, подождите. TON Connect загружается...", "⚠️");
-                return;
-            }
+            if (!tonConnectUI) return;
             try {
                 if (tonConnectUI.connected) {
                     showCustomModal({
@@ -560,15 +451,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                         ]
                     });
                 } else {
-                    // Принудительно очищаем зависшие сессии перед входом
                     try {
                         await tonConnectUI.disconnect(); 
                     } catch (e) {}
                     await tonConnectUI.openModal();
                 }
             } catch (e) {
-                console.error("Connection error:", e);
-                // Очистка принудительно если все зависло
                 try {
                     localStorage.clear();
                     showNotification("Сессия сброшена. Пожалуйста, попробуйте еще раз.", "🔄");
@@ -576,16 +464,13 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         });
 
-        // КЛИК ПОПОЛНИТЬ
         elements.depositBalanceBtn.addEventListener('click', () => {
             if (!tonConnectUI.connected) {
                 showNotification("Пожалуйста, сначала привяжите кошелек!", "⚠️");
                 return;
             }
 
-            // Открываем кастомное красивое диалоговое окно
             showDepositModal(async (gramAmount) => {
-                // Курс 1:1, GRAM = TON
                 const amountFloat = gramAmount; 
 
                 try {
@@ -599,9 +484,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     }
 
                     const nanoAmount = Math.floor(amountFloat * 1000000000).toString();
-                    
-                    // Собираем 100% валидный комментарий через TonWeb
-                    const compiledPayload = await buildCommentPayload(`deposit_${currentUser.id || "0"}`);
+                    const compiledPayload = buildCommentPayload(`deposit_${currentUser.id || "0"}`);
 
                     const transaction = {
                         validUntil: Math.floor(Date.now() / 1000) + 360, 
@@ -619,8 +502,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                     try {
                         await tonConnectUI.sendTransaction(transaction);
                         showNotification("Транзакция отправлена в сеть! Ожидаем зачисления...", "⌛");
-                        
-                        // Запуск автоматического фонового опроса
                         startPaymentPolling(amountFloat);
                     } catch (sendError) {
                         showNotification("Ошибка: Оплата не прошла или была отменена.", "❌");
@@ -638,7 +519,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     function navigateTo(target) {
-        currentActiveTab = target; // Запоминаем вкладку
+        currentActiveTab = target; 
         updateWalletBadgeVisibility(currentActiveTab, currentWalletAddress);
 
         [elements.homeSection, elements.caseSection, elements.inventorySection, elements.ratingSection, elements.balanceSection].forEach(s => {
