@@ -136,12 +136,10 @@ function matchTransactionComment(tx, userId) {
         // 2. Декодирование стандартного Base64 из блокчейна TON
         try {
             const fromBase64 = Buffer.from(val, 'base64');
-            // Если транзакция отправлена правильно, первые 4 байта равны 0 (op-code для комментария)
             if (fromBase64.length > 4 && fromBase64.readUInt32BE(0) === 0) {
                 const textPart = fromBase64.slice(4).toString('utf8');
                 if (textPart.includes(targetPattern)) return true;
             }
-            // Дополнительная проверка на случай если op-code отсутствовал
             if (fromBase64.toString('utf8').includes(targetPattern)) return true;
         } catch (e) {}
 
