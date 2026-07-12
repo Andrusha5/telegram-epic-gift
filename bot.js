@@ -66,7 +66,7 @@ bot.on('callback_query', async (callbackQuery) => {
             await client.query('COMMIT');
             console.log(`[УСПЕХ] Предмет ${item.name} успешно зачислен игроку ${targetUserId}.`);
 
-            // Обновляем сообщение в вашем чате (указываем статус)
+            // Обновляем сообщение в чате админа (статус) — оставляем только вечные ссылки!
             await bot.editMessageText(
                 message.text + `\n\n🟢 <b>Статус:</b> ЗАЯВКА ОДОБРЕНА (Предмет передан)`,
                 { chat_id: message.chat.id, message_id: message.message_id, parse_mode: 'HTML' }
