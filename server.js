@@ -26,7 +26,6 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const CHANNEL_USERNAME = process.env.CHANNEL_USERNAME || "";
 
-// КОШЕЛЕК АДМИНИСТРАТОРА (ВЕРНЫЙ АДРЕС ПОЛУЧАЕМ ИЗ НАСТРОЕК RENDER)
 const ADMIN_TON_ADDRESS = process.env.ADMIN_TON_ADDRESS; 
 const TONCENTER_API_KEY = process.env.TONCENTER_API_KEY; 
 
@@ -132,16 +131,16 @@ function matchTransactionComment(tx, userId) {
     for (const val of candidates) {
         if (!val) continue;
         
-        // 1. Проверка прямого совпадения (если текст чистый)
+        // 1. Проверка прямого совпадения
         if (val.includes(targetPattern)) return true;
 
-        // 2. Декодирование Base64 (стандартно для Wallet API / TonCenter)
+        // 2. Декодирование Base64
         try {
             const fromBase64 = Buffer.from(val, 'base64').toString('utf8');
             if (fromBase64.includes(targetPattern)) return true;
         } catch (e) {}
 
-        // 3. Декодирование Hex (шестнадцатеричное представление комментариев)
+        // 3. Декодирование Hex
         try {
             const fromHex = Buffer.from(val, 'hex').toString('utf8');
             if (fromHex.includes(targetPattern)) return true;
@@ -150,7 +149,7 @@ function matchTransactionComment(tx, userId) {
     return false;
 }
 
-// АВТОМАТИЧЕСКАЯ ПРОВЕРКА ПЛАТЕЖЕЙ TON CONNECT
+// АВТОМАТИЧЕСКАЯ ПРОВЕРКА ПЛАТЕЖЕЙ TON CONNECT (1 TON = 1 GRAM)
 app.post('/api/verify-payment', async (req, res) => {
     if (!req.telegramUser || !req.telegramUser.id) {
         console.warn("verify-payment: Запрос отклонен (нет telegramUser.id в сессии)");
@@ -163,9 +162,16 @@ app.post('/api/verify-payment', async (req, res) => {
         return res.status(500).json({ error: "Ошибка сервера: API-ключ TON не настроен." });
     }
 
+    // Минимальный лимит на депозит на бэкенде
+    if (parseFloat(amount) < 0.1) {
+         return res.status(400).json({ error: "Ошибка: минимальная сумма 0.1 GRAM" });
+    }
+
     try {
         const TONCENTER_BASE_URL = "https://toncenter.com/api/v2/jsonRPC";
-        const exchangeRate = 10.0; // 1 TON = 10 GRAM
+        
+        // Курс обмена установлен как 1:1 (1 TON = 1 GRAM)
+        const exchangeRate = 1.0; 
 
         console.log(`verify-payment: Запрос транзакций для кошелька ${ADMIN_TON_ADDRESS}...`);
         const getTxsResponse = await axios.post(TONCENTER_BASE_URL, {
@@ -200,7 +206,7 @@ app.post('/api/verify-payment', async (req, res) => {
                     
                     // Запуск умного мульти-декодирования
                     if (matchTransactionComment(tx, userId)) {
-                        console.log(`verify-payment: Транзакция найдена в TON! Hash: ${tx.transaction_id.hash}`);
+                        console.log(`verify-payment: Транзакция успешно найдена! Hash: ${tx.transaction_id.hash}`);
                         foundTransaction = tx;
                         break;
                     }
@@ -238,18 +244,12 @@ app.post('/api/verify-payment', async (req, res) => {
                 await client.query('COMMIT');
                 console.log(`verify-payment: Баланс пользователя ${userId} пополнен на +${gramAmount} GRAM.`);
 
-                // Отправка уведомления администратору в Telegram
-                const adminId = process.env.ADMIN_TELEGRAM_ID;
-                if (adminId && bot) {
-                    const userRes = await query('SELECT username, first_name FROM users WHERE id = $1', [userId]);
-                    const user = userRes.rows[0];
-                    const mention = user.username ? `@${user.username}` : user.first_name;
-                    
-                    const msg = `💎 *Авто-пополнение баланса!*\n\n` +
-                                `👤 Игрок: ${user.first_name} (${mention})\n` +
-                                `💰 Сумма: *${amount} TON* (+${gramAmount} GRAM)\n` +
-                                `🔗 Чат: [Открыть чат](tg://user?id=${userId})`;
-                    bot.sendMessage(adminId, msg, { parse_mode: 'Markdown' }).catch(console.error);
+                // Отправка автоматического уведомления ТОЛЬКО ИГРОКУ, сделавшему перевод (Админу НЕ шлет)
+                if (bot && userId) {
+                    const msg = `🎉 *Баланс успешно пополнен!*\n\n` +
+                                `💰 На ваш игровой счет зачислено: *${gramAmount.toFixed(2)} GRAM*\n\n` +
+                                `🎈 Спасибо за покупку и приятной игры!`;
+                    bot.sendMessage(userId, msg, { parse_mode: 'Markdown' }).catch(console.error);
                 }
 
                 return res.json({ success: true, newBalance: gramAmount });
