@@ -3,31 +3,108 @@ const tg = window.Telegram.WebApp;
 tg.expand();
 tg.ready();
 
+// Добавляем красивый CSS стиль для кастомного окна ввода
+const customStyle = document.createElement('style');
+customStyle.innerHTML = `
+    .custom-deposit-modal {
+        position: fixed;
+        top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0, 0, 0, 0.85);
+        display: flex; align-items: center; justify-content: center;
+        z-index: 10000;
+        opacity: 0; pointer-events: none;
+        transition: opacity 0.3s ease;
+    }
+    .custom-deposit-modal.show {
+        opacity: 1; pointer-events: auto;
+    }
+    .deposit-modal-content {
+        background: #1c1c1e;
+        border: 1px solid #2c2c2e;
+        border-radius: 20px;
+        padding: 24px;
+        width: 90%; max-width: 320px;
+        text-align: center;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+        transform: translateY(20px);
+        transition: transform 0.3s ease;
+    }
+    .custom-deposit-modal.show .deposit-modal-content {
+        transform: translateY(0);
+    }
+    .deposit-modal-title {
+        font-size: 18px; font-weight: bold; color: #fff; margin-bottom: 8px;
+    }
+    .deposit-modal-desc {
+        font-size: 13px; color: #8e8e93; margin-bottom: 20px;
+    }
+    .deposit-input-wrapper {
+        position: relative; margin-bottom: 20px;
+    }
+    .deposit-input-field {
+        width: 100%; padding: 14px 16px;
+        background: #2c2c2e; border: 1.5px solid #3a3a3c;
+        border-radius: 12px; color: #fff; font-size: 18px;
+        text-align: center; outline: none; box-sizing: border-box;
+        transition: border-color 0.2s;
+    }
+    .deposit-input-field:focus {
+        border-color: #0088cc;
+    }
+    .deposit-modal-btns {
+        display: flex; gap: 12px;
+    }
+    .deposit-btn {
+        flex: 1; padding: 12px; border: none; border-radius: 12px;
+        font-size: 14px; font-weight: 600; cursor: pointer;
+        transition: opacity 0.2s;
+    }
+    .deposit-btn-pay {
+        background: linear-gradient(135deg, #0088cc, #00a2ff); color: #fff;
+    }
+    .deposit-btn-cancel {
+        background: #2c2c2e; color: #ff3b30;
+    }
+    .deposit-btn:active {
+        opacity: 0.8;
+    }
+    .sub-wallet-address-badge {
+        font-size: 11px;
+        color: #a1a1a5;
+        text-align: center;
+        margin-top: 4px;
+        font-family: monospace;
+        background: rgba(255, 255, 255, 0.07);
+        padding: 2px 10px;
+        border-radius: 20px;
+        display: inline-block;
+    }
+`;
+document.head.appendChild(customStyle);
+
 document.addEventListener('DOMContentLoaded', async () => {
     const API_BASE_URL = window.location.origin;
     let currentUser = {};
     let isNewbieCaseMode = false; 
+    let currentWalletAddress = null; // Храним текущий кошелек
+    let currentActiveTab = 'home';  // Храним текущую вкладку
 
     const GRAMCOIN_ICON_URL = "/Images/Items/gram_popolnenie.png"; 
-
-    // Получаем Telegram ID пользователя для создания уникального хранилища
     const userId = tg.initDataUnsafe?.user?.id || "guest_user_id";
 
-    // --- ИНИЦИАЛИЗАЦИЯ TON CONNECT SDK С УНИКАЛЬНЫМ ХРАНИЛИЩЕМ ДЛЯ КАЖДОГО ПОЛЬЗОВАТЕЛЯ ---
+    // --- ИНИЦИАЛИЗАЦИЯ TON CONNECT SDK С УНИКАЛЬНЫМ ХРАНИЛИЩЕМ ---
     let tonConnectUI = null;
     try {
         const manifestUrl = `${API_BASE_URL}/tonconnect-manifest.json`;
-        
-        // Custom storage для TonConnect, чтобы сессии были уникальными для каждого Telegram ID
         const customStorage = {
             setItem: (key, value) => {
-                try { localStorage.setItem(`ton-connect-${userId}-${key}`, value); } catch (e) { console.error("localStorage setItem error:", e); }
+                try { localStorage.setItem(`ton-connect-${userId}-${key}`, value); } catch (e) {}
             },
             getItem: (key) => {
-                try { return localStorage.getItem(`ton-connect-${userId}-${key}`); } catch (e) { console.error("localStorage getItem error:", e); return null; }
+                try { return localStorage.getItem(`ton-connect-${userId}-${key}`); } catch (e) { return null; }
             },
             removeItem: (key) => {
-                try { localStorage.removeItem(`ton-connect-${userId}-${key}`); } catch (e) { console.error("localStorage removeItem error:", e); }
+                try { localStorage.removeItem(`ton-connect-${userId}-${key}`); } catch (e) {}
             }
         };
 
@@ -179,6 +256,73 @@ document.addEventListener('DOMContentLoaded', async () => {
         overlay.classList.remove('hidden');
     }
 
+    // --- КРАСИВОЕ КАСТОМНОЕ ОКНО ВВОДА СУММЫ ---
+    function showDepositModal(onConfirm) {
+        const existing = document.getElementById('custom-dep-input-modal');
+        if (existing) existing.remove();
+
+        const modalHtml = `
+            <div id="custom-dep-input-modal" class="custom-deposit-modal">
+                <div class="deposit-modal-content">
+                    <div class="deposit-modal-title">Пополнение баланса</div>
+                    <div class="deposit-modal-desc">Введите сумму пополнения (минимальная сумма 0.1 GRAM)</div>
+                    <div class="deposit-input-wrapper">
+                        <input type="number" id="deposit-gram-input" class="deposit-input-field" placeholder="0.00" min="0.1" step="0.1" value="1.0">
+                    </div>
+                    <div class="deposit-modal-btns">
+                        <button id="deposit-modal-btn-cancel" class="deposit-btn deposit-btn-cancel">Отмена</button>
+                        <button id="deposit-modal-btn-pay" class="deposit-btn deposit-btn-pay">Оплатить</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+        
+        const modal = document.getElementById('custom-dep-input-modal');
+        const input = document.getElementById('deposit-gram-input');
+        const btnCancel = document.getElementById('deposit-modal-btn-cancel');
+        const btnPay = document.getElementById('deposit-modal-btn-pay');
+
+        setTimeout(() => modal.classList.add('show'), 10);
+
+        btnCancel.onclick = () => {
+            modal.classList.remove('show');
+            setTimeout(() => modal.remove(), 300);
+        };
+
+        btnPay.onclick = () => {
+            const val = parseFloat(input.value);
+            if (isNaN(val) || val < 0.1) {
+                showNotification("Ошибка! Минимальная сумма 0.1 GRAM.", "⚠️");
+                return;
+            }
+            modal.classList.remove('show');
+            setTimeout(() => {
+                modal.remove();
+                onConfirm(val);
+            }, 300);
+        };
+    }
+
+    // --- ОТОБРАЖЕНИЕ СОКРАЩЕННОГО АДРЕСА ПОД БАЛАНСОМ ---
+    function updateWalletBadgeVisibility(activeTab, walletAddress) {
+        document.querySelectorAll('.sub-wallet-address-badge').forEach(el => el.remove());
+
+        if (!walletAddress) return;
+
+        const allowedTabs = ['home', 'inventory', 'rating'];
+        if (!allowedTabs.includes(activeTab)) return;
+
+        const shortAddr = walletAddress.slice(0, 6) + '...' + walletAddress.slice(-4);
+        const balancePill = document.getElementById('balance-pill');
+        if (balancePill) {
+            const badge = document.createElement('div');
+            badge.className = 'sub-wallet-address-badge';
+            badge.innerText = `👛 ${shortAddr}`;
+            balancePill.parentNode.insertBefore(badge, balancePill.nextSibling);
+        }
+    }
+
     // --- МАТЕМАТИЧЕСКИ ТОЧНЫЙ КОНВЕРТЕР АДРЕСОВ В ГАРАНТИРОВАННЫЙ СТАНДАРТ UQ... ---
     function crc16Xmodem(data) {
         let crc = 0x0000;
@@ -197,7 +341,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     function toUserFriendlyAddress(rawAddress) {
-        if (!rawAddress) return "Неизвестен";
+        if (!rawAddress) return null;
         if (rawAddress.startsWith('U') || rawAddress.startsWith('E')) {
             return rawAddress; 
         }
@@ -213,7 +357,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
             
             let b = new Uint8Array(34);
-            b[0] = 0x51; // Тег "non-bounceable" (для префикса UQ...)
+            b[0] = 0x51; 
             b[1] = (workchain === 0) ? 0x00 : (workchain === -1 ? 0xFF : workchain & 0xFF);
             b.set(addressBytes, 2);
             
@@ -231,7 +375,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             let base64 = btoa(binary);
             return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
         } catch (e) {
-            console.warn("Ошибка конвертации сырого адреса:", rawAddress, e);
             return rawAddress;
         }
     }
@@ -288,20 +431,19 @@ document.addEventListener('DOMContentLoaded', async () => {
             attempt++;
             if (attempt > maxAttempts) {
                 clearInterval(intervalId);
-                showNotification("Время ожидания транзакции истекло. Баланс обновится, как только TON поступят на кошелек.", "⌛");
+                showNotification("Превышено время ожидания. Баланс обновится автоматически в течение пары минут.", "⌛");
                 fetchUserData();
                 return;
             }
 
             try {
-                // Отправляем запрос верификации с передачей initData внутри JSON Body
                 const verifyRes = await fetch(`${API_BASE_URL}/api/verify-payment`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         amount: amountFloat,
                         userId: currentUser.id,
-                        initData: tg.initData || "" // Избавляет от проблем с UTF-8 заголовками
+                        initData: tg.initData || "" 
                     })
                 });
 
@@ -309,17 +451,17 @@ document.addEventListener('DOMContentLoaded', async () => {
                     const verifyData = await verifyRes.json();
                     if (verifyData.success) {
                         clearInterval(intervalId);
-                        showNotification(`Баланс успешно пополнен на +${(amountFloat * 10).toFixed(3)} GRAM!`, "✅");
-                        fetchUserData(); // Обновляем баланс мгновенно!
+                        showNotification(`Успешно! Баланс пополнен на +${amountFloat.toFixed(2)} GRAM!`, "✅");
+                        fetchUserData(); 
                     }
                 } else if (verifyRes.status === 401) {
                     clearInterval(intervalId);
-                    showNotification("Ошибка авторизации. Пожалуйста, перезапустите мини-приложение.", "❌");
+                    showNotification("Запрос отклонен: Перезапустите приложение.", "❌");
                 }
             } catch (pollErr) {
-                console.error("Ошибка при опросе сервера верификации:", pollErr);
+                console.error("Ошибка при опросе сервера:", pollErr);
             }
-        }, 4000); // Опрос каждые 4 секунды
+        }, 4000); 
     }
 
     // --- ПРИВЯЗКА И ДЕПОЗИТ TON CONNECT ---
@@ -327,8 +469,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         tonConnectUI.onStatusChange(wallet => {
             if (wallet) {
                 const rawAddress = wallet.account.address;
-                const userFriendlyAddress = toUserFriendlyAddress(rawAddress); 
-                const shortAddress = userFriendlyAddress.slice(0, 4) + '...' + userFriendlyAddress.slice(-4);
+                currentWalletAddress = toUserFriendlyAddress(rawAddress); 
+                const shortAddress = currentWalletAddress.slice(0, 4) + '...' + currentWalletAddress.slice(-4);
                 
                 elements.connectWalletBtn.innerText = `Привязан: (${shortAddress})`;
                 elements.connectWalletBtn.style.background = 'linear-gradient(135deg, #28a745, #218838)';
@@ -339,7 +481,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                 elements.depositBalanceBtn.style.cursor = "pointer";
                 elements.depositNoticeText.innerText = "Пополнение кошелька полностью разблокировано";
                 elements.depositNoticeText.style.color = "var(--green-success)";
+                
+                // Рисуем кошелек под балансом на разрешенных страницах
+                updateWalletBadgeVisibility(currentActiveTab, currentWalletAddress);
             } else {
+                currentWalletAddress = null;
                 elements.connectWalletBtn.innerText = 'Привязать кошелёк';
                 elements.connectWalletBtn.style.background = 'linear-gradient(135deg, #0088cc, #00a2ff)';
                 elements.connectWalletBtn.style.boxShadow = '0 4px 15px rgba(0, 136, 204, 0.4)';
@@ -349,15 +495,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                 elements.depositBalanceBtn.style.cursor = "not-allowed";
                 elements.depositNoticeText.innerText = "Пополнение доступно после привязки кошелька";
                 elements.depositNoticeText.style.color = "var(--light-text-color)";
+                
+                updateWalletBadgeVisibility(currentActiveTab, null);
             }
         });
 
         // КЛИК ПРИВЯЗАТЬ
         elements.connectWalletBtn.addEventListener('click', async () => {
-            if (!tonConnectUI) {
-                showNotification("Ошибка: TON Connect не загрузился. Перезапустите приложение.", "⚠️");
-                return;
-            }
+            if (!tonConnectUI) return;
             if (tonConnectUI.connected) {
                 showCustomModal({
                     icon: '💎',
@@ -379,78 +524,63 @@ document.addEventListener('DOMContentLoaded', async () => {
                 try {
                     await tonConnectUI.openModal();
                 } catch (e) {
-                    console.error("Ошибка при открытии TON Connect модала:", e);
-                    showNotification("Не удалось запустить подключение. Попробуйте снова.", "❌");
+                    showNotification("Не удалось запустить подключение.", "❌");
                 }
             }
         });
 
         // КЛИК ПОПОЛНИТЬ
-        elements.depositBalanceBtn.addEventListener('click', async () => {
+        elements.depositBalanceBtn.addEventListener('click', () => {
             if (!tonConnectUI.connected) {
                 showNotification("Пожалуйста, сначала привяжите кошелек!", "⚠️");
                 return;
             }
 
-            const minGramAmount = 0.1; // Минималка 0.1 GRAM
-            const amountStr = prompt(`Введите сумму пополнения в GRAM (минимальное пополнение: ${minGramAmount} GRAM):`, minGramAmount.toString());
-            if (!amountStr) return;
-
-            const gramAmount = parseFloat(amountStr);
-            if (isNaN(gramAmount) || gramAmount < minGramAmount) {
-                showNotification(`Ошибка! Минимальное пополнение ${minGramAmount} GRAM.`, "⚠️");
-                return;
-            }
-
-            // Переводим GRAM в TON по курсу (1 TON = 10 GRAM) для проведения транзакции в блокчейне
-            const amountFloat = gramAmount / 10.0; 
-
-            try {
-                const addrRes = await fetch(`${API_BASE_URL}/api/deposit_address`);
-                const addrData = await addrRes.json();
-                const adminTonAddress = addrData.address;
-
-                if (!adminTonAddress) {
-                    showNotification("Ошибка получения реквизитов администратора.", "⚠️");
-                    return;
-                }
-
-                const nanoAmount = Math.floor(amountFloat * 1000000000).toString();
-                const compiledPayload = buildCommentPayload(`deposit_${currentUser.id || "0"}`);
-
-                const transaction = {
-                    validUntil: Math.floor(Date.now() / 1000) + 360, 
-                    messages: [
-                        {
-                            address: adminTonAddress,
-                            amount: nanoAmount,
-                            payload: compiledPayload 
-                        }
-                    ]
-                };
-
-                showNotification("Ожидание подтверждения транзакции в вашем кошельке...", "💎");
+            // Открываем кастомное красивое диалоговое окно
+            showDepositModal(async (gramAmount) => {
+                // Курс 1:1, значит количество GRAM равно количеству TON для блокчейн транзакции
+                const amountFloat = gramAmount; 
 
                 try {
-                    await tonConnectUI.sendTransaction(transaction);
-                    showNotification("Транзакция отправлена в блокчейн! Ожидаем подтверждения...", "⌛");
-                    
-                    // Запуск автоматического фонового опроса сервера
-                    startPaymentPolling(amountFloat);
-                } catch (sendError) {
-                    console.warn("Транзакция отменена или не удалась:", sendError);
-                    if (sendError.message && sendError.message.includes("cancelled")) {
-                         showNotification("Оплата отменена пользователем.", "ℹ️");
-                    } else {
-                         showNotification("Ошибка при отправке. Пробуем проверить статус...", "⌛");
-                         startPaymentPolling(amountFloat);
-                    }
-                }
+                    const addrRes = await fetch(`${API_BASE_URL}/api/deposit_address`);
+                    const addrData = await addrRes.json();
+                    const adminTonAddress = addrData.address;
 
-            } catch (err) {
-                console.error("Ошибка инициализации транзакции:", err);
-                showNotification("Не удалось инициировать оплату.", "❌");
-            }
+                    if (!adminTonAddress) {
+                        showNotification("Ошибка получения реквизитов.", "⚠️");
+                        return;
+                    }
+
+                    const nanoAmount = Math.floor(amountFloat * 1000000000).toString();
+                    const compiledPayload = buildCommentPayload(`deposit_${currentUser.id || "0"}`);
+
+                    const transaction = {
+                        validUntil: Math.floor(Date.now() / 1000) + 360, 
+                        messages: [
+                            {
+                                address: adminTonAddress,
+                                amount: nanoAmount,
+                                payload: compiledPayload 
+                            }
+                        ]
+                    };
+
+                    showNotification("Ожидание подтверждения транзакции в вашем кошельке...", "💎");
+
+                    try {
+                        await tonConnectUI.sendTransaction(transaction);
+                        showNotification("Транзакция отправлена в сеть! Ожидаем зачисления...", "⌛");
+                        
+                        // Запуск умного автоматического обновления баланса
+                        startPaymentPolling(amountFloat);
+                    } catch (sendError) {
+                        showNotification("Ошибка: Оплата не прошла или была отменена.", "❌");
+                    }
+
+                } catch (err) {
+                    showNotification("Не удалось инициировать оплату.", "❌");
+                }
+            });
         });
     }
 
@@ -459,6 +589,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     function navigateTo(target) {
+        currentActiveTab = target; // Запоминаем вкладку
+        updateWalletBadgeVisibility(currentActiveTab, currentWalletAddress);
+
         [elements.homeSection, elements.caseSection, elements.inventorySection, elements.ratingSection, elements.balanceSection].forEach(s => {
             if (s) s.classList.add('hidden');
         });
