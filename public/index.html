@@ -13,7 +13,7 @@
 </head>
 <body>
 
-    <!-- ВЕРХНЯЯ ПАНЕЛЬ (ХЕДЕР) С ОРИГИНАЛЬНЫМ СТИЛЕМ -->
+    <!-- ВЕРХНЯЯ ПАНЕЛЬ (ХЕДЕР) -->
     <header class="main-header">
         <div class="header-left">
             <div class="logo-area">
@@ -33,7 +33,7 @@
 
     <!-- ================= 1. ГЛАВНЫЙ ЭКРАН (МЕНЮ) ================= -->
     <section id="home-section" class="app-section">
-        <!-- ОРИГИНАЛЬНЫЙ ПРИВЕТСТВЕННЫЙ БАННЕР -->
+        <!-- ПРИВЕТСТВЕННЫЙ БАННЕР -->
         <div class="welcome-banner">
             <h2>Добро пожаловать в BestGifts!</h2>
         </div>
@@ -179,21 +179,15 @@
         <div class="wallet-actions-container">
             <!-- Кнопка привязки TON кошелька -->
             <button id="connect-wallet-btn" class="connect-wallet-btn">Привязать кошелёк</button>
+            
+            <!-- Поле ввода суммы пополнения -->
+            <div id="deposit-input-wrapper" class="deposit-input-wrapper hidden">
+                <input type="number" id="deposit-amount-input" class="deposit-amount-field" placeholder="Введите сумму (мин. 0.1 TON)" step="0.1" min="0.1">
+            </div>
+
             <!-- Пополнение баланса -->
             <button id="deposit-balance-btn" class="deposit-balance-btn" disabled>Пополнить баланс</button>
             <p id="deposit-notice-text" class="deposit-notice">Пополнение доступно после привязки кошелька</p>
-        </div>
-
-        <div class="wallet-faq-section">
-            <h3>Часто задаваемые вопросы</h3>
-            <div class="faq-item">
-                <span class="faq-q">Что такое валюта GRAM?</span>
-                <span class="faq-a">Это внутриигровая монета, эквивалентная криптовалюте TON (1 GRAM = 1 TON).</span>
-            </div>
-            <div class="faq-item">
-                <span class="faq-q">Как работает пополнение?</span>
-                <span class="faq-a">После привязки кошелька и указания суммы транзакция запрашивает одобрение в вашем TON-кошельке.</span>
-            </div>
         </div>
     </section>
 
@@ -213,7 +207,7 @@
         </button>
     </nav>
 
-    <!-- ================= МОДАЛКИ И УВЕДОМЛЕНИЯ ================= -->
+    <!-- МОДАЛКИ И УВЕДОМЛЕНИЯ -->
     <div id="toast-container" class="toast-container"></div>
 
     <div id="custom-modal" class="modal-overlay hidden">
@@ -229,4 +223,4 @@
     <!-- Подключение главного JS логики -->
     <script src="js/app.js"></script>
 </body>
-                                                 </html>
+    </html>
