@@ -94,14 +94,14 @@ app.get('/api/deposit_address', (req, res) => {
 });
 
 app.get('/tonconnect-manifest.json', (req, res) => {
-    const host = req.get('host');
-    const protocol = (host.includes('localhost') || host.includes('127.0.0.1')) ? 'http' : 'https';
-    const appUrl = process.env.WEB_APP_URL || `${protocol}://${host}`;
+    // Возвращаем точный манифест, привязанный к вашему репозиторию
     res.setHeader('Content-Type', 'application/json');
     res.json({
-        url: appUrl,
-        name: "BestGifts",
-        iconUrl: `${appUrl}/Images/Items/gram_popolnenie.png`
+        "url": "https://telegram.org",
+        "name": "BestGifts",
+        "iconUrl": "https://img.icons8.com/color/96/gift.png",
+        "termsOfUseUrl": "https://telegram.org",
+        "privacyPolicyUrl": "https://telegram.org"
     });
 });
 
@@ -110,8 +110,8 @@ app.post('/api/verify-payment', async (req, res) => {
         return res.status(401).json({ error: 'Unauthorized' });
     }
     const { amount, userId } = req.body;
-    if (!TONCENTER_API_KEY) return res.status(500).json({ error: "Ошибка сервера: API-ключ TON не настроен." });
-    if (parseFloat(amount) < 0.1) return res.status(400).json({ error: "Ошибка: минимальная сумма 0.1 GRAM" });
+    if (!TONCENTER_API_KEY) return res.status(500).json({ error: "API-ключ TON не настроен." });
+    if (parseFloat(amount) < 0.1) return res.status(400).json({ error: "Минимальная сумма 0.1 TON" });
 
     try {
         const TONCENTER_BASE_URL = "https://toncenter.com/api/v2/jsonRPC";
@@ -121,7 +121,7 @@ app.post('/api/verify-payment', async (req, res) => {
             jsonrpc: "2.0", id: 1, method: "getTransactions", params: { address: ADMIN_TON_ADDRESS, limit: 20 }
         }, { headers: { 'X-API-Key': TONCENTER_API_KEY } });
 
-        if (getTxsResponse.data.error) return res.status(500).json({ error: "Ошибка TonCenter API" });
+        if (getTxsResponse.data.error) return res.status(500).json({ error: "Ошибка API" });
 
         const transactions = getTxsResponse.data.result || [];
         let foundTransaction = null;
@@ -167,7 +167,7 @@ app.post('/api/verify-payment', async (req, res) => {
             return res.json({ success: false });
         }
     } catch (err) {
-        res.status(500).json({ error: "Сервер TON временно перегружен." });
+        res.status(500).json({ error: "Временная ошибка сети TON." });
     }
 });
 
