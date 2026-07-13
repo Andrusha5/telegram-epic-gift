@@ -4,7 +4,7 @@ const pool = db.pool || db;
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
 
-// Защитный механизм от дублирования процессов на Render (предотвращает ETELEGRAM 409 Conflict)
+// Защита от дублирования процессов на Render/Heroku (предотвращает ETELEGRAM 409 Conflict)
 if (!global.botInstance) {
     global.botInstance = new TelegramBot(token, { polling: true });
 }
@@ -37,7 +37,7 @@ bot.on('callback_query', async (callbackQuery) => {
         return; 
     }
 
-    // Мгновенно отвечаем Telegram
+    // Мгновенно отвечаем в API Telegram, чтобы убрать часики на кнопке
     bot.answerCallbackQuery(queryId).catch(() => {});
 
     const parts = actionData.split('_');
