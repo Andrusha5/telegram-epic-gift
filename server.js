@@ -41,11 +41,13 @@ let arenaState = {
     timerInterval: null
 };
 
+// Цвета для секторов игроков
 const SECTOR_COLORS = [
     '#0088cc', '#ff9500', '#28a745', '#e83e8c', '#6f42c1', 
     '#fd7e14', '#20c997', '#dc3545', '#17a2b8', '#ffc107'
 ];
 
+// Запуск игрового автомата-таймера Арены
 function startArenaCountdown() {
     if (arenaState.timerInterval) return;
 
@@ -63,13 +65,15 @@ function startArenaCountdown() {
     }, 1000);
 }
 
+// Проведение розыгрыша на сервере
 async function runArenaPhysicsAndReward() {
     arenaState.state = 'running';
-    arenaState.ballAngle = Math.random() * Math.PI * 2; 
+    arenaState.ballAngle = Math.random() * Math.PI * 2; // Рандомный угол вылета
 
+    // Симулируем победителя на сервере на основе пропорций ставок
     const totalBets = arenaState.bets.reduce((sum, b) => sum + parseFloat(b.amount), 0);
     let rand = Math.random() * totalBets;
-    let winner = arenaState.bets[arenaState.bets.length - 1]; 
+    let winner = arenaState.bets[arenaState.bets.length - 1]; // Дефолтный
 
     for (const bet of arenaState.bets) {
         rand -= parseFloat(bet.amount);
@@ -79,15 +83,17 @@ async function runArenaPhysicsAndReward() {
         }
     }
 
+    // Вычисляем чистый банк (сумма чужих ставок) и комиссию 15%
     const winnerBetAmount = parseFloat(winner.amount);
     const otherPlayersBets = totalBets - winnerBetAmount;
-    const finalProfit = winnerBetAmount + (otherPlayersBets * 0.85); 
+    const finalProfit = winnerBetAmount + (otherPlayersBets * 0.85); // 15% комиссия от чистой прибыли
 
     let client;
     try {
         client = await pool.connect();
         await client.query('BEGIN');
 
+        // Начисляем баланс победителю
         await client.query('UPDATE users SET balance = balance + $1 WHERE id = $2', [finalProfit, winner.userId]);
         await client.query(
             'INSERT INTO transactions (user_id, type, amount, details) VALUES ($1, $2, $3, $4)',
@@ -95,24 +101,28 @@ async function runArenaPhysicsAndReward() {
         );
         await client.query('COMMIT');
 
+        // Отправляем поздравление в ЛС
         if (bot && winner.userId) {
             const botMsg = `👑 <b>Вы выиграли в Арене Полигонов!</b>\n\n` +
                            `🏟 Игра №${arenaState.roundId}\n` +
                            `💰 Сумма выигрыша: <b>${finalProfit.toFixed(3)} GRAM</b>\n` +
                            `🎯 Ваш шанс составлял: ${((winnerBetAmount/totalBets)*100).toFixed(1)}%\n\n` +
-                           `Баланс уже зачислен!`;
+                           `Баланс уже зачислен! Удачи в новых раундах!`;
             bot.sendMessage(winner.userId, botMsg, { parse_mode: 'HTML' }).catch(() => {});
         }
 
     } catch (dbErr) {
         if (client) await client.query('ROLLBACK');
-        console.error("Ошибка БД в Арене:", dbErr);
+        console.error("Ошибка начисления выигрыша в БД:", dbErr);
     } finally {
         if (client) client.release();
     }
 
+    // Оставляем шарик лететь 8 секунд
     setTimeout(() => {
         arenaState.state = 'ended';
+
+        // Сброс и запуск нового раунда через 4 секунды
         setTimeout(() => {
             arenaState.bets = [];
             arenaState.state = 'waiting';
@@ -121,6 +131,7 @@ async function runArenaPhysicsAndReward() {
     }, 8000);
 }
 
+// Роуты API для игры Арена
 app.get('/api/arena/state', (req, res) => {
     res.json({
         roundId: arenaState.roundId,
@@ -143,7 +154,7 @@ app.post('/api/arena/bet', async (req, res) => {
     }
 
     if (arenaState.state !== 'waiting' && arenaState.state !== 'countdown') {
-        return res.status(400).json({ error: "Ставки в этом раунде больше не принимаются!" });
+        return res.status(400).json({ error: "Прием ставок завершен. Ожидайте новый раунд!" });
     }
 
     let client;
@@ -151,18 +162,21 @@ app.post('/api/arena/bet', async (req, res) => {
         client = await pool.connect();
         await client.query('BEGIN');
 
+        // Считываем баланс игрока
         const userRes = await client.query('SELECT username, first_name, balance, avatar_url FROM users WHERE id = $1 FOR UPDATE', [userId]);
         const user = userRes.rows[0];
 
         if (!user || parseFloat(user.balance) < amount) {
             await client.query('ROLLBACK');
-            return res.status(400).json({ error: "Недостаточно средств!" });
+            return res.status(400).json({ error: "Недостаточно GRAM на балансе!" });
         }
 
+        // Списываем ставку
         const newBalance = parseFloat(user.balance) - amount;
         await client.query('UPDATE users SET balance = $1 WHERE id = $2', [newBalance, userId]);
         await client.query('COMMIT');
 
+        // Добавляем ставку в Арену
         const existingBet = arenaState.bets.find(b => String(b.userId) === userId);
         if (existingBet) {
             existingBet.amount = parseFloat(existingBet.amount) + amount;
@@ -178,6 +192,7 @@ app.post('/api/arena/bet', async (req, res) => {
             });
         }
 
+        // Если ставок 2 или более, запускаем таймер
         if (arenaState.bets.length >= 2) {
             startArenaCountdown();
         }
@@ -186,7 +201,7 @@ app.post('/api/arena/bet', async (req, res) => {
 
     } catch (e) {
         if (client) await client.query('ROLLBACK');
-        res.status(500).json({ error: "Ошибка проведения транзакции." });
+        res.status(500).json({ error: "Ошибка проведения транзакции ставки." });
     } finally {
         if (client) client.release();
     }
@@ -259,6 +274,7 @@ app.get('/tonconnect-manifest.json', (req, res) => {
     });
 });
 
+// АВТОМАТИЧЕСКАЯ ПРОВЕРКА ПЛАТЕЖЕЙ (1 TON = 1 GRAM)
 app.post('/api/verify-payment', async (req, res) => {
     if (!req.telegramUser || !req.telegramUser.id) {
         return res.status(401).json({ error: 'Unauthorized' });
