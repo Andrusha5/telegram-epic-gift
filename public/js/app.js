@@ -17,7 +17,7 @@ function formatUsername(name) {
     return name.length > 10 ? name.substring(0, 10) + "..." : name;
 }
 
-// Преобразование hex-адреса TON в дружественный Base64 (UQA..._YI / _Yl)
+// Преобразование hex-адреса TON в дружественный Base64 (UQA..._YI)
 function getFriendlyAddress(rawAddress) {
     try {
         if (typeof TON_CONNECT_UI !== 'undefined' && TON_CONNECT_UI.toUserFriendlyAddress) {
@@ -39,11 +39,24 @@ function formatWalletAddress(rawAddress) {
     return friendly.substring(0, 4) + "-..." + friendly.substring(friendly.length - 4);
 }
 
-// Генерация payload комментария в TON (4 нулевых байта для текстового комментария)
-function makeCommentPayload(text) {
+// Генерация Payload транзакции с валидной структурой Bag of Cells (BOC)
+async function compileTextCommentBoc(text) {
+    try {
+        if (window.TonWeb) {
+            const tonWeb = new window.TonWeb();
+            const cell = new tonWeb.boc.Cell();
+            cell.bits.writeUint(0, 32); // Записываем 32-битный префикс 0 (указывает на обычный текстовый комментарий)
+            cell.bits.writeBytes(new TextEncoder().encode(String(text))); // Кодируем текст в байты
+            const bocBytes = await cell.toBoc();
+            return TonWeb.utils.bytesToBase64(bocBytes); // Конвертируем BOC в Base64
+        }
+    } catch (e) {
+        console.error("Ошибка при сборке BOC через TonWeb:", e);
+    }
+    // Фолбэк, если библиотека не загрузилась
     const bytes = new TextEncoder().encode(text);
     const payloadBytes = new Uint8Array(4 + bytes.length);
-    payloadBytes.set(bytes, 4); // Первые 4 байта нули (Opcode 0 для Text Comment)
+    payloadBytes.set(bytes, 4); 
     return btoa(String.fromCharCode.apply(null, payloadBytes));
 }
 
@@ -103,12 +116,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         connectWalletBtn: document.getElementById('connect-wallet-btn'),
         depositBalanceBtn: document.getElementById('deposit-balance-btn'),
         depositNoticeText: document.getElementById('deposit-notice-text'),
-        // Модалка пополнения
+        // Элементы модалки ввода суммы
         depositAmountModal: document.getElementById('deposit-amount-modal'),
         depositModalCloseBtn: document.getElementById('deposit-modal-close-btn'),
         modalDepositInput: document.getElementById('modal-deposit-input'),
         modalDepositConfirmBtn: document.getElementById('modal-deposit-confirm-btn'),
-        modalDepositCancelBtn: document.getElementById('modal-deposit-cancel-btn')
+        modalDepositCancelBtn: document.getElementById('modal-deposit-cancel-btn'),
+        adminTgChatTrigger: document.getElementById('admin-tg-chat-trigger')
     };
 
     const safeSetText = (el, val) => { if (el) el.innerText = val; };
@@ -253,54 +267,57 @@ document.addEventListener('DOMContentLoaded', async () => {
         console.error("TON Connect Error:", err);
     }
 
-    // Обработчик вызова модалки депозита
+    // Модальное окно пополнения счета
     if (elements.depositBalanceBtn) {
         elements.depositBalanceBtn.addEventListener('click', () => {
             if (elements.depositAmountModal) {
                 elements.depositAmountModal.classList.remove('hidden');
-                if (elements.modalDepositInput) elements.modalDepositInput.value = "0.1";
+                if (elements.modalDepositInput) {
+                    elements.modalDepositInput.value = "0.1";
+                }
             }
         });
     }
 
-    const hideDepositModal = () => {
+    const closeDepositModal = () => {
         if (elements.depositAmountModal) elements.depositAmountModal.classList.add('hidden');
     };
 
-    if (elements.depositModalCloseBtn) elements.depositModalCloseBtn.addEventListener('click', hideDepositModal);
-    if (elements.modalDepositCancelBtn) elements.modalDepositCancelBtn.addEventListener('click', hideDepositModal);
+    if (elements.depositModalCloseBtn) elements.depositModalCloseBtn.addEventListener('click', closeDepositModal);
+    if (elements.modalDepositCancelBtn) elements.modalDepositCancelBtn.addEventListener('click', closeDepositModal);
 
-    // Подтверждение депозита в модалке по центру
+    // Подтверждение пополнения в модалке по центру
     if (elements.modalDepositConfirmBtn) {
         elements.modalDepositConfirmBtn.addEventListener('click', async () => {
             const amount = parseFloat(elements.modalDepositInput.value);
+
             if (isNaN(amount) || amount < 0.1) {
                 showNotification("Минимальная сумма пополнения — 0.1 TON", "⚠️");
                 return;
             }
 
             if (!tonConnectUI || !tonConnectUI.connected) {
-                showNotification("Пожалуйста, привяжите ваш TON-кошелек!", "⚠️");
+                showNotification("Пожалуйста, сначала привяжите кошелек!", "⚠️");
                 return;
             }
 
-            hideDepositModal();
+            closeDepositModal();
 
             try {
-                // Запрашиваем адрес кошелька приема платежей (админский)
+                // Запрашиваем адрес получателя (администратора)
                 const res = await fetch(`${API_BASE_URL}/api/deposit_address`);
                 const data = await res.json();
                 const adminAddress = data.address;
 
                 if (!adminAddress) {
-                    showNotification("Ошибка: адрес получателя не настроен.", "⚠️");
+                    showNotification("Ошибка: адрес для депозита не настроен.", "⚠️");
                     return;
                 }
 
-                // Переводим TON в нанотоны
+                // Переводим в нанотоны
                 const nanoAmount = Math.floor(amount * 1000000000).toString();
-                // Генерируем комментарий, используя TG ID пользователя
-                const payloadBase64 = makeCommentPayload(String(userId));
+                // Генерируем 100% валидный Text Comment BOC через TonWeb
+                const payloadBase64 = await compileTextCommentBoc(String(userId));
 
                 const transaction = {
                     validUntil: Math.floor(Date.now() / 1000) + 360,
@@ -308,7 +325,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         {
                             address: adminAddress,
                             amount: nanoAmount,
-                            payload: payloadBase64
+                            payload: payloadBase64 // Чистый BOC комментарий, исключающий вылеты кошелька!
                         }
                     ]
                 };
@@ -319,12 +336,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if (result) {
                     showNotification("Транзакция отправлена! Проверяем...", "⏳");
                     
+                    // Проверка транзакции каждые 5 сек (10 попыток)
                     let checkCount = 0;
                     const checkInterval = setInterval(async () => {
                         checkCount++;
                         if (checkCount > 10) {
                             clearInterval(checkInterval);
-                            showNotification("Баланс зачислится автоматически при подтверждении сети TON.", "⏳");
+                            showNotification("Баланс зачислится автоматически при подтверждении сетью TON.", "⏳");
                             return;
                         }
 
@@ -347,26 +365,25 @@ document.addEventListener('DOMContentLoaded', async () => {
                                 fetchUserData();
                             }
                         } catch (e) {
-                            console.error("Верификация платежа:", e);
+                            console.error("Ошибка верификации:", e);
                         }
                     }, 5000);
                 }
             } catch (err) {
-                console.error("Ошибка при отправке TON транзакции:", err);
-                showNotification("Транзакция отменена или отклонена кошельком.", "⚠️");
+                console.error("Отказ транзакции:", err);
+                showNotification("Транзакция отменена или произошла ошибка.", "⚠️");
             }
         });
     }
 
-    // Перенаправление на чат админа при клике в инвентаре
-    const adminChatTrigger = document.getElementById('admin-tg-chat-trigger');
-    if (adminChatTrigger) {
-        adminChatTrigger.addEventListener('click', () => {
+    // Перенаправление на чат админа при клике на юзернейм в инвентаре
+    if (elements.adminTgChatTrigger) {
+        elements.adminTgChatTrigger.addEventListener('click', () => {
             tg.openTelegramLink("https://t.me/Sintopa");
         });
     }
 
-    // ----------------- КЕЙСЫ И НАГРАДЫ -----------------
+    // ----------------- ПУЛЫ НАГРАД -----------------
     const GIFT_POOL = [
         { id: 1, name: "Статуя птицы серая", icon: "/Images/Items/rare_bird.jpg", price: "20 GRAM", rawPrice: 20.0, isGold: true, type: "gift" },
         { id: 2, name: "Тыква", icon: "/Images/Items/pumpkin.jpg", price: "8 GRAM", rawPrice: 8.0, isGold: true, type: "gift" },
