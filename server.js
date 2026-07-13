@@ -31,7 +31,7 @@ const TONCENTER_API_KEY = process.env.TONCENTER_API_KEY;
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Хелпер сопоставления комментариев TON транзакций
+// Сопоставление комментариев транзакций TON
 function matchTransactionComment(tx, userId) {
     if (!tx.in_msg) return false;
     const comment = tx.in_msg.message || "";
