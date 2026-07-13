@@ -3,7 +3,12 @@ const db = require('./db');
 const pool = db.pool || db;
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
-const bot = new TelegramBot(token, { polling: true });
+
+// Защитный механизм от дублирования процессов на Render (предотвращает ETELEGRAM 409 Conflict)
+if (!global.botInstance) {
+    global.botInstance = new TelegramBot(token, { polling: true });
+}
+const bot = global.botInstance;
 
 // --- ОБРАБОТЧИК КНОПОК ДЕПОЗИТА (ОДОБРИТЬ / ОТКЛОНИТЬ) ---
 bot.on('callback_query', async (callbackQuery) => {
@@ -39,13 +44,13 @@ bot.on('callback_query', async (callbackQuery) => {
         }
 
         if (action === 'app') {
-            // Гарантируем, что пользователь создан в users во избежание сбоев внешних ключей
+            // Гарантируем, что пользователь создан в таблице users
             await client.query(
                 `INSERT INTO users (id, first_name, balance) VALUES ($1, $2, 0) ON CONFLICT (id) DO NOTHING`,
                 [targetUserId, 'Пользователь']
             );
 
-            // Добавляем или обновляем подарок в инвентаре
+            // Добавляем подарок в инвентарь
             const checkInv = await client.query(
                 'SELECT quantity FROM user_inventory WHERE user_id = $1 AND item_id = $2',
                 [targetUserId, targetItemId]
@@ -65,13 +70,13 @@ bot.on('callback_query', async (callbackQuery) => {
 
             await client.query('COMMIT');
 
-            // Редактируем сообщение для админа, сохраняя вечные ссылки
+            // Редактируем сообщение для админа, сохраняя вечную ссылку
             await bot.editMessageText(
                 message.text + `\n\n🟢 <b>Статус:</b> ЗАЯВКА ОДОБРЕНА (Предмет передан)`,
                 { chat_id: message.chat.id, message_id: message.message_id, parse_mode: 'HTML' }
             ).catch(() => {});
 
-            // Отправляем игроку в ЛС уведомление
+            // Отправляем игроку уведомление
             const userMsg = `📥 <b>Ваш депозит подтвержден!</b>\n\n` +
                             `🎁 Подарок <b>${item.name}</b> успешно добавлен в ваш инвентарь.\n` +
                             `🎒 Откройте «Инвентарь» в приложении, чтобы распорядиться им!`;
