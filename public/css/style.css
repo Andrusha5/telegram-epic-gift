@@ -20,7 +20,7 @@ body {
     color: #ffffff;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     margin: 0;
-    padding: 110px 16px 115px 16px; /* Большие отступы для хедера и парящего меню */
+    padding: 110px 16px 120px 16px; /* Оптимальные отступы для хедера и парящего меню */
     box-sizing: border-box;
     overflow-x: hidden;
     user-select: none;
@@ -31,7 +31,7 @@ body {
     display: none !important;
 }
 
-/* Кастомный красивый скроллбар */
+/* Кастомный красивый Web3 скроллбар */
 ::-webkit-scrollbar {
     width: 6px;
 }
@@ -54,7 +54,7 @@ body {
     top: 0;
     left: 0;
     width: 100%;
-    height: 94px; /* Оптимальная высота под крупный аватар */
+    height: 94px; /* Высота под крупный Web3-аватар */
     background: rgba(11, 9, 20, 0.92);
     backdrop-filter: blur(14px);
     -webkit-backdrop-filter: blur(14px);
@@ -99,7 +99,7 @@ body {
 }
 
 .header-avatar {
-    width: 48px; /* Сильно увеличенный аватар */
+    width: 48px; /* Увеличенный аватар */
     height: 48px;
     border-radius: 50%;
     border: 2px solid var(--accent-purple);
@@ -108,7 +108,7 @@ body {
 }
 
 .header-username {
-    font-size: 16px; /* Юзернейм стал значительно больше */
+    font-size: 16px; /* Увеличенный юзернейм */
     font-weight: 800;
     color: #ffffff;
 }
@@ -236,7 +236,7 @@ body {
 
 .case-image-wrapper {
     width: 100%;
-    height: 114px; /* Одинаковый красивый размер под все новые 3D-карты */
+    height: 114px; /* Одинаковая фиксированная высота под сочные 3D-картинки */
     display: flex;
     align-items: center;
     justify-content: center;
@@ -258,7 +258,7 @@ body {
 .case-info {
     width: 100%;
     display: flex;
-    justify-content: center; /* Выравнивание по центру, стрелки удалены */
+    justify-content: center; /* Центровка названий кейсов */
     align-items: center;
     padding: 0 4px;
 }
@@ -287,7 +287,7 @@ body {
     box-sizing: border-box;
 }
 
-/* Закругленная квадратная кнопка назад */
+/* Квадратная кнопка Назад */
 .back-btn-square {
     width: 44px;
     height: 44px;
@@ -454,7 +454,7 @@ body {
 
 .rewards-grid {
     display: grid;
-    grid-template-columns: repeat(2, 1fr); /* ДВЕ КОЛОНКИ */
+    grid-template-columns: repeat(2, 1fr); /* Ровно 2 колонки */
     gap: 12px;
     width: 100%;
     box-sizing: border-box;
@@ -516,7 +516,7 @@ body {
 }
 
 /* ==========================================================================
-   ЭКРАН ИНВЕНТАРЯ (АККУРАТНЫЙ И КРАСИВЫЙ БЕЗ ПРОФИЛЯ)
+   ЭКРАН ИНВЕНТАРЯ И АДАПТИВНОСТЬ
    ========================================================================== */
 .inventory-grid {
     display: grid;
@@ -564,73 +564,130 @@ body {
     text-align: center;
 }
 
-/* Депозит подарков */
+/* ==========================================================================
+   ДИЗАЙН БЛОКА ВВОДА ПОДАРКОВ (NFT)
+   ========================================================================== */
 .deposit-gift-box {
     background: var(--card-bg);
     border: 1.5px solid var(--border-color);
-    border-radius: 20px;
-    padding: 20px;
+    border-radius: 24px;
+    padding: 24px;
     text-align: left;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
     width: 100%;
     box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.deposit-header-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.deposit-box-icon {
+    font-size: 20px;
 }
 
 .deposit-gift-box h3 {
-    margin: 0 0 8px 0;
-    font-size: 15px;
+    margin: 0;
+    font-size: 18px;
     font-weight: 800;
 }
 
 .deposit-gift-desc {
-    font-size: 12px;
+    font-size: 13px;
     color: var(--light-text-color);
     line-height: 1.5;
-    margin: 0 0 16px 0;
+    margin: 0;
 }
 
-/* Кликабельная ссылка связи в инвентаре */
-.admin-link {
-    color: var(--accent-purple);
-    cursor: pointer;
-    text-decoration: underline;
-    transition: color 0.2s;
-}
-
-.admin-link:hover {
-    color: #a86cff;
-}
-
-.deposit-select-row {
+/* Кнопка отправки на аккаунт Telegram */
+.telegram-send-btn {
+    background: rgba(0, 136, 204, 0.1);
+    border: 1.5px solid rgba(0, 136, 204, 0.4);
+    border-radius: 14px;
+    padding: 14px;
+    color: #0088cc;
+    font-size: 15px;
+    font-weight: 800;
     display: flex;
-    gap: 10px;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    cursor: pointer;
+    box-sizing: border-box;
+    transition: background 0.2s, transform 0.1s;
+}
+
+.telegram-send-btn:active {
+    transform: scale(0.98);
+    background: rgba(0, 136, 204, 0.18);
+}
+
+.send-btn-icon {
+    font-size: 16px;
+}
+
+/* Кастомный красивый выпадающий список */
+.select-container-wrapper {
+    position: relative;
     width: 100%;
     box-sizing: border-box;
 }
 
 .deposit-select-field {
-    flex: 1;
-    min-width: 0;
-    background: #18142c;
+    width: 100%;
+    background: #0d0a1b;
     border: 1.5px solid var(--border-color);
-    border-radius: 12px;
+    border-radius: 14px;
     color: #ffffff;
-    padding: 12px;
-    font-size: 13px;
+    padding: 14px 40px 14px 16px;
+    font-size: 14px;
+    font-weight: 700;
     outline: none;
+    box-sizing: border-box;
+    appearance: none;
+    -webkit-appearance: none;
+    cursor: pointer;
+}
+
+.custom-select-arrow {
+    position: absolute;
+    right: 18px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 0;
+    height: 0;
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+    border-top: 6px solid var(--light-text-color);
+    pointer-events: none;
+}
+
+/* Кнопка подтверждения передачи (Фиолетовый градиент) */
+.deposit-confirm-btn {
+    background: linear-gradient(135deg, #8d3df5 0%, #6118c7 100%);
+    color: #ffffff;
+    border: none;
+    border-radius: 14px;
+    padding: 16px;
+    font-size: 14px;
+    font-weight: 800;
+    cursor: pointer;
+    text-align: center;
+    width: 100%;
+    box-shadow: 0 4px 15px rgba(141, 61, 245, 0.3);
+    transition: transform 0.1s, box-shadow 0.2s;
     box-sizing: border-box;
 }
 
-.deposit-confirm-btn {
-    background: var(--green-success);
-    color: #000000;
-    border: none;
-    border-radius: 12px;
-    padding: 0 20px;
-    font-size: 13px;
-    font-weight: 800;
-    cursor: pointer;
-    flex-shrink: 0;
+.deposit-confirm-btn:active {
+    transform: scale(0.98);
+    box-shadow: 0 2px 8px rgba(141, 61, 245, 0.2);
 }
 
 /* ==========================================================================
@@ -683,7 +740,7 @@ body {
     margin-bottom: 16px;
 }
 
-/* Замена значка алмаза на GRAM иконку */
+/* Иконка монеты GRAM вместо алмаза */
 .large-balance-coin-icon {
     width: 36px;
     height: 36px;
@@ -706,7 +763,7 @@ body {
     box-sizing: border-box;
 }
 
-/* Модалка пополнения по центру экрана */
+/* Центрированная модалка ввода суммы */
 .modal-input-wrapper {
     width: 100%;
     box-sizing: border-box;
@@ -818,11 +875,11 @@ body {
    ========================================================================== */
 .floating-nav-container {
     position: fixed;
-    bottom: 16px; /* Небольшой отступ снизу */
-    left: 16px;   /* Небольшой отступ слева */
-    right: 16px;  /* Небольшой отступ справа */
+    bottom: 16px; /* Парит в воздухе */
+    left: 16px;   /* Отступ слева */
+    right: 16px;  /* Отступ справа */
     z-index: 2000;
-    pointer-events: none; /* Пропускает клики на пустых зонах */
+    pointer-events: none; /* Разрешает тапы сквозь пустые места */
 }
 
 .bottom-nav {
@@ -830,13 +887,13 @@ body {
     backdrop-filter: blur(15px);
     -webkit-backdrop-filter: blur(15px);
     border: 1.5px solid var(--border-color);
-    border-radius: 24px; /* Красивые скругленные края */
-    height: 72px;
+    border-radius: 24px; /* Мягкие скругленные Web3-углы */
+    height: 74px;
     display: flex;
     align-items: center;
     justify-content: space-around;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
-    pointer-events: auto; /* Возвращает клики на саму панель */
+    pointer-events: auto; /* Активирует кликабельность самой панели */
 }
 
 .nav-tab {
@@ -846,28 +903,65 @@ body {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 6px;
+    justify-content: center;
+    gap: 4px;
     color: var(--light-text-color);
     cursor: pointer;
-    transition: color 0.15s, transform 0.1s;
+    transition: color 0.2s, transform 0.1s;
+    position: relative;
+    height: 100%;
+    flex: 1;
 }
 
-.nav-tab:active {
-    transform: scale(0.92);
+.nav-svg-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    color: var(--light-text-color);
+    transition: color 0.2s, filter 0.2s;
 }
 
-.nav-icon {
-    font-size: 20px;
+.nav-svg-icon svg {
+    width: 100%;
+    height: 100%;
 }
 
 .nav-label {
     font-size: 10px;
-    font-weight: bold;
+    font-weight: 800;
     letter-spacing: 0.5px;
+    transition: color 0.2s;
 }
 
-.nav-tab.active {
-    color: var(--accent-purple);
+/* Индикатор-точка под вкладкой */
+.nav-dot {
+    position: absolute;
+    bottom: 6px;
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background-color: #ffffff;
+    opacity: 0;
+    transform: scale(0);
+    transition: opacity 0.2s, transform 0.2s, box-shadow 0.2s;
+}
+
+/* Эффект мерцания и свечения активной вкладки */
+.nav-tab.active .nav-svg-icon {
+    color: #ffffff;
+    filter: drop-shadow(0 0 6px var(--accent-purple));
+}
+
+.nav-tab.active .nav-label {
+    color: #ffffff;
+}
+
+.nav-tab.active .nav-dot {
+    opacity: 1;
+    transform: scale(1);
+    box-shadow: 0 0 8px #ffffff, 0 0 14px var(--accent-purple);
 }
 
 /* ==========================================================================
@@ -875,7 +969,7 @@ body {
    ========================================================================== */
 .toast-container {
     position: fixed;
-    bottom: 100px; /* Четко над парящим навигационным меню */
+    bottom: 102px; /* Расположено точно над парящей навигационной панелью */
     left: 50%;
     transform: translateX(-50%);
     width: 90%;
@@ -899,7 +993,7 @@ body {
     box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.5);
     pointer-events: auto;
     opacity: 0;
-    transform: translateY(20px); /* Появление снизу вверх */
+    transform: translateY(20px); /* Всплывает снизу вверх */
     transition: opacity 0.3s, transform 0.3s;
 }
 
