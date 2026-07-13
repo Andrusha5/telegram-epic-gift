@@ -39,7 +39,7 @@ function formatWalletAddress(rawAddress) {
     return friendly.substring(0, 4) + "-..." + friendly.substring(friendly.length - 4);
 }
 
-// Простейшая генерация payload комментария в TON без внешних библиотек
+// Генерация payload комментария в TON
 function makeCommentPayload(text) {
     const bytes = new TextEncoder().encode(text);
     const payloadBytes = new Uint8Array(4 + bytes.length);
@@ -103,8 +103,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         connectWalletBtn: document.getElementById('connect-wallet-btn'),
         depositBalanceBtn: document.getElementById('deposit-balance-btn'),
         depositNoticeText: document.getElementById('deposit-notice-text'),
-        depositInputWrapper: document.getElementById('deposit-input-wrapper'),
-        depositAmountInput: document.getElementById('deposit-amount-input')
+        // Новые элементы для всплывающей модалки депозита
+        depositAmountModal: document.getElementById('deposit-amount-modal'),
+        depositModalClose: document.getElementById('deposit-modal-close'),
+        modalDepositInput: document.getElementById('modal-deposit-input'),
+        modalDepositConfirmBtn: document.getElementById('modal-deposit-confirm-btn'),
+        modalDepositCancelBtn: document.getElementById('modal-deposit-cancel-btn')
     };
 
     const safeSetText = (el, val) => { if (el) el.innerText = val; };
@@ -197,9 +201,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                         elements.connectWalletBtn.style.background = 'linear-gradient(135deg, #00e676, #00b34a)';
                         elements.connectWalletBtn.style.color = '#000000';
                     }
-                    if (elements.depositInputWrapper) {
-                        elements.depositInputWrapper.classList.remove('hidden');
-                    }
                     if (elements.depositBalanceBtn) {
                         elements.depositBalanceBtn.removeAttribute('disabled');
                     }
@@ -212,9 +213,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                         elements.connectWalletBtn.innerText = 'Привязать кошелёк';
                         elements.connectWalletBtn.style.background = 'linear-gradient(135deg, var(--accent-purple), #6a0dad)';
                         elements.connectWalletBtn.style.color = '#ffffff';
-                    }
-                    if (elements.depositInputWrapper) {
-                        elements.depositInputWrapper.classList.add('hidden');
                     }
                     if (elements.depositBalanceBtn) {
                         elements.depositBalanceBtn.setAttribute('disabled', 'true');
@@ -255,11 +253,27 @@ document.addEventListener('DOMContentLoaded', async () => {
         console.error("TON Connect Error:", err);
     }
 
-    // Обработчик Кнопки Пополнения
+    // --- ЛОГИКА ДЕПОЗИТА ЧЕРЕЗ ЦЕНТРАЛЬНОЕ ОКНО ---
     if (elements.depositBalanceBtn) {
-        elements.depositBalanceBtn.addEventListener('click', async () => {
-            if (!elements.depositAmountInput) return;
-            const amount = parseFloat(elements.depositAmountInput.value);
+        elements.depositBalanceBtn.addEventListener('click', () => {
+            if (elements.depositAmountModal) {
+                elements.depositAmountModal.classList.remove('hidden');
+                if (elements.modalDepositInput) elements.modalDepositInput.value = '0.1';
+            }
+        });
+    }
+
+    const closeDepositModal = () => {
+        if (elements.depositAmountModal) elements.depositAmountModal.classList.add('hidden');
+    };
+
+    if (elements.depositModalClose) elements.depositModalClose.addEventListener('click', closeDepositModal);
+    if (elements.modalDepositCancelBtn) elements.modalDepositCancelBtn.addEventListener('click', closeDepositModal);
+
+    if (elements.modalDepositConfirmBtn) {
+        elements.modalDepositConfirmBtn.addEventListener('click', async () => {
+            if (!elements.modalDepositInput) return;
+            const amount = parseFloat(elements.modalDepositInput.value);
 
             if (isNaN(amount) || amount < 0.1) {
                 showNotification("Минимальная сумма пополнения — 0.1 TON", "⚠️");
@@ -271,8 +285,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                 return;
             }
 
+            closeDepositModal();
+
             try {
-                // Запрашиваем адрес получателя (админа)
+                // Запрашиваем адрес получателя
                 const res = await fetch(`${API_BASE_URL}/api/deposit_address`);
                 const data = await res.json();
                 const adminAddress = data.address;
@@ -282,9 +298,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     return;
                 }
 
-                // Переводим в нанотоны
                 const nanoAmount = Math.floor(amount * 1000000000).toString();
-                // Генерируем комментарий (ID пользователя в Telegram)
                 const payloadBase64 = makeCommentPayload(String(userId));
 
                 const transaction = {
@@ -304,7 +318,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if (result) {
                     showNotification("Транзакция отправлена! Проверяем подтверждение...", "⏳");
                     
-                    // Попытка верификации на сервере каждые 5 сек (всего 10 попыток)
                     let checkCount = 0;
                     const checkInterval = setInterval(async () => {
                         checkCount++;
@@ -556,17 +569,16 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         updateBalanceUI();
         const avUrls = currentUser.avatar_url || "https://img.icons8.com/color/96/user.png";
-        ['user-avatar', 'inv-user-avatar'].forEach(id => {
-            const img = document.getElementById(id);
-            if (img) {
-                img.src = avUrls;
-                img.onerror = () => { img.src = "https://img.icons8.com/color/96/user.png"; };
-            }
-        });
+        
+        const mainAvatar = document.getElementById('user-avatar');
+        if (mainAvatar) {
+            mainAvatar.src = avUrls;
+            mainAvatar.onerror = () => { mainAvatar.src = "https://img.icons8.com/color/96/user.png"; };
+        }
+
         const rawName = currentUser.username || currentUser.first_name || "Пользователь";
         const truncatedName = formatUsername(rawName);
         safeSetText(document.getElementById('user-username'), truncatedName);
-        safeSetText(document.getElementById('inv-user-username'), truncatedName);
         updateDailyCaseTimer();
     }
 
