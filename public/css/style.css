@@ -20,7 +20,7 @@ body {
     color: #ffffff;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     margin: 0;
-    padding: 110px 16px 120px 16px; /* Оптимальные отступы для хедера и парящего меню */
+    padding: 110px 16px 125px 16px; /* Большие отступы под шапку и плавающее меню */
     box-sizing: border-box;
     overflow-x: hidden;
     user-select: none;
@@ -54,7 +54,7 @@ body {
     top: 0;
     left: 0;
     width: 100%;
-    height: 94px; /* Высота под крупный Web3-аватар */
+    height: 94px; /* Оптимальная высота под крупный аватар */
     background: rgba(11, 9, 20, 0.92);
     backdrop-filter: blur(14px);
     -webkit-backdrop-filter: blur(14px);
@@ -99,7 +99,7 @@ body {
 }
 
 .header-avatar {
-    width: 48px; /* Увеличенный аватар */
+    width: 48px; /* Сильно увеличенный аватар */
     height: 48px;
     border-radius: 50%;
     border: 2px solid var(--accent-purple);
@@ -108,7 +108,7 @@ body {
 }
 
 .header-username {
-    font-size: 16px; /* Увеличенный юзернейм */
+    font-size: 16px; /* Юзернейм стал значительно больше */
     font-weight: 800;
     color: #ffffff;
 }
@@ -236,7 +236,7 @@ body {
 
 .case-image-wrapper {
     width: 100%;
-    height: 114px; /* Одинаковая фиксированная высота под сочные 3D-картинки */
+    height: 114px; /* Одинаковый размер под все новые 3D-изображения */
     display: flex;
     align-items: center;
     justify-content: center;
@@ -258,7 +258,7 @@ body {
 .case-info {
     width: 100%;
     display: flex;
-    justify-content: center; /* Центровка названий кейсов */
+    justify-content: center; /* Центровка без стрелок */
     align-items: center;
     padding: 0 4px;
 }
@@ -287,27 +287,33 @@ body {
     box-sizing: border-box;
 }
 
-/* Квадратная кнопка Назад */
+/* Элегантная квадратная кнопка назад */
 .back-btn-square {
-    width: 44px;
-    height: 44px;
-    background: var(--card-bg);
+    width: 46px;
+    height: 46px;
+    background: rgba(30, 24, 54, 0.6);
     border: 1.5px solid var(--border-color);
-    border-radius: 12px;
+    border-radius: 14px;
     color: #ffffff;
-    font-size: 22px;
-    font-weight: bold;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    transition: transform 0.1s, border-color 0.2s;
+    transition: all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
     box-sizing: border-box;
 }
 
-.back-btn-square:active {
-    transform: scale(0.92);
+.back-btn-square:hover {
     border-color: var(--accent-purple);
+    box-shadow: 0 0 12px var(--accent-purple-glow);
+    transform: translateY(-2px);
+}
+
+.back-btn-square:active {
+    transform: translateY(1px) scale(0.95);
 }
 
 .header-title-container {
@@ -435,7 +441,7 @@ body {
     border-radius: 14px;
 }
 
-/* Сетка наград строго в 2 колонки */
+/* Сетка наград в 2 колонки */
 .rewards-section {
     width: 100%;
     text-align: left;
@@ -454,7 +460,7 @@ body {
 
 .rewards-grid {
     display: grid;
-    grid-template-columns: repeat(2, 1fr); /* Ровно 2 колонки */
+    grid-template-columns: repeat(2, 1fr);
     gap: 12px;
     width: 100%;
     box-sizing: border-box;
@@ -516,7 +522,7 @@ body {
 }
 
 /* ==========================================================================
-   ЭКРАН ИНВЕНТАРЯ И АДАПТИВНОСТЬ
+   ЭКРАН ИНВЕНТАРЯ И КРАСИВЫЙ Web3 ВВОД ПОДАРКОВ
    ========================================================================== */
 .inventory-grid {
     display: grid;
@@ -564,21 +570,19 @@ body {
     text-align: center;
 }
 
-/* ==========================================================================
-   ДИЗАЙН БЛОКА ВВОДА ПОДАРКОВ (NFT)
-   ========================================================================== */
+/* Премиальный блок ввода подарков (под ваш скриншот) */
 .deposit-gift-box {
-    background: var(--card-bg);
+    background: rgba(19, 16, 36, 0.95);
     border: 1.5px solid var(--border-color);
-    border-radius: 24px;
+    border-radius: 26px;
     padding: 24px;
     text-align: left;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
     width: 100%;
     box-sizing: border-box;
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 14px;
 }
 
 .deposit-header-row {
@@ -593,8 +597,9 @@ body {
 
 .deposit-gift-box h3 {
     margin: 0;
-    font-size: 18px;
+    font-size: 20px;
     font-weight: 800;
+    letter-spacing: 0.3px;
 }
 
 .deposit-gift-desc {
@@ -604,10 +609,10 @@ body {
     margin: 0;
 }
 
-/* Кнопка отправки на аккаунт Telegram */
+/* Синяя Web3 кнопка прямой связи */
 .telegram-send-btn {
-    background: rgba(0, 136, 204, 0.1);
-    border: 1.5px solid rgba(0, 136, 204, 0.4);
+    background: rgba(0, 136, 204, 0.08);
+    border: 1.5px solid rgba(0, 136, 204, 0.35);
     border-radius: 14px;
     padding: 14px;
     color: #0088cc;
@@ -620,19 +625,25 @@ body {
     width: 100%;
     cursor: pointer;
     box-sizing: border-box;
-    transition: background 0.2s, transform 0.1s;
+    transition: all 0.25s ease;
+}
+
+.telegram-send-btn:hover {
+    background: rgba(0, 136, 204, 0.14);
+    border-color: #0088cc;
+    box-shadow: 0 0 12px rgba(0, 136, 204, 0.25);
+    transform: translateY(-1px);
 }
 
 .telegram-send-btn:active {
-    transform: scale(0.98);
-    background: rgba(0, 136, 204, 0.18);
+    transform: translateY(1px);
 }
 
 .send-btn-icon {
     font-size: 16px;
 }
 
-/* Кастомный красивый выпадающий список */
+/* Кастомный красивый выпадающий Web3 список */
 .select-container-wrapper {
     position: relative;
     width: 100%;
@@ -645,7 +656,7 @@ body {
     border: 1.5px solid var(--border-color);
     border-radius: 14px;
     color: #ffffff;
-    padding: 14px 40px 14px 16px;
+    padding: 15px 40px 15px 16px;
     font-size: 14px;
     font-weight: 700;
     outline: none;
@@ -653,6 +664,11 @@ body {
     appearance: none;
     -webkit-appearance: none;
     cursor: pointer;
+    transition: border-color 0.2s;
+}
+
+.deposit-select-field:focus {
+    border-color: var(--accent-purple);
 }
 
 .custom-select-arrow {
@@ -668,7 +684,7 @@ body {
     pointer-events: none;
 }
 
-/* Кнопка подтверждения передачи (Фиолетовый градиент) */
+/* Кнопка подтверждения (Фиолетовый градиент) */
 .deposit-confirm-btn {
     background: linear-gradient(135deg, #8d3df5 0%, #6118c7 100%);
     color: #ffffff;
@@ -681,12 +697,17 @@ body {
     text-align: center;
     width: 100%;
     box-shadow: 0 4px 15px rgba(141, 61, 245, 0.3);
-    transition: transform 0.1s, box-shadow 0.2s;
+    transition: all 0.25s ease;
     box-sizing: border-box;
 }
 
+.deposit-confirm-btn:hover {
+    box-shadow: 0 6px 20px rgba(141, 61, 245, 0.45);
+    transform: translateY(-1.5px);
+}
+
 .deposit-confirm-btn:active {
-    transform: scale(0.98);
+    transform: translateY(1px);
     box-shadow: 0 2px 8px rgba(141, 61, 245, 0.2);
 }
 
@@ -740,7 +761,7 @@ body {
     margin-bottom: 16px;
 }
 
-/* Иконка монеты GRAM вместо алмаза */
+/* Иконка монеты GRAM */
 .large-balance-coin-icon {
     width: 36px;
     height: 36px;
@@ -763,7 +784,7 @@ body {
     box-sizing: border-box;
 }
 
-/* Центрированная модалка ввода суммы */
+/* Поле ввода в модалке */
 .modal-input-wrapper {
     width: 100%;
     box-sizing: border-box;
@@ -871,15 +892,15 @@ body {
 }
 
 /* ==========================================================================
-   ПАРЯЩИЙ НАВИГАЦИОННЫЙ БАР
+   ПАРЯЩИЙ НАВИГАЦИОННЫЙ БАР С ПОДДСВЕТКОЙ (Web3)
    ========================================================================== */
 .floating-nav-container {
     position: fixed;
-    bottom: 16px; /* Парит в воздухе */
-    left: 16px;   /* Отступ слева */
-    right: 16px;  /* Отступ справа */
+    bottom: 16px; /* Расстояние от краев */
+    left: 16px;   
+    right: 16px;  
     z-index: 2000;
-    pointer-events: none; /* Разрешает тапы сквозь пустые места */
+    pointer-events: none; /* Пропускает тапы за пределами меню */
 }
 
 .bottom-nav {
@@ -887,13 +908,13 @@ body {
     backdrop-filter: blur(15px);
     -webkit-backdrop-filter: blur(15px);
     border: 1.5px solid var(--border-color);
-    border-radius: 24px; /* Мягкие скругленные Web3-углы */
+    border-radius: 24px; /* Мягкие скругления */
     height: 74px;
     display: flex;
     align-items: center;
     justify-content: space-around;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
-    pointer-events: auto; /* Активирует кликабельность самой панели */
+    pointer-events: auto; /* Делает кликабельным само меню */
 }
 
 .nav-tab {
@@ -911,6 +932,10 @@ body {
     position: relative;
     height: 100%;
     flex: 1;
+}
+
+.nav-tab:active {
+    transform: scale(0.92);
 }
 
 .nav-svg-icon {
@@ -935,7 +960,7 @@ body {
     transition: color 0.2s;
 }
 
-/* Индикатор-точка под вкладкой */
+/* Точка-индикатор под вкладкой */
 .nav-dot {
     position: absolute;
     bottom: 6px;
@@ -948,7 +973,7 @@ body {
     transition: opacity 0.2s, transform 0.2s, box-shadow 0.2s;
 }
 
-/* Эффект мерцания и свечения активной вкладки */
+/* Подсветка активной вкладки */
 .nav-tab.active .nav-svg-icon {
     color: #ffffff;
     filter: drop-shadow(0 0 6px var(--accent-purple));
@@ -965,11 +990,11 @@ body {
 }
 
 /* ==========================================================================
-   УВЕДОМЛЕНИЯ ПЕРЕНЕСЕНЫ ВНИЗ НАД ПАРЯЩЕЙ ПАНЕЛЬЮ
+   УВЕДОМЛЕНИЯ НАД ПАРЯЩЕЙ ПАНЕЛЬЮ
    ========================================================================== */
 .toast-container {
     position: fixed;
-    bottom: 102px; /* Расположено точно над парящей навигационной панелью */
+    bottom: 102px; /* Позиционировано над парящим навигационным меню */
     left: 50%;
     transform: translateX(-50%);
     width: 90%;
@@ -993,7 +1018,7 @@ body {
     box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.5);
     pointer-events: auto;
     opacity: 0;
-    transform: translateY(20px); /* Всплывает снизу вверх */
+    transform: translateY(20px); /* Анимация всплытия */
     transition: opacity 0.3s, transform 0.3s;
 }
 
