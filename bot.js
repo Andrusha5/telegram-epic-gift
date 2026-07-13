@@ -10,6 +10,23 @@ if (!global.botInstance) {
 }
 const bot = global.botInstance;
 
+// --- ФУНКЦИЯ ПРОВЕРКИ ПОДПИСКИ ПОЛЬЗОВАТЕЛЯ НА КАНАЛ ---
+async function checkUserSubscription(userId) {
+    try {
+        const channelUsername = process.env.CHANNEL_USERNAME;
+        if (!channelUsername) return true; // Если канал в конфиге не указан, даем доступ всем
+
+        const cleanUsername = channelUsername.replace('@', '').trim();
+        const chatMember = await bot.getChatMember('@' + cleanUsername, userId);
+        
+        const activeStatuses = ['creator', 'administrator', 'member'];
+        return activeStatuses.includes(chatMember.status);
+    } catch (err) {
+        console.error("Ошибка при проверке подписки бота:", err);
+        return false;
+    }
+}
+
 // --- ОБРАБОТЧИК КНОПОК ДЕПОЗИТА (ОДОБРИТЬ / ОТКЛОНИТЬ) ---
 bot.on('callback_query', async (callbackQuery) => {
     const actionData = callbackQuery.data;
@@ -20,7 +37,7 @@ bot.on('callback_query', async (callbackQuery) => {
         return; 
     }
 
-    // Мгновенно шлём ответ Telegram, чтобы кнопка сразу же «отвисла»
+    // Мгновенно отвечаем Telegram
     bot.answerCallbackQuery(queryId).catch(() => {});
 
     const parts = actionData.split('_');
@@ -104,5 +121,6 @@ bot.on('callback_query', async (callbackQuery) => {
 });
 
 module.exports = {
-    bot
+    bot,
+    checkUserSubscription // Экспортируем функцию наружу
 };
