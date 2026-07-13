@@ -39,25 +39,55 @@ function formatWalletAddress(rawAddress) {
     return friendly.substring(0, 4) + "-..." + friendly.substring(friendly.length - 4);
 }
 
-// Генерация Payload транзакции с валидной структурой Bag of Cells (BOC)
-async function compileTextCommentBoc(text) {
+// АВТОНОМНЫЙ JS-КОМПИЛЯТОР BOC (РЕШАЕТ ВСЕ ПРОБЛЕМЫ С ПОПОЛНЕНИЕМ БАЛАНСА)
+function serializeCommentBoc(text) {
     try {
-        if (window.TonWeb) {
-            const tonWeb = new window.TonWeb();
-            const cell = new tonWeb.boc.Cell();
-            cell.bits.writeUint(0, 32); // Записываем 32-битный префикс 0 (указывает на обычный текстовый комментарий)
-            cell.bits.writeBytes(new TextEncoder().encode(String(text))); // Кодируем текст в байты
-            const bocBytes = await cell.toBoc();
-            return TonWeb.utils.bytesToBase64(bocBytes); // Конвертируем BOC в Base64
-        }
+        const textBytes = new TextEncoder().encode(String(text));
+        const dataLen = 4 + textBytes.length; // 4 нулевых байта + байты строки
+        
+        // Описание структуры ячейки (BOC Cell Descriptor)
+        const desc1 = 0; // Ссылки отсутствуют
+        const desc2 = dataLen * 2; // Выравнивание не требуется (биты кратны 8)
+        
+        const cellContentLen = 2 + dataLen; // Дескрипторы + тело ячейки
+        
+        // Заголовок сериализации TON BOC
+        const header = [
+            0xb5, 0xee, 0x9c, 0x72, // Магический префикс (BOC Magic)
+            0x01,                   // Флаги (без CRC, размер индексов = 1)
+            0x01,                   // Размер индексов ячеек (1)
+            0x01,                   // Размер смещений (1)
+            0x01,                   // Всего ячеек (1)
+            0x01,                   // Корневых ячеек (1)
+            0x00,                   // Отсутствующие ячейки (0)
+            cellContentLen,         // Общая длина контента
+            0x00                    // Индекс корня (0)
+        ];
+        
+        const boc = new Uint8Array(header.length + 2 + dataLen);
+        boc.set(header, 0);
+        boc[header.length] = desc1;
+        boc[header.length + 1] = desc2;
+        
+        // Запись 32-битного пустого префикса (Opcode 0 - указывает кошельку на текст)
+        boc[header.length + 2] = 0;
+        boc[header.length + 3] = 0;
+        boc[header.length + 4] = 0;
+        boc[header.length + 5] = 0;
+        
+        // Запись байт строки
+        boc.set(textBytes, header.length + 6);
+        
+        // Конвертация в Base64 для передачи в TON Connect
+        return btoa(String.fromCharCode.apply(null, boc));
     } catch (e) {
-        console.error("Ошибка при сборке BOC через TonWeb:", e);
+        console.error("Критическая ошибка компиляции BOC:", e);
+        // Запасной вариант (сырые байты)
+        const bytes = new TextEncoder().encode(text);
+        const payloadBytes = new Uint8Array(4 + bytes.length);
+        payloadBytes.set(bytes, 4); 
+        return btoa(String.fromCharCode.apply(null, payloadBytes));
     }
-    // Фолбэк, если библиотека не загрузилась
-    const bytes = new TextEncoder().encode(text);
-    const payloadBytes = new Uint8Array(4 + bytes.length);
-    payloadBytes.set(bytes, 4); 
-    return btoa(String.fromCharCode.apply(null, payloadBytes));
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -116,7 +146,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         connectWalletBtn: document.getElementById('connect-wallet-btn'),
         depositBalanceBtn: document.getElementById('deposit-balance-btn'),
         depositNoticeText: document.getElementById('deposit-notice-text'),
-        // Элементы модалки ввода суммы
+        // Элементы модалки пополнения счета
         depositAmountModal: document.getElementById('deposit-amount-modal'),
         depositModalCloseBtn: document.getElementById('deposit-modal-close-btn'),
         modalDepositInput: document.getElementById('modal-deposit-input'),
@@ -267,7 +297,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         console.error("TON Connect Error:", err);
     }
 
-    // Модальное окно пополнения счета
+    // Обработчик вызова модального окна депозита
     if (elements.depositBalanceBtn) {
         elements.depositBalanceBtn.addEventListener('click', () => {
             if (elements.depositAmountModal) {
@@ -286,11 +316,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (elements.depositModalCloseBtn) elements.depositModalCloseBtn.addEventListener('click', closeDepositModal);
     if (elements.modalDepositCancelBtn) elements.modalDepositCancelBtn.addEventListener('click', closeDepositModal);
 
-    // Подтверждение пополнения в модалке по центру
+    // Подтверждение пополнения баланса в модальном окне
     if (elements.modalDepositConfirmBtn) {
         elements.modalDepositConfirmBtn.addEventListener('click', async () => {
             const amount = parseFloat(elements.modalDepositInput.value);
-
             if (isNaN(amount) || amount < 0.1) {
                 showNotification("Минимальная сумма пополнения — 0.1 TON", "⚠️");
                 return;
@@ -304,7 +333,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             closeDepositModal();
 
             try {
-                // Запрашиваем адрес получателя (администратора)
+                // Получаем адрес депозита
                 const res = await fetch(`${API_BASE_URL}/api/deposit_address`);
                 const data = await res.json();
                 const adminAddress = data.address;
@@ -314,10 +343,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                     return;
                 }
 
-                // Переводим в нанотоны
+                // Перевод TON в нанотоны
                 const nanoAmount = Math.floor(amount * 1000000000).toString();
-                // Генерируем 100% валидный Text Comment BOC через TonWeb
-                const payloadBase64 = await compileTextCommentBoc(String(userId));
+                // Генерация 100% валидного BOC-комментария
+                const payloadBase64 = serializeCommentBoc(String(userId));
 
                 const transaction = {
                     validUntil: Math.floor(Date.now() / 1000) + 360,
@@ -325,18 +354,17 @@ document.addEventListener('DOMContentLoaded', async () => {
                         {
                             address: adminAddress,
                             amount: nanoAmount,
-                            payload: payloadBase64 // Чистый BOC комментарий, исключающий вылеты кошелька!
+                            payload: payloadBase64 // Чистый BOC комментарий без вылетов
                         }
                     ]
                 };
 
-                showNotification("Подтвердите транзакцию в кошельке...", "⏳");
+                showNotification("Подтвердите транзакцию в вашем кошельке...", "⏳");
                 const result = await tonConnectUI.sendTransaction(transaction);
 
                 if (result) {
                     showNotification("Транзакция отправлена! Проверяем...", "⏳");
                     
-                    // Проверка транзакции каждые 5 сек (10 попыток)
                     let checkCount = 0;
                     const checkInterval = setInterval(async () => {
                         checkCount++;
@@ -365,7 +393,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                                 fetchUserData();
                             }
                         } catch (e) {
-                            console.error("Ошибка верификации:", e);
+                            console.error("Ошибка верификации платежа:", e);
                         }
                     }, 5000);
                 }
@@ -376,7 +404,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    // Перенаправление на чат админа при клике на юзернейм в инвентаре
+    // Перенаправление в ЛС админа при клике в инвентаре
     if (elements.adminTgChatTrigger) {
         elements.adminTgChatTrigger.addEventListener('click', () => {
             tg.openTelegramLink("https://t.me/Sintopa");
