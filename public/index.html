@@ -46,7 +46,7 @@
             <div class="case-card" id="daily-case-banner">
                 <div class="case-badge free">Бесплатно</div>
                 <div class="case-image-wrapper">
-                    <img src="/Images/Cases/daily_case.png" onerror="this.src='https://img.icons8.com/color/96/gift.png';" alt="Ежедневный кейс">
+                    <img src="/Images/Cases/freebox.png" onerror="this.src='https://img.icons8.com/color/96/gift.png';" alt="Ежедневный кейс">
                 </div>
                 <div class="case-info">
                     <span class="case-name">Ежедневный кейс</span>
@@ -58,7 +58,7 @@
             <div class="case-card" id="newbie-case-banner">
                 <div class="case-badge paid">0.1 GRAM</div>
                 <div class="case-image-wrapper">
-                    <img src="/Images/Cases/newbie_case.png" onerror="this.src='https://img.icons8.com/color/96/gift.png';" alt="Кейс новичка">
+                    <img src="/Images/Cases/keysnovichka.png" onerror="this.src='https://img.icons8.com/color/96/gift.png';" alt="Кейс новичка">
                 </div>
                 <div class="case-info">
                     <span class="case-name">Кейс новичка</span>
@@ -70,7 +70,7 @@
             <div class="case-card locked" id="bomzh-case-banner">
                 <div class="case-badge locked-badge">Скоро</div>
                 <div class="case-image-wrapper">
-                    <img src="/Images/Cases/bomzh_case.png" onerror="this.src='https://img.icons8.com/color/96/beggar.png';" alt="Кейс бомжа">
+                    <img src="/Images/Cases/bomzh.png" onerror="this.src='https://img.icons8.com/color/96/beggar.png';" alt="Кейс бомжа">
                 </div>
                 <div class="case-info">
                     <span class="case-name">Кейс бомжа</span>
@@ -82,7 +82,7 @@
             <div class="case-card locked" id="krutoy-case-banner">
                 <div class="case-badge locked-badge">Скоро</div>
                 <div class="case-image-wrapper">
-                    <img src="/Images/Cases/krutoy_case.png" onerror="this.src='https://img.icons8.com/color/96/cool.png';" alt="Кейс крутого">
+                    <img src="/Images/Cases/krutoy.png" onerror="this.src='https://img.icons8.com/color/96/cool.png';" alt="Кейс крутого">
                 </div>
                 <div class="case-info">
                     <span class="case-name">Кейс крутого</span>
@@ -127,12 +127,6 @@
 
     <!-- ================= 3. ЭКРАН ИНВЕНТАРЯ ================= -->
     <section id="inventory-section" class="app-section hidden">
-        <div class="inventory-profile-header">
-            <img id="inv-user-avatar" src="https://img.icons8.com/color/96/user.png" alt="Avatar" class="inv-profile-avatar">
-            <h2 id="inv-user-username" class="inv-profile-username">Загрузка...</h2>
-            <p class="inv-desc">Здесь хранятся ваши выигранные подарки</p>
-        </div>
-
         <!-- Сетка предметов -->
         <div class="inventory-grid" id="inventory-grid"></div>
 
@@ -179,19 +173,13 @@
         <div class="wallet-actions-container">
             <!-- Кнопка привязки TON кошелька -->
             <button id="connect-wallet-btn" class="connect-wallet-btn">Привязать кошелёк</button>
-            
-            <!-- Поле ввода суммы пополнения -->
-            <div id="deposit-input-wrapper" class="deposit-input-wrapper hidden">
-                <input type="number" id="deposit-amount-input" class="deposit-amount-field" placeholder="Введите сумму (мин. 0.1 TON)" step="0.1" min="0.1">
-            </div>
-
             <!-- Пополнение баланса -->
             <button id="deposit-balance-btn" class="deposit-balance-btn" disabled>Пополнить баланс</button>
             <p id="deposit-notice-text" class="deposit-notice">Пополнение доступно после привязки кошелька</p>
         </div>
     </section>
 
-    <!-- ================= НИЖНЕЕ МЕНЮ НАВИГАЦИИ (ПОРЯДОК: ИНВЕНТАРЬ | МЕНЮ | РЕЙТИНГ) ================= -->
+    <!-- ================= НИЖНЕЕ МЕНЮ НАВИГАЦИИ ================= -->
     <nav class="bottom-nav" id="bottom-navigation">
         <button class="nav-tab" data-target="inventory">
             <span class="nav-icon">🎒</span>
@@ -210,6 +198,24 @@
     <!-- МОДАЛКИ И УВЕДОМЛЕНИЯ -->
     <div id="toast-container" class="toast-container"></div>
 
+    <!-- Модалка пополнения по центру -->
+    <div id="deposit-amount-modal" class="modal-overlay hidden">
+        <div class="modal-card">
+            <button class="modal-close-x" id="deposit-modal-close">&times;</button>
+            <div class="modal-icon">💎</div>
+            <h2 class="modal-title">Пополнение счета</h2>
+            <p class="modal-message">Введите количество Gram, которое вы хотите внести на баланс (минимум 0.1 Gram):</p>
+            <div style="margin: 16px 0;">
+                <input type="number" id="modal-deposit-input" class="modal-deposit-field" placeholder="0.1" step="0.1" min="0.1">
+            </div>
+            <div class="modal-actions">
+                <button id="modal-deposit-confirm-btn" class="modal-btn modal-btn-primary">Подтвердить</button>
+                <button id="modal-deposit-cancel-btn" class="modal-btn modal-btn-secondary">Отмена</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Общая кастомная модалка -->
     <div id="custom-modal" class="modal-overlay hidden">
         <div class="modal-card">
             <button class="modal-close-x" id="modal-close-btn">&times;</button>
@@ -223,4 +229,4 @@
     <!-- Подключение главного JS логики -->
     <script src="js/app.js"></script>
 </body>
-    </html>
+                    </html>
