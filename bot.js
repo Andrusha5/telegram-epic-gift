@@ -4,7 +4,7 @@ const pool = db.pool || db;
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
 
-// Защита от дублирования процессов на сервере (синглтон)
+// Защита от запуска дублирующих процессов (синглтон-клиент)
 if (!global.botInstance) {
     global.botInstance = new TelegramBot(token, { polling: true });
 }
@@ -14,7 +14,7 @@ const bot = global.botInstance;
 async function checkUserSubscription(userId) {
     try {
         const channelUsername = process.env.CHANNEL_USERNAME;
-        if (!channelUsername) return true; // Если канал не настроен, даем доступ всем
+        if (!channelUsername) return true; // Если канал не привязан, разрешаем всем
 
         const cleanUsername = channelUsername.replace('@', '').trim();
         const chatMember = await bot.getChatMember('@' + cleanUsername, userId);
@@ -37,7 +37,7 @@ bot.on('callback_query', async (callbackQuery) => {
         return; 
     }
 
-    // Мгновенно отвечаем Telegram
+    // Мгновенно убираем часики загрузки у администратора
     bot.answerCallbackQuery(queryId).catch(() => {});
 
     const parts = actionData.split('_');
