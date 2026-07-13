@@ -14,7 +14,7 @@ const bot = global.botInstance;
 async function checkUserSubscription(userId) {
     try {
         const channelUsername = process.env.CHANNEL_USERNAME;
-        if (!channelUsername) return true; // Если канал в конфиге не указан, даем доступ всем
+        if (!channelUsername) return true; // Если канал не настроен, даем доступ всем
 
         const cleanUsername = channelUsername.replace('@', '').trim();
         const chatMember = await bot.getChatMember('@' + cleanUsername, userId);
@@ -122,5 +122,5 @@ bot.on('callback_query', async (callbackQuery) => {
 
 module.exports = {
     bot,
-    checkUserSubscription // Экспортируем функцию наружу
+    checkUserSubscription
 };
