@@ -1,16 +1,18 @@
 /* ==========================================================================
-   ОБЩИЕ СТИЛИ И ТЕМАТИЗАЦИЯ (ТЕМНАЯ ТЕМА TELEGRAM)
+   ОБЩИЕ СТИЛИ И ТЕМАТИЗАЦИЯ (ФИОЛЕТОВАЯ ТЕМА BESTGIFTS)
    ========================================================================== */
 :root {
-    --bg-color: #0c0c0e;
-    --card-bg: #1c1c1e;
-    --border-color: #2c2c2e;
+    --bg-color: #0b0914;
+    --card-bg: #131024;
+    --border-color: #241c44;
+    --accent-purple: #8d3df5;
+    --accent-purple-glow: rgba(141, 61, 245, 0.4);
     --accent-blue: #0088cc;
-    --accent-blue-active: #00a2ff;
-    --green-success: #28a745;
+    --green-success: #00e676;
     --red-alert: #ff3b30;
     --gold-gradient: linear-gradient(135deg, #ff9500, #ffcc00);
-    --light-text-color: #8e8e93;
+    --light-text-color: #a5a1b8;
+    --purple-gradient: linear-gradient(135deg, #22184c 0%, #0d091a 100%);
 }
 
 body {
@@ -18,7 +20,7 @@ body {
     color: #ffffff;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     margin: 0;
-    padding: 72px 16px 90px 16px; /* Отступы под верхний и нижний бары */
+    padding: 86px 16px 90px 16px; /* Отступы под верхний и нижний бары */
     box-sizing: border-box;
     overflow-x: hidden;
     user-select: none;
@@ -37,11 +39,11 @@ body {
     top: 0;
     left: 0;
     width: 100%;
-    height: 60px;
-    background: rgba(28, 28, 30, 0.85);
+    height: 74px;
+    background: rgba(13, 10, 26, 0.9);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
-    border-bottom: 1.5px solid var(--border-color);
+    border-bottom: 2px solid var(--border-color);
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -50,42 +52,65 @@ body {
     z-index: 1000;
 }
 
+.header-left {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.logo-area {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.logo-icon {
+    font-size: 18px;
+}
+
+.logo-text {
+    font-size: 18px;
+    font-weight: 900;
+    letter-spacing: 1px;
+    background: linear-gradient(135deg, #ffffff 0%, #a5a1b8 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
 .user-profile-pill {
     display: flex;
     align-items: center;
     gap: 8px;
-    background: rgba(0,0,0,0.3);
-    padding: 6px 12px;
-    border-radius: 20px;
-    border: 1px solid var(--border-color);
 }
 
 .header-avatar {
-    width: 24px;
-    height: 24px;
+    width: 22px;
+    height: 22px;
     border-radius: 50%;
+    border: 1.5px solid var(--accent-purple);
     object-fit: cover;
 }
 
 .header-username {
     font-size: 13px;
-    font-weight: 600;
-    color: #fff;
+    font-weight: bold;
+    color: #ffffff;
 }
 
 .balance-pill {
-    background: rgba(0, 136, 204, 0.12);
-    border: 1.5px solid rgba(0, 136, 204, 0.4);
+    background: rgba(0, 230, 118, 0.08);
+    border: 1.5px solid rgba(0, 230, 118, 0.4);
+    box-shadow: 0 0 10px rgba(0, 230, 118, 0.15);
     border-radius: 20px;
-    padding: 6px 14px;
+    padding: 8px 16px;
     display: flex;
     align-items: center;
     gap: 6px;
-    font-size: 14px;
-    font-weight: bold;
-    color: #ffffff;
+    font-size: 15px;
+    font-weight: 800;
+    color: #00e676;
     cursor: pointer;
-    transition: transform 0.1s;
+    transition: transform 0.1s, box-shadow 0.2s;
 }
 
 .balance-pill:active {
@@ -98,13 +123,39 @@ body {
 }
 
 /* ==========================================================================
-   СЕТКА КЕЙСОВ В 2 СТОЛБИКА
+   ПРИВЕТСТВЕННЫЙ БАННЕР
+   ========================================================================== */
+.welcome-banner {
+    width: 100%;
+    background: linear-gradient(135deg, #1c143c 0%, #0d091a 100%);
+    border: 1.5px solid #452a8c;
+    border-radius: 20px;
+    padding: 24px 16px;
+    margin-bottom: 24px;
+    text-align: center;
+    box-sizing: border-box;
+    box-shadow: 0 8px 24px rgba(13, 9, 26, 0.5);
+}
+
+.welcome-banner h2 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 800;
+    color: #ffffff;
+    letter-spacing: 0.5px;
+}
+
+/* ==========================================================================
+   СЕТКА КЕЙСОВ
    ========================================================================== */
 .section-title {
-    font-size: 20px;
-    font-weight: bold;
-    margin: 24px 0 16px 0;
+    font-size: 15px;
+    font-weight: 800;
+    color: var(--light-text-color);
+    letter-spacing: 1.5px;
+    margin: 24px 0 16px 4px;
     text-align: left;
+    text-transform: uppercase;
 }
 
 .cases-grid-layout {
@@ -117,7 +168,7 @@ body {
 
 .case-card {
     background: var(--card-bg);
-    border: 1px solid var(--border-color);
+    border: 1.5px solid var(--border-color);
     border-radius: 20px;
     padding: 12px;
     position: relative;
@@ -127,7 +178,8 @@ body {
     flex-direction: column;
     align-items: center;
     box-sizing: border-box;
-    transition: transform 0.2s, border-color 0.2s;
+    transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
 .case-card:active {
@@ -135,7 +187,8 @@ body {
 }
 
 .case-card:hover {
-    border-color: var(--accent-blue);
+    border-color: var(--accent-purple);
+    box-shadow: 0 0 12px var(--accent-purple-glow);
 }
 
 .case-badge {
@@ -143,26 +196,26 @@ body {
     top: 8px;
     left: 8px;
     font-size: 9px;
-    font-weight: bold;
+    font-weight: 800;
     text-transform: uppercase;
-    padding: 3px 6px;
-    border-radius: 6px;
+    padding: 4px 8px;
+    border-radius: 8px;
     z-index: 10;
 }
 
 .case-badge.free {
-    background: var(--green-success);
-    color: #fff;
+    background: #ffd600;
+    color: #000000;
 }
 
 .case-badge.paid {
-    background: var(--accent-blue);
-    color: #fff;
+    background: var(--accent-purple);
+    color: #ffffff;
 }
 
 .case-badge.locked-badge {
-    background: var(--light-text-color);
-    color: #000;
+    background: #3a355c;
+    color: var(--light-text-color);
 }
 
 .case-image-wrapper {
@@ -171,14 +224,14 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    margin-bottom: 8px;
+    margin-bottom: 12px;
 }
 
 .case-image-wrapper img {
-    max-width: 95%;
-    max-height: 95%;
+    max-width: 90%;
+    max-height: 90%;
     object-fit: contain;
-    border-radius: 12px;
+    border-radius: 16px;
 }
 
 .case-info {
@@ -190,318 +243,20 @@ body {
 }
 
 .case-name {
-    font-size: 13px;
-    font-weight: 600;
-    color: #fff;
+    font-size: 14px;
+    font-weight: 700;
+    color: #ffffff;
 }
 
 .case-arrow {
     color: var(--light-text-color);
     font-weight: bold;
+    font-size: 14px;
 }
 
 .case-card.locked {
-    opacity: 0.65;
+    opacity: 0.5;
     cursor: not-allowed;
-}
-
-/* ==========================================================================
-   КНОПКА ИГРЫ BEST ARENA (НАД КЕЙСАМИ)
-   ========================================================================== */
-.arena-banner-btn {
-    width: 100%;
-    background: linear-gradient(135deg, #1c1c1e 0%, #0c0c0e 100%);
-    border: 1px solid var(--border-color);
-    border-radius: 20px;
-    padding: 16px;
-    margin-bottom: 24px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    position: relative;
-    overflow: hidden;
-    cursor: pointer;
-    box-sizing: border-box;
-    transition: transform 0.2s, border-color 0.2s;
-}
-
-.arena-banner-btn:active {
-    transform: scale(0.98);
-}
-
-.arena-banner-btn:hover {
-    border-color: var(--accent-blue);
-}
-
-.arena-info-left {
-    z-index: 2;
-    text-align: left;
-}
-
-.arena-badge {
-    background: var(--gold-gradient);
-    color: #000;
-    font-size: 10px;
-    font-weight: 900;
-    text-transform: uppercase;
-    padding: 4px 8px;
-    border-radius: 20px;
-    display: inline-block;
-    margin-bottom: 6px;
-}
-
-.arena-banner-title {
-    color: #fff;
-    font-size: 18px;
-    font-weight: bold;
-    margin-bottom: 4px;
-}
-
-.arena-banner-desc {
-    color: var(--light-text-color);
-    font-size: 12px;
-}
-
-.arena-live-preview {
-    width: 70px;
-    height: 70px;
-    background: #1c1c1e;
-    border-radius: 12px;
-    border: 1.5px solid #3a3a3c;
-    overflow: hidden;
-    position: relative;
-}
-
-/* ==========================================================================
-   ИГРОВОЙ ЭКРАН "BEST ARENA"
-   ========================================================================== */
-.arena-screen {
-    padding: 16px;
-    box-sizing: border-box;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-}
-
-.arena-header-row {
-    width: 100%;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 16px;
-}
-
-.arena-back-btn {
-    background: #2c2c2e;
-    border: none;
-    border-radius: 50%;
-    width: 40px;
-    height: 40px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #fff;
-    font-size: 20px;
-    cursor: pointer;
-}
-
-.arena-game-id {
-    color: var(--light-text-color);
-    font-size: 13px;
-}
-
-.arena-main-box {
-    width: 100%;
-    max-width: 330px;
-    aspect-ratio: 1;
-    background: #121214;
-    border-radius: 24px;
-    border: 2px solid var(--border-color);
-    position: relative;
-    overflow: hidden;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-}
-
-.arena-canvas {
-    width: 100%;
-    height: 100%;
-    display: block;
-}
-
-.arena-status-text {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    color: rgba(255, 255, 255, 0.4);
-    font-size: 16px;
-    font-weight: bold;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    animation: pulseText 1.5s infinite;
-    pointer-events: none;
-    text-align: center;
-    z-index: 5;
-}
-
-.arena-countdown-timer {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    color: #fff;
-    font-size: 48px;
-    font-weight: 900;
-    z-index: 5;
-    pointer-events: none;
-    text-shadow: 0 4px 12px rgba(0,0,0,0.5);
-}
-
-@keyframes pulseText {
-    0% { opacity: 0.3; }
-    50% { opacity: 0.8; }
-    100% { opacity: 0.3; }
-}
-
-/* Кнопки ставок */
-.arena-controls {
-    width: 100%;
-    max-width: 330px;
-    margin-top: 16px;
-    display: flex;
-    gap: 8px;
-    align-items: center;
-}
-
-.arena-ctrl-btn {
-    flex: 1;
-    background: #2c2c2e;
-    border: 1px solid #3a3a3c;
-    border-radius: 14px;
-    padding: 12px 0;
-    color: #fff;
-    font-size: 14px;
-    font-weight: bold;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: transform 0.1s;
-}
-
-.arena-ctrl-btn:active {
-    transform: scale(0.95);
-}
-
-.arena-ctrl-btn-edit {
-    flex: 0 0 50px;
-    background: #1c1c1e;
-    border-color: var(--border-color);
-    font-size: 18px;
-}
-
-/* Модальное окно изменения ставок */
-.arena-edit-modal {
-    position: fixed;
-    top: 0; left: 0; width: 100%; height: 100%;
-    background: rgba(0, 0, 0, 0.85);
-    display: flex; align-items: center; justify-content: center;
-    z-index: 20000;
-    opacity: 0; pointer-events: none;
-    transition: opacity 0.3s ease;
-}
-
-.arena-edit-modal.show {
-    opacity: 1; pointer-events: auto;
-}
-
-.arena-edit-content {
-    background: #1c1c1e;
-    border: 1px solid var(--border-color);
-    border-radius: 20px;
-    padding: 24px;
-    width: 90%; max-width: 300px;
-    text-align: center;
-}
-
-.arena-edit-inputs {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    margin: 16px 0;
-}
-
-.arena-edit-input {
-    width: 100%;
-    padding: 12px;
-    background: #2c2c2e;
-    border: 1px solid #3a3a3c;
-    border-radius: 10px;
-    color: #fff;
-    font-size: 15px;
-    text-align: center;
-    box-sizing: border-box;
-}
-
-/* Список участников */
-.arena-players-container {
-    width: 100%;
-    max-width: 330px;
-    margin-top: 20px;
-}
-
-.arena-players-title {
-    color: #fff;
-    font-size: 15px;
-    font-weight: bold;
-    margin-bottom: 10px;
-    text-align: left;
-}
-
-.arena-players-list {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
-
-.arena-player-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    background: var(--card-bg);
-    border: 1px solid var(--border-color);
-    border-radius: 12px;
-    padding: 8px 12px;
-}
-
-.arena-player-info {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.arena-player-avatar {
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    object-fit: cover;
-}
-
-.arena-player-name {
-    color: #fff;
-    font-size: 13px;
-    font-weight: 500;
-}
-
-.arena-player-bet {
-    color: var(--light-text-color);
-    font-size: 11px;
-}
-
-.arena-player-chance {
-    color: var(--green-success);
-    font-size: 13px;
-    font-weight: bold;
 }
 
 /* ==========================================================================
@@ -517,18 +272,33 @@ body {
 
 .back-btn {
     background: var(--card-bg);
-    border: 1px solid var(--border-color);
-    border-radius: 12px;
-    width: 40px;
-    height: 40px;
-    color: #fff;
-    font-size: 18px;
+    border: 1.5px solid var(--border-color);
+    border-radius: 14px;
+    padding: 10px 16px;
+    color: #ffffff;
+    font-size: 14px;
+    font-weight: bold;
     cursor: pointer;
+    transition: transform 0.1s;
+}
+
+.back-btn:active {
+    transform: scale(0.95);
+}
+
+.header-title-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.logo-icon-small {
+    font-size: 22px;
 }
 
 .case-title {
     font-size: 20px;
-    font-weight: bold;
+    font-weight: 800;
     margin: 0;
 }
 
@@ -537,12 +307,12 @@ body {
     width: 100%;
     height: 120px;
     background: var(--card-bg);
-    border: 1.5px solid var(--border-color);
+    border: 2px solid var(--border-color);
     border-radius: 20px;
     position: relative;
     overflow: hidden;
     margin-bottom: 24px;
-    box-shadow: inset 0 0 20px rgba(0,0,0,0.8);
+    box-shadow: inset 0 0 24px rgba(0,0,0,0.8);
 }
 
 .roulette-marker {
@@ -552,9 +322,9 @@ body {
     transform: translateX(-50%);
     width: 4px;
     height: 100%;
-    background: #ff9500;
+    background: #8d3df5;
     z-index: 10;
-    box-shadow: 0 0 8px #ff9500;
+    box-shadow: 0 0 12px #8d3df5;
 }
 
 .roulette-track {
@@ -569,9 +339,9 @@ body {
 .roulette-item {
     width: 96px;
     height: 96px;
-    background: rgba(255,255,255,0.03);
-    border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 14px;
+    background: rgba(255,255,255,0.02);
+    border: 1.5px solid var(--border-color);
+    border-radius: 16px;
     margin-right: 8px;
     display: flex;
     flex-direction: column;
@@ -590,11 +360,11 @@ body {
 
 .roulette-item span {
     font-size: 10px;
-    font-weight: bold;
-    color: #fff;
+    font-weight: 800;
+    color: #ffffff;
 }
 
-/* Спин кнопки */
+/* Спин кнопка */
 .spin-controls {
     width: 100%;
     display: flex;
@@ -607,15 +377,15 @@ body {
 .spin-btn {
     width: 100%;
     max-width: 300px;
-    background: linear-gradient(135deg, #0088cc, #00a2ff);
-    color: #fff;
+    background: linear-gradient(135deg, #8d3df5, #6a0dad);
+    color: #ffffff;
     border: none;
     border-radius: 16px;
-    padding: 16px;
+    padding: 18px;
     font-size: 16px;
-    font-weight: bold;
+    font-weight: 800;
     cursor: pointer;
-    box-shadow: 0 4px 15px rgba(0, 136, 204, 0.4);
+    box-shadow: 0 6px 20px rgba(141, 61, 245, 0.3);
     transition: transform 0.1s;
 }
 
@@ -624,19 +394,20 @@ body {
 }
 
 .spin-btn:disabled {
-    background: #2c2c2e;
+    background: #241c44;
     color: var(--light-text-color);
     box-shadow: none;
     cursor: not-allowed;
 }
 
 .timer-box {
-    font-size: 13px;
-    color: var(--light-text-color);
-    background: rgba(255, 149, 0, 0.1);
-    border: 1px solid rgba(255, 149, 0, 0.3);
-    padding: 6px 16px;
-    border-radius: 12px;
+    font-size: 14px;
+    font-weight: bold;
+    color: #ffffff;
+    background: rgba(141, 61, 245, 0.08);
+    border: 1.5px solid rgba(141, 61, 245, 0.3);
+    padding: 8px 24px;
+    border-radius: 14px;
 }
 
 /* Сетка наград */
@@ -647,50 +418,55 @@ body {
 
 .sub-title {
     font-size: 15px;
-    font-weight: bold;
-    color: var(--light-text-color);
-    margin-bottom: 12px;
+    font-weight: 800;
+    color: #ffffff;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
 }
 
 .rewards-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 8px;
+    gap: 10px;
 }
 
 .reward-card {
     background: var(--card-bg);
-    border: 1px solid var(--border-color);
-    border-radius: 14px;
-    padding: 8px;
+    border: 1.5px solid var(--border-color);
+    border-radius: 16px;
+    padding: 10px;
     display: flex;
     flex-direction: column;
     align-items: center;
     position: relative;
     overflow: hidden;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
 }
 
 .reward-card.gold-tier {
-    border-color: #ff9500;
+    border-color: #ffd600;
+    box-shadow: 0 0 10px rgba(255, 214, 0, 0.15);
 }
 
 .reward-price-top {
-    font-size: 9px;
-    font-weight: bold;
-    color: var(--light-text-color);
-    margin-bottom: 6px;
+    font-size: 10px;
+    font-weight: 800;
+    color: #ffd600;
+    margin-bottom: 8px;
 }
 
 .reward-card img {
-    width: 44px;
-    height: 44px;
+    width: 52px;
+    height: 52px;
     object-fit: contain;
 }
 
 .reward-name {
-    font-size: 10px;
-    font-weight: bold;
-    margin-top: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    margin-top: 8px;
     text-align: center;
     white-space: nowrap;
     overflow: hidden;
@@ -700,10 +476,13 @@ body {
 
 .reward-random-badge {
     position: absolute;
-    bottom: 2px;
-    right: 2px;
-    font-size: 7px;
-    color: #ff9500;
+    bottom: 4px;
+    font-size: 8px;
+    font-weight: bold;
+    color: var(--accent-purple);
+    background: rgba(141, 61, 245, 0.15);
+    padding: 2px 6px;
+    border-radius: 4px;
     text-transform: uppercase;
 }
 
@@ -718,17 +497,17 @@ body {
 }
 
 .inv-profile-avatar {
-    width: 60px;
-    height: 60px;
+    width: 64px;
+    height: 64px;
     border-radius: 50%;
-    border: 2px solid var(--border-color);
-    margin-bottom: 8px;
+    border: 2px solid var(--accent-purple);
+    margin-bottom: 10px;
 }
 
 .inv-profile-username {
     font-size: 18px;
-    font-weight: bold;
-    margin: 0 0 4px 0;
+    font-weight: 800;
+    margin: 0 0 6px 0;
 }
 
 .inv-desc {
@@ -740,90 +519,93 @@ body {
 .inventory-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
-    gap: 10px;
+    gap: 12px;
     margin-bottom: 30px;
 }
 
 .inv-actions {
     display: flex;
-    gap: 6px;
+    gap: 8px;
     width: 100%;
-    margin-top: 8px;
+    margin-top: 10px;
 }
 
 .inv-btn {
     flex: 1;
     border: none;
-    border-radius: 8px;
-    padding: 6px 0;
-    font-size: 11px;
+    border-radius: 10px;
+    padding: 8px 0;
+    font-size: 12px;
     font-weight: bold;
     cursor: pointer;
-    color: #fff;
+    color: #ffffff;
 }
 
 .withdraw-btn {
-    background: var(--accent-blue);
+    background: var(--accent-purple);
 }
 
 .sell-btn {
-    background: #ff9500;
+    background: #ffd600;
+    color: #000000;
 }
 
 .empty-inventory {
     grid-column: span 2;
-    padding: 40px 0;
+    padding: 50px 0;
     color: var(--light-text-color);
     font-size: 13px;
-    line-height: 1.5;
+    line-height: 1.6;
+    text-align: center;
 }
 
 /* Депозит подарков */
 .deposit-gift-box {
     background: var(--card-bg);
-    border: 1px solid var(--border-color);
+    border: 1.5px solid var(--border-color);
     border-radius: 20px;
-    padding: 16px;
+    padding: 20px;
     text-align: left;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
 }
 
 .deposit-gift-box h3 {
     margin: 0 0 8px 0;
     font-size: 15px;
-    font-weight: bold;
+    font-weight: 800;
 }
 
 .deposit-gift-desc {
-    font-size: 11px;
+    font-size: 12px;
     color: var(--light-text-color);
-    line-height: 1.4;
+    line-height: 1.5;
     margin: 0 0 16px 0;
 }
 
 .deposit-select-row {
     display: flex;
-    gap: 8px;
+    gap: 10px;
 }
 
 .deposit-select-field {
     flex: 1;
-    background: #2c2c2e;
-    border: 1.5px solid #3a3a3c;
-    border-radius: 10px;
-    color: #fff;
-    padding: 10px;
+    background: #18142c;
+    border: 1.5px solid var(--border-color);
+    border-radius: 12px;
+    color: #ffffff;
+    padding: 12px;
     font-size: 13px;
     outline: none;
 }
 
 .deposit-confirm-btn {
     background: var(--green-success);
-    color: #fff;
+    color: #000000;
     border: none;
-    border-radius: 10px;
-    padding: 0 16px;
+    border-radius: 12px;
+    padding: 0 20px;
     font-size: 13px;
-    font-weight: bold;
+    font-weight: 800;
     cursor: pointer;
 }
 
@@ -841,9 +623,9 @@ body {
 .back-btn-header {
     background: none;
     border: none;
-    color: var(--accent-blue);
-    font-size: 14px;
-    font-weight: 600;
+    color: var(--accent-purple);
+    font-size: 15px;
+    font-weight: bold;
     cursor: pointer;
     position: absolute;
     left: 0;
@@ -854,39 +636,47 @@ body {
     text-align: center;
     margin: 0;
     font-size: 18px;
+    font-weight: 800;
 }
 
 .large-balance-card {
-    background: var(--card-bg);
+    background: linear-gradient(135deg, #1b123a 0%, #0d081e 100%);
     border: 1.5px solid var(--border-color);
     border-radius: 24px;
-    padding: 24px;
+    padding: 30px 20px;
     text-align: center;
     margin-bottom: 24px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
 }
 
 .balance-card-label {
     font-size: 12px;
-    text-transform: uppercase;
+    font-weight: 800;
     color: var(--light-text-color);
-    letter-spacing: 0.5px;
+    letter-spacing: 1px;
     display: block;
-    margin-bottom: 8px;
+    margin-bottom: 12px;
 }
 
 .balance-card-value {
-    font-size: 36px;
+    font-size: 42px;
     font-weight: 900;
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 8px;
+    gap: 10px;
+    margin-bottom: 16px;
 }
 
-.currency-text {
-    font-size: 18px;
-    color: var(--accent-blue);
-    font-weight: bold;
+.currency-text-diamond {
+    font-size: 32px;
+}
+
+.balance-card-subtitle {
+    font-size: 12px;
+    color: var(--light-text-color);
+    line-height: 1.5;
+    margin: 0;
 }
 
 .wallet-actions-container {
@@ -899,63 +689,77 @@ body {
 
 .connect-wallet-btn {
     width: 100%;
-    background: linear-gradient(135deg, #0088cc, #00a2ff);
-    color: #fff;
+    background: linear-gradient(135deg, var(--accent-purple), #6a0dad);
+    color: #ffffff;
     border: none;
     border-radius: 16px;
-    padding: 14px;
+    padding: 16px;
     font-size: 14px;
-    font-weight: bold;
+    font-weight: 800;
     cursor: pointer;
-    box-shadow: 0 4px 15px rgba(0, 136, 204, 0.4);
+    box-shadow: 0 4px 15px rgba(141, 61, 245, 0.25);
+    transition: transform 0.1s, background 0.3s;
+}
+
+.connect-wallet-btn:active {
+    transform: scale(0.98);
 }
 
 .deposit-balance-btn {
     width: 100%;
-    background: linear-gradient(135deg, var(--green-success), #218838);
-    color: #fff;
+    background: linear-gradient(135deg, var(--green-success), #00b34a);
+    color: #000000;
     border: none;
     border-radius: 16px;
-    padding: 14px;
+    padding: 16px;
     font-size: 14px;
-    font-weight: bold;
+    font-weight: 800;
     cursor: pointer;
+    box-shadow: 0 4px 15px rgba(0, 230, 118, 0.25);
 }
 
 .deposit-balance-btn:disabled {
-    opacity: 0.5;
+    opacity: 0.35;
     cursor: not-allowed;
+    color: #ffffff;
 }
 
 .deposit-notice {
     font-size: 11px;
     color: var(--light-text-color);
     margin: -4px 0 0 0;
+    text-align: center;
 }
 
 .wallet-faq-section {
     text-align: left;
 }
 
+.wallet-faq-section h3 {
+    font-size: 15px;
+    font-weight: 800;
+    margin-bottom: 12px;
+}
+
 .faq-item {
     background: var(--card-bg);
-    border: 1px solid var(--border-color);
-    border-radius: 14px;
-    padding: 12px;
-    margin-bottom: 8px;
+    border: 1.5px solid var(--border-color);
+    border-radius: 16px;
+    padding: 14px;
+    margin-bottom: 10px;
 }
 
 .faq-q {
     font-size: 13px;
     font-weight: bold;
     display: block;
-    margin-bottom: 4px;
+    margin-bottom: 6px;
 }
 
 .faq-a {
-    font-size: 11px;
+    font-size: 12px;
     color: var(--light-text-color);
-    line-height: 1.4;
+    line-height: 1.5;
 }
 
 /* ==========================================================================
@@ -963,12 +767,13 @@ body {
    ========================================================================== */
 .rating-header {
     text-align: center;
-    margin-bottom: 20px;
+    margin-bottom: 24px;
 }
 
 .rating-header h2 {
-    margin: 0 0 4px 0;
+    margin: 0 0 6px 0;
     font-size: 18px;
+    font-weight: 800;
 }
 
 .rating-header p {
@@ -987,8 +792,8 @@ body {
     padding: 60px 20px;
     color: var(--light-text-color);
     font-size: 13px;
-    border: 1px dashed var(--border-color);
-    border-radius: 16px;
+    border: 1.5px dashed var(--border-color);
+    border-radius: 20px;
     text-align: center;
 }
 
@@ -1000,11 +805,11 @@ body {
     bottom: 0;
     left: 0;
     width: 100%;
-    height: 64px;
-    background: rgba(28, 28, 30, 0.94);
+    height: 72px;
+    background: rgba(13, 10, 26, 0.96);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
-    border-top: 1.5px solid var(--border-color);
+    border-top: 2px solid var(--border-color);
     display: flex;
     align-items: center;
     justify-content: space-around;
@@ -1017,9 +822,10 @@ body {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 4px;
+    gap: 6px;
     color: var(--light-text-color);
     cursor: pointer;
+    transition: color 0.15s;
 }
 
 .nav-icon {
@@ -1028,11 +834,12 @@ body {
 
 .nav-label {
     font-size: 10px;
-    font-weight: 500;
+    font-weight: bold;
+    letter-spacing: 0.5px;
 }
 
 .nav-tab.active {
-    color: var(--accent-blue);
+    color: var(--accent-purple);
 }
 
 /* ==========================================================================
@@ -1040,7 +847,7 @@ body {
    ========================================================================== */
 .toast-container {
     position: fixed;
-    top: 76px;
+    top: 90px;
     left: 50%;
     transform: translateX(-50%);
     width: 90%;
@@ -1053,15 +860,15 @@ body {
 }
 
 .custom-toast {
-    background: rgba(28, 28, 30, 0.95);
-    border: 1px solid var(--border-color);
-    border-left: 4px solid var(--accent-blue);
-    border-radius: 12px;
+    background: rgba(19, 16, 36, 0.95);
+    border: 1.5px solid var(--border-color);
+    border-left: 4px solid var(--accent-purple);
+    border-radius: 14px;
     padding: 12px;
     display: flex;
     align-items: center;
     gap: 10px;
-    box-shadow: 0 10px 20px rgba(0,0,0,0.4);
+    box-shadow: 0 10px 24px rgba(0,0,0,0.5);
     pointer-events: auto;
     opacity: 0;
     transform: translateY(-20px);
@@ -1080,9 +887,9 @@ body {
 .custom-toast-content {
     flex: 1;
     font-size: 12px;
-    color: #fff;
+    color: #ffffff;
     text-align: left;
-    line-height: 1.4;
+    line-height: 1.5;
 }
 
 .custom-toast-close {
@@ -1109,14 +916,14 @@ body {
 
 .modal-card {
     background: var(--card-bg);
-    border: 1px solid var(--border-color);
+    border: 1.5px solid var(--border-color);
     border-radius: 24px;
     padding: 24px;
     width: 85%;
     max-width: 310px;
     text-align: center;
     position: relative;
-    box-shadow: 0 12px 30px rgba(0,0,0,0.5);
+    box-shadow: 0 12px 30px rgba(0,0,0,0.6);
 }
 
 .modal-close-x {
@@ -1137,7 +944,7 @@ body {
 
 .modal-title {
     font-size: 18px;
-    font-weight: bold;
+    font-weight: 800;
     margin: 0 0 10px 0;
 }
 
@@ -1165,11 +972,11 @@ body {
 }
 
 .modal-btn-primary {
-    background: var(--accent-blue);
-    color: #fff;
+    background: var(--accent-purple);
+    color: #ffffff;
 }
 
 .modal-btn-secondary {
-    background: #2c2c2e;
-    color: #fff;
+    background: #241c44;
+    color: #ffffff;
    }
