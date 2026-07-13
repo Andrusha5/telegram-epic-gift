@@ -20,7 +20,7 @@ body {
     color: #ffffff;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     margin: 0;
-    padding: 102px 16px 90px 16px; /* Отступы под увеличенный хедер и нижний бар */
+    padding: 110px 16px 115px 16px; /* Большие отступы для хедера и парящего меню */
     box-sizing: border-box;
     overflow-x: hidden;
     user-select: none;
@@ -31,6 +31,21 @@ body {
     display: none !important;
 }
 
+/* Кастомный красивый скроллбар */
+::-webkit-scrollbar {
+    width: 6px;
+}
+::-webkit-scrollbar-track {
+    background: var(--bg-color);
+}
+::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: var(--accent-purple);
+}
+
 /* ==========================================================================
    ВЕРХНИЙ БАР (ХЕДЕР) С УВЕЛИЧЕННЫМ ПРОФИЛЕМ
    ========================================================================== */
@@ -39,10 +54,10 @@ body {
     top: 0;
     left: 0;
     width: 100%;
-    height: 86px; /* Оптимальная высота под крупный аватар */
-    background: rgba(13, 10, 26, 0.9);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
+    height: 94px; /* Оптимальная высота под крупный аватар */
+    background: rgba(11, 9, 20, 0.92);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
     border-bottom: 2px solid var(--border-color);
     display: flex;
     align-items: center;
@@ -55,7 +70,7 @@ body {
 .header-left {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 6px;
 }
 
 .logo-area {
@@ -65,11 +80,11 @@ body {
 }
 
 .logo-icon {
-    font-size: 15px;
+    font-size: 16px;
 }
 
 .logo-text {
-    font-size: 15px;
+    font-size: 16px;
     font-weight: 900;
     letter-spacing: 1px;
     background: linear-gradient(135deg, #ffffff 0%, #a5a1b8 100%);
@@ -80,21 +95,21 @@ body {
 .user-profile-pill {
     display: flex;
     align-items: center;
-    gap: 12px; /* Увеличено расстояние */
+    gap: 12px;
 }
 
 .header-avatar {
-    width: 46px; /* УВЕЛИЧЕНО до 46px */
-    height: 46px; /* УВЕЛИЧЕНО до 46px */
+    width: 48px; /* Сильно увеличенный аватар */
+    height: 48px;
     border-radius: 50%;
-    border: 2px solid var(--accent-purple); /* Солидная фиолетовая обводка */
+    border: 2px solid var(--accent-purple);
     object-fit: cover;
-    box-shadow: 0 0 10px var(--accent-purple-glow);
+    box-shadow: 0 0 12px var(--accent-purple-glow);
 }
 
 .header-username {
-    font-size: 16px; /* УВЕЛИЧЕНО до 16px */
-    font-weight: 800; /* Жирный и заметный шрифт */
+    font-size: 16px; /* Юзернейм стал значительно больше */
+    font-weight: 800;
     color: #ffffff;
 }
 
@@ -119,8 +134,8 @@ body {
 }
 
 .balance-icon {
-    width: 16px;
-    height: 16px;
+    width: 18px;
+    height: 18px;
 }
 
 /* ==========================================================================
@@ -130,8 +145,8 @@ body {
     width: 100%;
     background: linear-gradient(135deg, #1c143c 0%, #0d091a 100%);
     border: 1.5px solid #452a8c;
-    border-radius: 20px;
-    padding: 24px 16px;
+    border-radius: 22px;
+    padding: 26px 18px;
     margin-bottom: 24px;
     text-align: center;
     box-shadow: 0 8px 24px rgba(13, 9, 26, 0.5);
@@ -140,14 +155,14 @@ body {
 
 .welcome-banner h2 {
     margin: 0;
-    font-size: 18px;
+    font-size: 19px;
     font-weight: 800;
     color: #ffffff;
     letter-spacing: 0.5px;
 }
 
 /* ==========================================================================
-   СЕТКА КЕЙСОВ И УЛУЧШЕННЫЕ КАРТИНКИ
+   СЕТКА КЕЙСОВ И КАРТИНКИ ИЗ РЕПОЗИТОРИЯ
    ========================================================================== */
 .section-title {
     font-size: 15px;
@@ -170,8 +185,8 @@ body {
 .case-card {
     background: var(--card-bg);
     border: 1.5px solid var(--border-color);
-    border-radius: 20px;
-    padding: 12px;
+    border-radius: 22px;
+    padding: 14px;
     position: relative;
     overflow: hidden;
     cursor: pointer;
@@ -219,30 +234,31 @@ body {
     color: var(--light-text-color);
 }
 
-/* Фиксированный размер для картинок кейсов */
 .case-image-wrapper {
     width: 100%;
-    aspect-ratio: 1;
+    height: 114px; /* Одинаковый красивый размер под все новые 3D-карты */
     display: flex;
     align-items: center;
     justify-content: center;
     margin-bottom: 12px;
-    height: 110px; /* Одинаковая фиксированная высота */
 }
 
 .case-image-wrapper img {
     max-width: 100%;
     max-height: 100%;
-    width: auto;
-    height: auto;
     object-fit: contain;
     border-radius: 16px;
+    transition: transform 0.3s;
+}
+
+.case-card:hover .case-image-wrapper img {
+    transform: scale(1.06);
 }
 
 .case-info {
     width: 100%;
     display: flex;
-    justify-content: space-between;
+    justify-content: center; /* Выравнивание по центру, стрелки удалены */
     align-items: center;
     padding: 0 4px;
 }
@@ -251,16 +267,11 @@ body {
     font-size: 14px;
     font-weight: 700;
     color: #ffffff;
-}
-
-.case-arrow {
-    color: var(--light-text-color);
-    font-weight: bold;
-    font-size: 14px;
+    text-align: center;
 }
 
 .case-card.locked {
-    opacity: 0.5;
+    opacity: 0.55;
     cursor: not-allowed;
 }
 
@@ -276,20 +287,27 @@ body {
     box-sizing: border-box;
 }
 
-.back-btn {
+/* Закругленная квадратная кнопка назад */
+.back-btn-square {
+    width: 44px;
+    height: 44px;
     background: var(--card-bg);
     border: 1.5px solid var(--border-color);
-    border-radius: 14px;
-    padding: 10px 16px;
+    border-radius: 12px;
     color: #ffffff;
-    font-size: 14px;
+    font-size: 22px;
     font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     cursor: pointer;
-    transition: transform 0.1s;
+    transition: transform 0.1s, border-color 0.2s;
+    box-sizing: border-box;
 }
 
-.back-btn:active {
-    transform: scale(0.95);
+.back-btn-square:active {
+    transform: scale(0.92);
+    border-color: var(--accent-purple);
 }
 
 .header-title-container {
@@ -311,14 +329,14 @@ body {
 /* Рулетка */
 .roulette-viewport {
     width: 100%;
-    height: 120px;
+    height: 124px;
     background: var(--card-bg);
     border: 2px solid var(--border-color);
-    border-radius: 20px;
+    border-radius: 22px;
     position: relative;
     overflow: hidden;
     margin-bottom: 24px;
-    box-shadow: inset 0 0 24px rgba(0,0,0,0.8);
+    box-shadow: inset 0 0 24px rgba(0,0,0,0.85);
     box-sizing: border-box;
 }
 
@@ -338,7 +356,7 @@ body {
     display: flex;
     align-items: center;
     position: absolute;
-    top: 10px;
+    top: 11px;
     left: 0;
     height: 100px;
 }
@@ -417,7 +435,7 @@ body {
     border-radius: 14px;
 }
 
-/* Сетка наград строго в 2 столбика */
+/* Сетка наград строго в 2 колонки */
 .rewards-section {
     width: 100%;
     text-align: left;
@@ -436,7 +454,7 @@ body {
 
 .rewards-grid {
     display: grid;
-    grid-template-columns: repeat(2, 1fr); /* ИЗМЕНЕНО НА 2 СТОЛБИКА */
+    grid-template-columns: repeat(2, 1fr); /* ДВЕ КОЛОНКИ */
     gap: 12px;
     width: 100%;
     box-sizing: border-box;
@@ -445,8 +463,8 @@ body {
 .reward-card {
     background: var(--card-bg);
     border: 1.5px solid var(--border-color);
-    border-radius: 16px;
-    padding: 14px;
+    border-radius: 18px;
+    padding: 16px;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -469,8 +487,8 @@ body {
 }
 
 .reward-card img {
-    width: 64px;
-    height: 64px;
+    width: 68px;
+    height: 68px;
     object-fit: contain;
 }
 
@@ -498,13 +516,12 @@ body {
 }
 
 /* ==========================================================================
-   ЭКРАН ИНВЕНТАРЯ (АККУРАТНЫЙ И БЕЗ ПРОФИЛЯ)
+   ЭКРАН ИНВЕНТАРЯ (АККУРАТНЫЙ И КРАСИВЫЙ БЕЗ ПРОФИЛЯ)
    ========================================================================== */
 .inventory-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
     gap: 12px;
-    margin-top: 10px;
     margin-bottom: 30px;
     width: 100%;
     box-sizing: border-box;
@@ -572,6 +589,18 @@ body {
     margin: 0 0 16px 0;
 }
 
+/* Кликабельная ссылка связи в инвентаре */
+.admin-link {
+    color: var(--accent-purple);
+    cursor: pointer;
+    text-decoration: underline;
+    transition: color 0.2s;
+}
+
+.admin-link:hover {
+    color: #a86cff;
+}
+
 .deposit-select-row {
     display: flex;
     gap: 10px;
@@ -616,17 +645,6 @@ body {
     box-sizing: border-box;
 }
 
-.back-btn-header {
-    background: none;
-    border: none;
-    color: var(--accent-purple);
-    font-size: 15px;
-    font-weight: bold;
-    cursor: pointer;
-    position: absolute;
-    left: 0;
-}
-
 .balance-header h2 {
     width: 100%;
     text-align: center;
@@ -661,12 +679,15 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 10px;
+    gap: 12px;
     margin-bottom: 16px;
 }
 
-.currency-text-diamond {
-    font-size: 32px;
+/* Замена значка алмаза на GRAM иконку */
+.large-balance-coin-icon {
+    width: 36px;
+    height: 36px;
+    object-fit: contain;
 }
 
 .balance-card-subtitle {
@@ -685,7 +706,13 @@ body {
     box-sizing: border-box;
 }
 
-/* Депозит поля ввода в Модалке */
+/* Модалка пополнения по центру экрана */
+.modal-input-wrapper {
+    width: 100%;
+    box-sizing: border-box;
+    margin-top: 14px;
+}
+
 .modal-deposit-field {
     width: 100%;
     background: #18142c;
@@ -787,34 +814,46 @@ body {
 }
 
 /* ==========================================================================
-   НИЖНИЙ НАВИГАЦИОННЫЙ БАР
+   ПАРЯЩИЙ НАВИГАЦИОННЫЙ БАР
    ========================================================================== */
-.bottom-nav {
+.floating-nav-container {
     position: fixed;
-    bottom: 0;
-    left: 0;
-    width: 100%;
+    bottom: 16px; /* Небольшой отступ снизу */
+    left: 16px;   /* Небольшой отступ слева */
+    right: 16px;  /* Небольшой отступ справа */
+    z-index: 2000;
+    pointer-events: none; /* Пропускает клики на пустых зонах */
+}
+
+.bottom-nav {
+    background: rgba(19, 16, 36, 0.95);
+    backdrop-filter: blur(15px);
+    -webkit-backdrop-filter: blur(15px);
+    border: 1.5px solid var(--border-color);
+    border-radius: 24px; /* Красивые скругленные края */
     height: 72px;
-    background: rgba(13, 10, 26, 0.96);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border-top: 2px solid var(--border-color);
     display: flex;
     align-items: center;
     justify-content: space-around;
-    z-index: 1000;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+    pointer-events: auto; /* Возвращает клики на саму панель */
 }
 
 .nav-tab {
     background: none;
     border: none;
+    outline: none;
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 6px;
     color: var(--light-text-color);
     cursor: pointer;
-    transition: color 0.15s;
+    transition: color 0.15s, transform 0.1s;
+}
+
+.nav-tab:active {
+    transform: scale(0.92);
 }
 
 .nav-icon {
@@ -832,11 +871,11 @@ body {
 }
 
 /* ==========================================================================
-   УВЕДОМЛЕНИЯ ПЕРЕНЕСЕНЫ ВНИЗ (ИСПРАВЛЕНО)
+   УВЕДОМЛЕНИЯ ПЕРЕНЕСЕНЫ ВНИЗ НАД ПАРЯЩЕЙ ПАНЕЛЬЮ
    ========================================================================== */
 .toast-container {
     position: fixed;
-    bottom: 86px; /* НАХОДИТСЯ НАД НИЖНИМ МЕНЮ */
+    bottom: 100px; /* Четко над парящим навигационным меню */
     left: 50%;
     transform: translateX(-50%);
     width: 90%;
@@ -849,7 +888,7 @@ body {
 }
 
 .custom-toast {
-    background: rgba(19, 16, 36, 0.95);
+    background: rgba(19, 16, 36, 0.98);
     border: 1.5px solid var(--border-color);
     border-left: 4px solid var(--accent-purple);
     border-radius: 14px;
@@ -857,10 +896,10 @@ body {
     display: flex;
     align-items: center;
     gap: 10px;
-    box-shadow: 0 -4px 15px rgba(0,0,0,0.5); /* Тень направлена вверх */
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.5);
     pointer-events: auto;
     opacity: 0;
-    transform: translateY(20px); /* Всплывает СНИЗУ вверх */
+    transform: translateY(20px); /* Появление снизу вверх */
     transition: opacity 0.3s, transform 0.3s;
 }
 
@@ -906,7 +945,7 @@ body {
 .modal-card {
     background: var(--card-bg);
     border: 1.5px solid var(--border-color);
-    border-radius: 24px;
+    border-radius: 26px;
     padding: 24px;
     width: 85%;
     max-width: 310px;
