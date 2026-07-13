@@ -3,7 +3,7 @@ tg.expand();
 tg.ready();
 
 // ==========================================================================
-// ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ И ОЧИСТКА ДАННЫХ (КРИТИЧЕСКИ ВАЖНО)
+// ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ (ГЛОБАЛЬНЫЕ ДЛЯ ЗАЩИТЫ ОТ СБОЕВ)
 // ==========================================================================
 function formatItemName(name) {
     if (!name) return "";
@@ -622,12 +622,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         { id: 118, name: "Пополнение 0.005 GRAM (Новичок)", icon: GRAMCOIN_ICON_URL, price: "0.005 GRAM", rawPrice: 0.005, isGold: false, type: "balance" }
     ];
 
+    // КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: БЕЗОПАСНАЯ НАВИГАЦИЯ БЕЗ СБОЕВ JS
     function navigateTo(target) {
         const sections = [
             elements.homeSection, elements.caseSection, elements.inventorySection, 
             elements.ratingSection, elements.balanceSection, document.getElementById('arena-section')
-        ];
-        sections.forEach(s => { if (s) s.classList.add('hidden'); });
+        ].filter(Boolean); // Фильтруем пустые элементы
+        
+        sections.forEach(s => s.classList.add('hidden'));
         
         if (elements.bottomNavigation) elements.bottomNavigation.classList.remove('hidden');
 
