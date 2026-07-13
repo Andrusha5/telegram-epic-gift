@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>BestGifts</title>
-    <!-- Подключение стилей -->
+    <!-- Основные стили приложения -->
     <link rel="stylesheet" href="css/style.css">
     <!-- Telegram WebApp SDK -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
@@ -50,7 +50,6 @@
                 </div>
                 <div class="case-info">
                     <span class="case-name">Ежедневный кейс</span>
-                    <span class="case-arrow">&rarr;</span>
                 </div>
             </div>
 
@@ -62,11 +61,10 @@
                 </div>
                 <div class="case-info">
                     <span class="case-name">Кейс новичка</span>
-                    <span class="case-arrow">&rarr;</span>
                 </div>
             </div>
 
-            <!-- Кейс бомжа (в разработке) -->
+            <!-- Кейс бомжа -->
             <div class="case-card locked" id="bomzh-case-banner">
                 <div class="case-badge locked-badge">Скоро</div>
                 <div class="case-image-wrapper">
@@ -74,11 +72,10 @@
                 </div>
                 <div class="case-info">
                     <span class="case-name">Кейс бомжа</span>
-                    <span class="case-arrow">&larr;</span>
                 </div>
             </div>
 
-            <!-- Кейс крутого (в разработке) -->
+            <!-- Кейс крутого -->
             <div class="case-card locked" id="krutoy-case-banner">
                 <div class="case-badge locked-badge">Скоро</div>
                 <div class="case-image-wrapper">
@@ -86,7 +83,6 @@
                 </div>
                 <div class="case-info">
                     <span class="case-name">Кейс крутого</span>
-                    <span class="case-arrow">&larr;</span>
                 </div>
             </div>
         </div>
@@ -95,12 +91,12 @@
     <!-- ================= 2. ЭКРАН КЕЙСА (ОТКРЫТИЕ) ================= -->
     <section id="case-section" class="app-section hidden">
         <div class="case-open-header">
-            <button class="back-btn" id="back-to-home-button">&larr; Назад</button>
+            <button class="back-btn-square" id="back-to-home-button">&larr;</button>
             <div class="header-title-container">
                 <span class="logo-icon-small">🎁</span>
                 <h1 id="case-page-main-title" class="case-title">Ежедневный кейс</h1>
             </div>
-            <div style="width:40px;"></div>
+            <div style="width:44px;"></div>
         </div>
 
         <!-- Рулетка прокрутки -->
@@ -125,7 +121,7 @@
         </div>
     </section>
 
-    <!-- ================= 3. ЭКРАН ИНВЕНТАРЯ ================= -->
+    <!-- ================= 3. ЭКРАН ИНВЕНТАРЯ (ЧИСТЫЙ) ================= -->
     <section id="inventory-section" class="app-section hidden">
         <!-- Сетка предметов -->
         <div class="inventory-grid" id="inventory-grid"></div>
@@ -133,7 +129,7 @@
         <!-- Раздел ввода подарков в игру -->
         <div class="deposit-gift-box">
             <h3>📥 Пополнить инвентарь подарком</h3>
-            <p class="deposit-gift-desc">Передайте ваш подарок игроку <b>@Sintopa</b> в Telegram, выберите его ниже и подтвердите отправку:</p>
+            <p class="deposit-gift-desc">Передайте ваш подарок игроку <b id="admin-tg-chat-trigger" class="admin-link">@Sintopa</b> в Telegram, выберите его ниже и подтвердите отправку:</p>
             <div class="deposit-select-row">
                 <select id="deposit-item-select" class="deposit-select-field"></select>
                 <button id="deposit-confirm-button" class="deposit-confirm-btn">Отправить</button>
@@ -157,7 +153,7 @@
     <!-- ================= 5. ЭКРАН КОШЕЛЬКА (БАЛАНС) ================= -->
     <section id="balance-section" class="app-section hidden">
         <div class="balance-header">
-            <button class="back-btn-header" id="back-to-home-from-balance">&larr; Назад</button>
+            <button class="back-btn-square" id="back-to-home-from-balance">&larr;</button>
             <h2>💎 Мой Баланс</h2>
         </div>
 
@@ -165,7 +161,7 @@
             <span class="balance-card-label">ВАШ ТЕКУЩИЙ БАЛАНС</span>
             <div class="balance-card-value">
                 <span id="large-balance-value">0.000</span>
-                <span class="currency-text-diamond">💎</span>
+                <img src="/Images/Items/gram_popolnenie.png" alt="GRAM" class="large-balance-coin-icon">
             </div>
             <p class="balance-card-subtitle">Принимайте участие в розыгрышах и выводите ценные NFT призы прямо на свой кошелек!</p>
         </div>
@@ -179,43 +175,45 @@
         </div>
     </section>
 
-    <!-- ================= НИЖНЕЕ МЕНЮ НАВИГАЦИИ ================= -->
-    <nav class="bottom-nav" id="bottom-navigation">
-        <button class="nav-tab" data-target="inventory">
-            <span class="nav-icon">🎒</span>
-            <span class="nav-label">ИНВЕНТАРЬ</span>
-        </button>
-        <button class="nav-tab active" data-target="home">
-            <span class="nav-icon">🏠</span>
-            <span class="nav-label">МЕНЮ</span>
-        </button>
-        <button class="nav-tab" data-target="rating">
-            <span class="nav-icon">🏆</span>
-            <span class="nav-label">РЕЙТИНГ</span>
-        </button>
-    </nav>
+    <!-- ================= ПАРЯЩЕЕ НИЖНЕЕ МЕНЮ НАВИГАЦИИ ================= -->
+    <div class="floating-nav-container">
+        <nav class="bottom-nav">
+            <button class="nav-tab" data-target="inventory">
+                <span class="nav-icon">🎒</span>
+                <span class="nav-label">ИНВЕНТАРЬ</span>
+            </button>
+            <button class="nav-tab active" data-target="home">
+                <span class="nav-icon">🏠</span>
+                <span class="nav-label">МЕНЮ</span>
+            </button>
+            <button class="nav-tab" data-target="rating">
+                <span class="nav-icon">🏆</span>
+                <span class="nav-label">РЕЙТИНГ</span>
+            </button>
+        </nav>
+    </div>
 
-    <!-- МОДАЛКИ И УВЕДОМЛЕНИЯ -->
+    <!-- ================= МОДАЛКИ И УВЕДОМЛЕНИЯ ================= -->
     <div id="toast-container" class="toast-container"></div>
 
-    <!-- Модалка пополнения по центру -->
+    <!-- МОДАЛЬНОЕ ОКНО ДЛЯ ВВОДА СУММЫ ДЕПОЗИТА (ПО ЦЕНТРУ ЭКРАНА) -->
     <div id="deposit-amount-modal" class="modal-overlay hidden">
         <div class="modal-card">
-            <button class="modal-close-x" id="deposit-modal-close">&times;</button>
+            <button class="modal-close-x" id="deposit-modal-close-btn">&times;</button>
             <div class="modal-icon">💎</div>
-            <h2 class="modal-title">Пополнение счета</h2>
-            <p class="modal-message">Введите количество Gram, которое вы хотите внести на баланс (минимум 0.1 Gram):</p>
-            <div style="margin: 16px 0;">
+            <h2 class="modal-title">Пополнение баланса</h2>
+            <p class="modal-message">Введите сумму в TON, которую вы хотите внести на баланс (минимальная сумма пополнения — 0.1 TON):</p>
+            <div class="modal-input-wrapper">
                 <input type="number" id="modal-deposit-input" class="modal-deposit-field" placeholder="0.1" step="0.1" min="0.1">
             </div>
             <div class="modal-actions">
-                <button id="modal-deposit-confirm-btn" class="modal-btn modal-btn-primary">Подтвердить</button>
+                <button id="modal-deposit-confirm-btn" class="modal-btn modal-btn-primary">Пополнить</button>
                 <button id="modal-deposit-cancel-btn" class="modal-btn modal-btn-secondary">Отмена</button>
             </div>
         </div>
     </div>
 
-    <!-- Общая кастомная модалка -->
+    <!-- ОБЩЕЕ СИСТЕМНОЕ МОДАЛЬНОЕ ОКНО -->
     <div id="custom-modal" class="modal-overlay hidden">
         <div class="modal-card">
             <button class="modal-close-x" id="modal-close-btn">&times;</button>
@@ -226,7 +224,7 @@
         </div>
     </div>
 
-    <!-- Подключение главного JS логики -->
+    <!-- Главный JS файл приложения -->
     <script src="js/app.js"></script>
 </body>
-                    </html>
+                                </html>
