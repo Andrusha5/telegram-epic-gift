@@ -15,7 +15,7 @@
 
     <!-- ВЕРХНЯЯ ПАНЕЛЬ (ХЕДЕР) -->
     <header class="main-header">
-        <div class="user-profile-pill">
+        <div class="user-profile-pill" id="header-profile-pill">
             <img id="user-avatar" src="https://img.icons8.com/color/96/user.png" alt="Avatar" class="header-avatar">
             <span id="user-username" class="header-username">Загрузка...</span>
         </div>
@@ -41,7 +41,7 @@
 
         <h2 class="section-title">Кейсы</h2>
         
-        <!-- СЕТКА КЕЙСОВ В 2 СТОЛБИКА С ОРИГИНАЛЬНЫМИ 3D СУНДУКАМИ -->
+        <!-- СЕТКА КЕЙСОВ В 2 СТОЛБИКА С ОРИГИНАЛЬНЫМИ СУНДУКАМИ -->
         <div class="cases-grid-layout" id="banners-container">
             <!-- Ежедневный бесплатный кейс -->
             <div class="case-card" id="daily-case-banner">
@@ -175,16 +175,16 @@
         </div>
     </section>
 
-    <!-- ================= 5. ЭКРАН РЕЙТИНГА (ПУСТОЙ РЕЙТИНГ) ================= -->
+    <!-- ================= 5. ЭКРАН РЕЙТИНГА ================= -->
     <section id="rating-section" class="app-section hidden">
         <div class="rating-header">
             <h2>🏆 Таблица лидеров</h2>
             <p>Топ игроков по ценности инвентаря и выигрышам</p>
         </div>
         <div class="leaderboard-list" id="leaderboard-list">
-            <!-- Список пуст, как и требовалось -->
+            <!-- Чистый пустой рейтинг по ТЗ -->
             <div class="empty-rating-placeholder">
-                🏆 Таблица лидеров пуста. Будьте первым в рейтинге!
+                🏆 Таблица лидеров пока пуста. Станьте первым лидером Best Arena!
             </div>
         </div>
     </section>
@@ -225,7 +225,7 @@
         </div>
     </section>
 
-    <!-- ================= НИЖНЕЕ МЕНЮ НАВИГАЦИИ (ПОРЯДОК: ИНВЕНТАРЬ | МЕНЮ | РЕЙТИНГ) ================= -->
+    <!-- ================= НИЖНЕЕ МЕНЮ НАВИГАЦИИ (ИНВЕНТАРЬ (СЛЕВА) | МЕНЮ (ПОСЕРЕДИНЕ) | РЕЙТИНГ (СПРАВА)) ================= -->
     <nav class="bottom-nav" id="bottom-navigation">
         <button class="nav-tab" data-target="inventory">
             <span class="nav-icon">🎒</span>
@@ -242,10 +242,8 @@
     </nav>
 
     <!-- ================= МОДАЛКИ И УВЕДОМЛЕНИЯ ================= -->
-    <!-- Контейнер для всплывающих тостов (Toast Notifications) -->
     <div id="toast-container" class="toast-container"></div>
 
-    <!-- Кастомное модальное окно -->
     <div id="custom-modal" class="modal-overlay hidden">
         <div class="modal-card">
             <button class="modal-close-x" id="modal-close-btn">&times;</button>
@@ -259,4 +257,4 @@
     <!-- Подключение главного JS логики -->
     <script src="js/app.js"></script>
 </body>
-    </html>
+                    </html>
