@@ -17,10 +17,34 @@ function formatUsername(name) {
     return name.length > 10 ? name.substring(0, 10) + "..." : name;
 }
 
-// Преобразование hex-адреса TON в сокращенный вид (friendly)
+// Преобразование hex-адреса TON в дружественный Base64 (UQA..._Yl)
+function getFriendlyAddress(rawAddress) {
+    try {
+        if (typeof TON_CONNECT_UI !== 'undefined' && TON_CONNECT_UI.toUserFriendlyAddress) {
+            return TON_CONNECT_UI.toUserFriendlyAddress(rawAddress);
+        }
+        if (typeof TonConnectUI !== 'undefined' && TonConnectUI.toUserFriendlyAddress) {
+            return TonConnectUI.toUserFriendlyAddress(rawAddress);
+        }
+        if (window.TonConnectUI && window.TonConnectUI.toUserFriendlyAddress) {
+            return window.TonConnectUI.toUserFriendlyAddress(rawAddress);
+        }
+    } catch(e) {}
+    return rawAddress; 
+}
+
 function formatWalletAddress(rawAddress) {
     if (!rawAddress) return "";
-    return rawAddress.substring(0, 4) + "-..." + rawAddress.substring(rawAddress.length - 4);
+    const friendly = getFriendlyAddress(rawAddress);
+    return friendly.substring(0, 4) + "-..." + friendly.substring(friendly.length - 4);
+}
+
+// Простейшая генерация payload комментария в TON без внешних библиотек
+function makeCommentPayload(text) {
+    const bytes = new TextEncoder().encode(text);
+    const payloadBytes = new Uint8Array(4 + bytes.length);
+    payloadBytes.set(bytes, 4); // Первые 4 байта нули (Opcode 0 для Text Comment)
+    return btoa(String.fromCharCode.apply(null, payloadBytes));
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -78,7 +102,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         casePageMainTitle: document.getElementById('case-page-main-title'),
         connectWalletBtn: document.getElementById('connect-wallet-btn'),
         depositBalanceBtn: document.getElementById('deposit-balance-btn'),
-        depositNoticeText: document.getElementById('deposit-notice-text')
+        depositNoticeText: document.getElementById('deposit-notice-text'),
+        depositInputWrapper: document.getElementById('deposit-input-wrapper'),
+        depositAmountInput: document.getElementById('deposit-amount-input')
     };
 
     const safeSetText = (el, val) => { if (el) el.innerText = val; };
@@ -146,7 +172,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         overlay.classList.remove('hidden');
     }
 
-    // Инициализация TON Connect и обновление статуса кнопки
+    // Инициализация TON Connect
     let tonConnectUI = null;
     try {
         const manifestUrl = `${API_BASE_URL}/tonconnect-manifest.json`;
@@ -162,16 +188,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         if (tonConnectUI) {
-            // Подписка на изменение статуса кошелька (Screenshot 4)
             tonConnectUI.onStatusChange(wallet => {
                 if (wallet) {
-                    const friendlyAddress = wallet.account.address;
-                    const displayAddress = formatWalletAddress(friendlyAddress);
+                    const displayAddress = formatWalletAddress(wallet.account.address);
                     
                     if (elements.connectWalletBtn) {
                         elements.connectWalletBtn.innerText = `Привязан: (${displayAddress})`;
                         elements.connectWalletBtn.style.background = 'linear-gradient(135deg, #00e676, #00b34a)';
                         elements.connectWalletBtn.style.color = '#000000';
+                    }
+                    if (elements.depositInputWrapper) {
+                        elements.depositInputWrapper.classList.remove('hidden');
                     }
                     if (elements.depositBalanceBtn) {
                         elements.depositBalanceBtn.removeAttribute('disabled');
@@ -186,6 +213,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                         elements.connectWalletBtn.style.background = 'linear-gradient(135deg, var(--accent-purple), #6a0dad)';
                         elements.connectWalletBtn.style.color = '#ffffff';
                     }
+                    if (elements.depositInputWrapper) {
+                        elements.depositInputWrapper.classList.add('hidden');
+                    }
                     if (elements.depositBalanceBtn) {
                         elements.depositBalanceBtn.setAttribute('disabled', 'true');
                     }
@@ -196,7 +226,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
             });
 
-            // Обработчик кнопки кошелька
             if (elements.connectWalletBtn) {
                 elements.connectWalletBtn.addEventListener('click', async () => {
                     if (tonConnectUI.connected) {
@@ -226,14 +255,96 @@ document.addEventListener('DOMContentLoaded', async () => {
         console.error("TON Connect Error:", err);
     }
 
-    // Обработка кнопки Пополнения баланса
+    // Обработчик Кнопки Пополнения
     if (elements.depositBalanceBtn) {
-        elements.depositBalanceBtn.addEventListener('click', () => {
-            showNotification("Система пополнения баланса временно подготавливается!", "💎");
+        elements.depositBalanceBtn.addEventListener('click', async () => {
+            if (!elements.depositAmountInput) return;
+            const amount = parseFloat(elements.depositAmountInput.value);
+
+            if (isNaN(amount) || amount < 0.1) {
+                showNotification("Минимальная сумма пополнения — 0.1 TON", "⚠️");
+                return;
+            }
+
+            if (!tonConnectUI || !tonConnectUI.connected) {
+                showNotification("Пожалуйста, сначала подключите кошелек!", "⚠️");
+                return;
+            }
+
+            try {
+                // Запрашиваем адрес получателя (админа)
+                const res = await fetch(`${API_BASE_URL}/api/deposit_address`);
+                const data = await res.json();
+                const adminAddress = data.address;
+
+                if (!adminAddress) {
+                    showNotification("Ошибка: адрес для депозита не настроен.", "⚠️");
+                    return;
+                }
+
+                // Переводим в нанотоны
+                const nanoAmount = Math.floor(amount * 1000000000).toString();
+                // Генерируем комментарий (ID пользователя в Telegram)
+                const payloadBase64 = makeCommentPayload(String(userId));
+
+                const transaction = {
+                    validUntil: Math.floor(Date.now() / 1000) + 360,
+                    messages: [
+                        {
+                            address: adminAddress,
+                            amount: nanoAmount,
+                            payload: payloadBase64
+                        }
+                    ]
+                };
+
+                showNotification("Подтвердите транзакцию в вашем кошельке...", "⏳");
+                const result = await tonConnectUI.sendTransaction(transaction);
+
+                if (result) {
+                    showNotification("Транзакция отправлена! Проверяем подтверждение...", "⏳");
+                    
+                    // Попытка верификации на сервере каждые 5 сек (всего 10 попыток)
+                    let checkCount = 0;
+                    const checkInterval = setInterval(async () => {
+                        checkCount++;
+                        if (checkCount > 10) {
+                            clearInterval(checkInterval);
+                            showNotification("Баланс обновится автоматически в течение пары минут.", "⏳");
+                            return;
+                        }
+
+                        try {
+                            const verifyRes = await fetch(`${API_BASE_URL}/api/verify-payment`, {
+                                method: 'POST',
+                                headers: { 
+                                    'Content-Type': 'application/json',
+                                    'X-Telegram-Init-Data': tg.initData || ""
+                                },
+                                body: JSON.stringify({
+                                    amount: amount,
+                                    userId: userId
+                                })
+                            });
+                            const verifyData = await verifyRes.json();
+                            if (verifyRes.ok && verifyData.success) {
+                                clearInterval(checkInterval);
+                                showNotification(`Баланс успешно пополнен на +${amount.toFixed(2)} GRAM!`, "💎");
+                                fetchUserData();
+                            }
+                        } catch (e) {
+                            console.error("Проверка транзакции:", e);
+                        }
+                    }, 5000);
+                }
+            } catch (err) {
+                console.error("Отказ транзакции:", err);
+                showNotification("Транзакция отменена или произошла ошибка.", "⚠️");
+            }
         });
     }
 
-    // ----------------- КЕЙСЫ И НАГРАДЫ (ОРИГИНАЛЬНЫЕ ПУЛЫ) -----------------
+    // ----------------- ПУЛЫ НАГРАД -----------------
     const GIFT_POOL = [
         { id: 1, name: "Статуя птицы серая", icon: "/Images/Items/rare_bird.jpg", price: "20 GRAM", rawPrice: 20.0, isGold: true, type: "gift" },
         { id: 2, name: "Тыква", icon: "/Images/Items/pumpkin.jpg", price: "8 GRAM", rawPrice: 8.0, isGold: true, type: "gift" },
