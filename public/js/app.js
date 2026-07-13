@@ -17,7 +17,7 @@ function formatUsername(name) {
     return name.length > 10 ? name.substring(0, 10) + "..." : name;
 }
 
-// Преобразование hex-адреса TON в дружественный Base64 (UQA..._Yl)
+// Преобразование hex-адреса TON в дружественный Base64 (UQA..._YI / _Yl)
 function getFriendlyAddress(rawAddress) {
     try {
         if (typeof TON_CONNECT_UI !== 'undefined' && TON_CONNECT_UI.toUserFriendlyAddress) {
@@ -39,7 +39,7 @@ function formatWalletAddress(rawAddress) {
     return friendly.substring(0, 4) + "-..." + friendly.substring(friendly.length - 4);
 }
 
-// Генерация payload комментария в TON
+// Генерация payload комментария в TON (4 нулевых байта для текстового комментария)
 function makeCommentPayload(text) {
     const bytes = new TextEncoder().encode(text);
     const payloadBytes = new Uint8Array(4 + bytes.length);
@@ -103,9 +103,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         connectWalletBtn: document.getElementById('connect-wallet-btn'),
         depositBalanceBtn: document.getElementById('deposit-balance-btn'),
         depositNoticeText: document.getElementById('deposit-notice-text'),
-        // Новые элементы для всплывающей модалки депозита
+        // Модалка пополнения
         depositAmountModal: document.getElementById('deposit-amount-modal'),
-        depositModalClose: document.getElementById('deposit-modal-close'),
+        depositModalCloseBtn: document.getElementById('deposit-modal-close-btn'),
         modalDepositInput: document.getElementById('modal-deposit-input'),
         modalDepositConfirmBtn: document.getElementById('modal-deposit-confirm-btn'),
         modalDepositCancelBtn: document.getElementById('modal-deposit-cancel-btn')
@@ -253,52 +253,53 @@ document.addEventListener('DOMContentLoaded', async () => {
         console.error("TON Connect Error:", err);
     }
 
-    // --- ЛОГИКА ДЕПОЗИТА ЧЕРЕЗ ЦЕНТРАЛЬНОЕ ОКНО ---
+    // Обработчик вызова модалки депозита
     if (elements.depositBalanceBtn) {
         elements.depositBalanceBtn.addEventListener('click', () => {
             if (elements.depositAmountModal) {
                 elements.depositAmountModal.classList.remove('hidden');
-                if (elements.modalDepositInput) elements.modalDepositInput.value = '0.1';
+                if (elements.modalDepositInput) elements.modalDepositInput.value = "0.1";
             }
         });
     }
 
-    const closeDepositModal = () => {
+    const hideDepositModal = () => {
         if (elements.depositAmountModal) elements.depositAmountModal.classList.add('hidden');
     };
 
-    if (elements.depositModalClose) elements.depositModalClose.addEventListener('click', closeDepositModal);
-    if (elements.modalDepositCancelBtn) elements.modalDepositCancelBtn.addEventListener('click', closeDepositModal);
+    if (elements.depositModalCloseBtn) elements.depositModalCloseBtn.addEventListener('click', hideDepositModal);
+    if (elements.modalDepositCancelBtn) elements.modalDepositCancelBtn.addEventListener('click', hideDepositModal);
 
+    // Подтверждение депозита в модалке по центру
     if (elements.modalDepositConfirmBtn) {
         elements.modalDepositConfirmBtn.addEventListener('click', async () => {
-            if (!elements.modalDepositInput) return;
             const amount = parseFloat(elements.modalDepositInput.value);
-
             if (isNaN(amount) || amount < 0.1) {
                 showNotification("Минимальная сумма пополнения — 0.1 TON", "⚠️");
                 return;
             }
 
             if (!tonConnectUI || !tonConnectUI.connected) {
-                showNotification("Пожалуйста, сначала подключите кошелек!", "⚠️");
+                showNotification("Пожалуйста, привяжите ваш TON-кошелек!", "⚠️");
                 return;
             }
 
-            closeDepositModal();
+            hideDepositModal();
 
             try {
-                // Запрашиваем адрес получателя
+                // Запрашиваем адрес кошелька приема платежей (админский)
                 const res = await fetch(`${API_BASE_URL}/api/deposit_address`);
                 const data = await res.json();
                 const adminAddress = data.address;
 
                 if (!adminAddress) {
-                    showNotification("Ошибка: адрес для депозита не настроен.", "⚠️");
+                    showNotification("Ошибка: адрес получателя не настроен.", "⚠️");
                     return;
                 }
 
+                // Переводим TON в нанотоны
                 const nanoAmount = Math.floor(amount * 1000000000).toString();
+                // Генерируем комментарий, используя TG ID пользователя
                 const payloadBase64 = makeCommentPayload(String(userId));
 
                 const transaction = {
@@ -312,18 +313,18 @@ document.addEventListener('DOMContentLoaded', async () => {
                     ]
                 };
 
-                showNotification("Подтвердите транзакцию в вашем кошельке...", "⏳");
+                showNotification("Подтвердите транзакцию в кошельке...", "⏳");
                 const result = await tonConnectUI.sendTransaction(transaction);
 
                 if (result) {
-                    showNotification("Транзакция отправлена! Проверяем подтверждение...", "⏳");
+                    showNotification("Транзакция отправлена! Проверяем...", "⏳");
                     
                     let checkCount = 0;
                     const checkInterval = setInterval(async () => {
                         checkCount++;
                         if (checkCount > 10) {
                             clearInterval(checkInterval);
-                            showNotification("Баланс обновится автоматически в течение пары минут.", "⏳");
+                            showNotification("Баланс зачислится автоматически при подтверждении сети TON.", "⏳");
                             return;
                         }
 
@@ -346,18 +347,26 @@ document.addEventListener('DOMContentLoaded', async () => {
                                 fetchUserData();
                             }
                         } catch (e) {
-                            console.error("Проверка транзакции:", e);
+                            console.error("Верификация платежа:", e);
                         }
                     }, 5000);
                 }
             } catch (err) {
-                console.error("Отказ транзакции:", err);
-                showNotification("Транзакция отменена или произошла ошибка.", "⚠️");
+                console.error("Ошибка при отправке TON транзакции:", err);
+                showNotification("Транзакция отменена или отклонена кошельком.", "⚠️");
             }
         });
     }
 
-    // ----------------- ПУЛЫ НАГРАД -----------------
+    // Перенаправление на чат админа при клике в инвентаре
+    const adminChatTrigger = document.getElementById('admin-tg-chat-trigger');
+    if (adminChatTrigger) {
+        adminChatTrigger.addEventListener('click', () => {
+            tg.openTelegramLink("https://t.me/Sintopa");
+        });
+    }
+
+    // ----------------- КЕЙСЫ И НАГРАДЫ -----------------
     const GIFT_POOL = [
         { id: 1, name: "Статуя птицы серая", icon: "/Images/Items/rare_bird.jpg", price: "20 GRAM", rawPrice: 20.0, isGold: true, type: "gift" },
         { id: 2, name: "Тыква", icon: "/Images/Items/pumpkin.jpg", price: "8 GRAM", rawPrice: 8.0, isGold: true, type: "gift" },
@@ -747,7 +756,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         void elements.rouletteTrack.offsetWidth; 
         elements.rouletteTrack.innerHTML = '';
         const currentPool = isNewbieCaseMode ? NEWBIE_GIFT_POOL : GIFT_POOL;
-        for (let i = 0; i < 50; i++) {
+        for (let i = 0; i < 60; i++) {
             const randomItem = currentPool[Math.floor(Math.random() * currentPool.length)];
             const itemEl = document.createElement('div');
             itemEl.className = 'roulette-item';
@@ -764,7 +773,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const itemWidth = 96; 
         const gap = 8; 
         const itemFullWidth = itemWidth + gap; 
-        const targetIndex = 35; 
+        const targetIndex = 45; 
         const trackItems = elements.rouletteTrack.children;
         if (trackItems[targetIndex]) {
             trackItems[targetIndex].className = 'roulette-item';
@@ -776,9 +785,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         const containerWidth = elements.rouletteTrack.parentElement.offsetWidth;
         const centerOffset = (containerWidth / 2) - (itemWidth / 2);
         const totalTranslate = (targetIndex * itemFullWidth) - centerOffset;
-        elements.rouletteTrack.style.transition = 'transform 5s cubic-bezier(0.15, 0.85, 0.15, 1)';
+        elements.rouletteTrack.style.transition = 'transform 5.5s cubic-bezier(0.12, 0.82, 0.12, 1)';
         elements.rouletteTrack.style.transform = `translateX(-${totalTranslate}px)`;
-        setTimeout(() => { onComplete(); }, 5100);
+        setTimeout(() => { onComplete(); }, 5600);
     }
 
     function processWinning(winningGift, apiNewBalance = null) {
