@@ -987,9 +987,10 @@ body {
     padding: 60px 20px;
     color: var(--light-text-color);
     font-size: 13px;
-    border: 1px dashed var(--border-color);
+    border: 1.5px dashed var(--border-color);
     border-radius: 16px;
     text-align: center;
+    background: var(--card-bg);
 }
 
 /* ==========================================================================
@@ -1172,4 +1173,4 @@ body {
 .modal-btn-secondary {
     background: #2c2c2e;
     color: #fff;
-   }
+}
