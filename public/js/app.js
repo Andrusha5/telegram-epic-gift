@@ -2,16 +2,17 @@ const tg = window.Telegram.WebApp;
 tg.expand();
 tg.ready();
 
+// Ограничивает длину юзернейма до 15 символов, предотвращая сдвиг хедера
+function formatUsername(name) {
+    if (!name) return "Пользователь";
+    return name.length > 15 ? name.substring(0, 15) + "..." : name;
+}
+
 function formatItemName(name) {
     if (!name) return "";
     let clean = name.replace(/\.(png|jpg|jpeg)$/i, '');
     clean = clean.replace(/_/g, ' ');
     return clean.trim();
-}
-
-function formatUsername(name) {
-    if (!name) return "Пользователь";
-    return name.length > 10 ? name.substring(0, 10) + "..." : name;
 }
 
 function getFriendlyAddress(rawAddress) {
@@ -32,6 +33,7 @@ function formatWalletAddress(rawAddress) {
     return friendly.substring(0, 4) + "-..." + friendly.substring(friendly.length - 4);
 }
 
+// Загружает файлы картинок в кэш устройства
 function preloadImages(urls) {
     urls.forEach(url => {
         const img = new Image();
@@ -90,7 +92,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const safeSetText = (el, val) => { if (el) el.innerText = val; };
 
     // -----------------------------------------------------------------------
-    // МГНОВЕННЫЙ ЗАПУСК ИЗ ЛОКАЛЬНОГО КЭША (МГНОВЕННОЕ УСТРАНЕНИЕ СЕРОГО ЭКРАНА)
+    // ОПТИМИЗАЦИЯ СКОРОСТИ ЗАПУСКА: Загрузка из LocalStorage
     // -----------------------------------------------------------------------
     function loadCachedUserData() {
         try {
@@ -107,7 +109,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                     mainAvatar.src = cache.avatar_url || `${API_BASE_URL}/api/avatar/${userId}`;
                 }
             } else {
-                // Временный плейсхолдер до загрузки из БД
                 const rawName = tg.initDataUnsafe?.user?.username || tg.initDataUnsafe?.user?.first_name || "Пользователь";
                 safeSetText(document.getElementById('user-username'), formatUsername(rawName));
             }
@@ -122,7 +123,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         } catch (e) {}
     }
 
-    // Сразу читаем кэш, чтобы интерфейс загрузился за 0.05 сек
+    // Запускаем мгновенный импорт сохраненного профиля
     loadCachedUserData();
 
     function showNotification(message, icon = '🎁') {
@@ -187,7 +188,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         overlay.classList.remove('hidden');
     }
 
-    // Инициализация TON Connect
+    // Настройка TON Connect
     let tonConnectUI = null;
     try {
         const manifestUrl = `${API_BASE_URL}/tonconnect-manifest.json`;
@@ -197,7 +198,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             removeItem: (key) => { try { localStorage.removeItem(`tc-${userId}-${key}`); } catch (e) {} }
         };
 
-        // Запуск UI после загрузки SDK
         const initTonConnect = () => {
             const TC_SDK = window.TON_CONNECT_UI || window.TonConnectUI;
             if (TC_SDK) {
@@ -310,7 +310,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     return;
                 }
 
-                // Запрашиваем 100% совместимый BOC
+                // Запрос BOC
                 const payloadRes = await fetch(`${API_BASE_URL}/api/generate_payload?text=${userId}`);
                 const payloadData = await payloadRes.json();
                 const payloadBase64 = payloadData.payload;
@@ -366,9 +366,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    if (elements.adminTgChatTrigger) {
-        elements.adminTgChatTrigger.addEventListener('click', () => {
-            tg.openTelegramLink("https://t.me/Sintopa");
+    // Перенаправление на игру Best Arena
+    const gameTrigger = document.getElementById('game-arena-trigger');
+    if (gameTrigger) {
+        gameTrigger.addEventListener('click', () => {
+            showNotification("Игра Best Arena находится в разработке!", "⏳");
         });
     }
 
@@ -411,7 +413,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         { id: 118, name: "Пополнение 0.005 GRAM (Новичок)", icon: GRAMCOIN_ICON_URL, price: "0.005 GRAM", rawPrice: 0.005, isGold: false, type: "balance" }
     ];
 
-    // Оптимизированная фоновая загрузка картинок
+    // Кэширование изображений
     const allImagesToPreload = [
         "/Images/Logo/logotip.png",
         GRAMCOIN_ICON_URL,
@@ -586,10 +588,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (!res.ok) throw new Error();
             currentUser = await res.json();
             
-            // Сохраняем новые данные в кэш для моментального запуска в следующий раз
+            // Сохраняем новые данные в кэш
             saveUserDataToCache(currentUser);
         } catch (e) {
-            console.error("Ошибка загрузки данных, используются данные кэша.");
+            console.error("Используются кэшированные данные");
         }
 
         updateBalanceUI();
