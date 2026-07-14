@@ -1,5 +1,4 @@
 // --- БЕЗОПАСНЫЙ СЛОЙ ИНИЦИАЛИЗАЦИИ SDK ТЕЛЕГРАМ ---
-// Защищает скрипт от любых падений в случае задержки загрузки CDN-скриптов
 const tg = (window.Telegram && window.Telegram.WebApp) ? window.Telegram.WebApp : {
     expand: () => {},
     ready: () => {},
@@ -57,7 +56,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     let isNewbieCaseMode = false; 
     const GRAMCOIN_ICON_URL = "/Images/Items/gram_popolnenie.png"; 
 
-    // --- МГНОВЕННОЕ УСТРАНЕНИЕ СЕРОГО ЭКРАНА С НАДПИСЬЮ "Загрузка..." ---
+    // Настройки быстрых ставок Best Arena (По умолчанию: 1, 2, 3)
+    let customBets = [1, 2, 3];
+
+    // Мгновенная замена заглушки "Загрузка..." на имя пользователя Telegram
     const safeSetText = (el, val) => { if (el) el.innerText = val; };
     const initialName = tg.initDataUnsafe?.user?.username || tg.initDataUnsafe?.user?.first_name || "Пользователь";
     safeSetText(document.getElementById('user-username'), formatUsername(initialName));
@@ -78,7 +80,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         inventorySection: document.getElementById('inventory-section'),
         ratingSection: document.getElementById('rating-section'), 
         balanceSection: document.getElementById('balance-section'), 
-        arenaSection: document.getElementById('arena-section'), // Новый элемент
+        arenaSection: document.getElementById('arena-section'), 
         rouletteTrack: document.getElementById('roulette-track'),
         spinBtn: document.getElementById('spin-case-button'),
         balanceDisplayPill: document.getElementById('user-balance-pill-value'),
@@ -105,9 +107,19 @@ document.addEventListener('DOMContentLoaded', async () => {
         adminTgChatTrigger: document.getElementById('admin-tg-chat-trigger')
     };
 
-    // -----------------------------------------------------------------------
-    // МГНОВЕННЫЙ ИМПОРТ ИЗ ЛОКАЛЬНОГО КЭША (Для моментальной загрузки UI)
-    // -----------------------------------------------------------------------
+    // Загрузка кастомных конфигураций ставок из localStorage
+    function loadSavedBets() {
+        try {
+            const saved = localStorage.getItem(`custom_bets_${userId}`);
+            if (saved) {
+                customBets = JSON.parse(saved);
+            }
+        } catch (e) {
+            console.error("Ошибка чтения настроек ставок:", e);
+        }
+    }
+
+    // Загрузка данных профиля из локального кэша для снижения лагов
     function loadCachedUserData() {
         try {
             const cachedData = localStorage.getItem(`user_cache_${userId}`);
@@ -134,7 +146,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         } catch (e) {}
     }
 
-    // Сразу считываем кэш, избавляя приложение от любых задержек при старте
+    // Первичный запуск данных
+    loadSavedBets();
     loadCachedUserData();
 
     function showNotification(message, icon = '🎁') {
@@ -377,7 +390,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    // Перенаправление на новую вкладку игры Best Arena
+    // -----------------------------------------------------------------------
+    // ЛОГИКА ИГРЫ "BEST ARENA" (ОПТИМИЗИРОВАННАЯ КЛИЕНТ-СЕРВЕРНАЯ ЧАСТЬ)
+    // -----------------------------------------------------------------------
     const gameTrigger = document.getElementById('game-arena-trigger');
     if (gameTrigger) {
         gameTrigger.addEventListener('click', () => {
@@ -389,6 +404,115 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (backFromArena) {
         backFromArena.addEventListener('click', () => {
             navigateTo('home');
+        });
+    }
+
+    // Отрисовка кнопок ставок на основе баланса игрока
+    function renderBetButtons() {
+        const balance = parseFloat(currentUser.balance || 0);
+        for (let i = 0; i < 3; i++) {
+            const btn = document.getElementById(`bet-btn-${i + 1}`);
+            if (!btn) continue;
+            
+            const betVal = parseFloat(customBets[i]);
+            btn.querySelector('.bet-val').innerText = betVal.toString();
+            btn.setAttribute('data-bet', betVal);
+
+            if (balance >= betVal) {
+                btn.className = "bet-button active";
+                btn.disabled = false;
+            } else {
+                btn.className = "bet-button disabled";
+                btn.disabled = true;
+            }
+        }
+    }
+
+    // Обработчик совершения быстрой ставки
+    const handleBetClick = async (e) => {
+        const btn = e.currentTarget;
+        if (btn.classList.contains('disabled')) return;
+
+        const betValue = parseFloat(btn.getAttribute('data-bet'));
+        if (isNaN(betValue) || betValue < 0.1) return;
+
+        // Предотвращение случайных кликов
+        btn.classList.add('disabled');
+        btn.disabled = true;
+
+        try {
+            const res = await fetch(`${API_BASE_URL}/api/place_bet`, {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'X-Telegram-Init-Data': tg.initData || ""
+                },
+                body: JSON.stringify({ amount: betValue })
+            });
+            const data = await res.json();
+            
+            if (res.ok && data.success) {
+                showNotification(`Ставка принята: -${betValue} GRAM`, "🎮");
+                currentUser.balance = data.newBalance;
+                updateBalanceUI();
+            } else {
+                showNotification(data.error || "Ошибка принятия ставки", "⚠️");
+                fetchUserData();
+            }
+        } catch (err) {
+            showNotification("Ошибка связи с сервером", "⚠️");
+            fetchUserData();
+        } finally {
+            renderBetButtons();
+        }
+    };
+
+    document.getElementById('bet-btn-1').addEventListener('click', handleBetClick);
+    document.getElementById('bet-btn-2').addEventListener('click', handleBetClick);
+    document.getElementById('bet-btn-3').addEventListener('click', handleBetClick);
+
+    // Модальное окно редактирования ставок
+    const editBetsModal = document.getElementById('edit-bets-modal');
+    const betEditTrigger = document.getElementById('bet-edit-trigger');
+    const editBetsClose = document.getElementById('edit-bets-close-btn');
+    const cancelBetsBtn = document.getElementById('cancel-bets-btn');
+    const saveBetsBtn = document.getElementById('save-bets-btn');
+
+    if (betEditTrigger) {
+        betEditTrigger.addEventListener('click', () => {
+            document.getElementById('bet-input-1').value = customBets[0];
+            document.getElementById('bet-input-2').value = customBets[1];
+            document.getElementById('bet-input-3').value = customBets[2];
+            editBetsModal.classList.remove('hidden');
+        });
+    }
+
+    const closeEditBetsModal = () => {
+        editBetsModal.classList.add('hidden');
+    };
+
+    if (editBetsClose) editBetsClose.addEventListener('click', closeEditBetsModal);
+    if (cancelBetsBtn) cancelBetsBtn.addEventListener('click', closeEditBetsModal);
+
+    if (saveBetsBtn) {
+        saveBetsBtn.addEventListener('click', () => {
+            const b1 = parseFloat(document.getElementById('bet-input-1').value);
+            const b2 = parseFloat(document.getElementById('bet-input-2').value);
+            const b3 = parseFloat(document.getElementById('bet-input-3').value);
+
+            if (isNaN(b1) || b1 < 0.1 || isNaN(b2) || b2 < 0.1 || isNaN(b3) || b3 < 0.1) {
+                showNotification("Сумма ставки не может быть менее 0.1 GRAM!", "⚠️");
+                return;
+            }
+
+            customBets = [b1, b2, b3];
+            try {
+                localStorage.setItem(`custom_bets_${userId}`, JSON.stringify(customBets));
+            } catch(e) {}
+
+            closeEditBetsModal();
+            showNotification("Суммы ставок успешно обновлены!", "✏️");
+            renderBetButtons();
         });
     }
 
@@ -454,7 +578,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     function navigateTo(target) {
         const sections = [
             elements.homeSection, elements.caseSection, elements.inventorySection, 
-            elements.ratingSection, elements.balanceSection, elements.arenaSection // Добавлен в список
+            elements.ratingSection, elements.balanceSection, elements.arenaSection
         ];
         sections.forEach(s => { if (s) s.classList.add('hidden'); });
         
@@ -478,9 +602,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (elements.caseSection) elements.caseSection.classList.remove('hidden');
             if (elements.bottomNavigation) elements.bottomNavigation.classList.add('hidden'); 
             initRouletteTrack();
-        } else if (target === 'arena') { // Навигация на арену
+        } else if (target === 'arena') { 
             if (elements.arenaSection) elements.arenaSection.classList.remove('hidden');
             if (elements.bottomNavigation) elements.bottomNavigation.classList.add('hidden');
+            renderBetButtons();
         }
     }
 
@@ -615,7 +740,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (!res.ok) throw new Error();
             currentUser = await res.json();
             
-            // Сохраняем новые данные в кэш
             saveUserDataToCache(currentUser);
         } catch (e) {
             console.error("Используются кэшированные данные");
@@ -632,6 +756,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const rawName = currentUser.username || currentUser.first_name || "Пользователь";
         safeSetText(document.getElementById('user-username'), formatUsername(rawName));
         updateDailyCaseTimer();
+        renderBetButtons(); // Автоматическое обновление кнопок в Best Arena
     }
 
     function updateBalanceUI(forcedValue = null) {
@@ -795,7 +920,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     function initRouletteTrack() {
         if (!elements.rouletteTrack) return;
         elements.rouletteTrack.style.transition = 'none';
-        elements.rouletteTrack.style.transform = 'translateX(0px)';
+        elements.rouletteTrack.style.transform = 'translate3d(0, 0, 0)';
         void elements.rouletteTrack.offsetWidth; 
         elements.rouletteTrack.innerHTML = '';
         const currentPool = isNewbieCaseMode ? NEWBIE_GIFT_POOL : GIFT_POOL;
@@ -828,8 +953,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         const containerWidth = elements.rouletteTrack.parentElement.offsetWidth;
         const centerOffset = (containerWidth / 2) - (itemWidth / 2);
         const totalTranslate = (targetIndex * itemFullWidth) - centerOffset;
+        
+        // Оптимальное аппаратное 3D ускорение на GPU для прокрутки рулетки
         elements.rouletteTrack.style.transition = 'transform 5.5s cubic-bezier(0.12, 0.82, 0.12, 1)';
-        elements.rouletteTrack.style.transform = `translateX(-${totalTranslate}px)`;
+        elements.rouletteTrack.style.transform = `translate3d(-${totalTranslate}px, 0, 0)`;
         setTimeout(() => { onComplete(); }, 5600);
     }
 
