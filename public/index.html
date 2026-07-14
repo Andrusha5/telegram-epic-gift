@@ -4,12 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>BestGifts</title>
-    <!-- Версионный маркер ?v=2.0.3 гарантирует моментальный сброс кэша в Telegram -->
-    <link rel="stylesheet" href="css/style.css?v=2.0.3">
+    <!-- Версионный маркер ?v=2.0.4 гарантирует моментальный сброс кэша в Telegram -->
+    <link rel="stylesheet" href="css/style.css?v=2.0.4">
 </head>
 <body>
 
-    <!-- ВЕРХНЯЯ ПАНЕЛЬ (ХЕДЕР) -->
+    <!-- ВЕРХНЯЯ ПАНЕЛЬ (ХЕДЕР) - ЕДИНСТВЕННОЕ МЕСТО ОТОБРАЖЕНИЯ ЛОГОТИПА -->
     <header class="main-header">
         <div class="header-left">
             <div class="logo-area">
@@ -35,7 +35,7 @@
             <h2>Добро пожаловать в BestGifts!</h2>
         </div>
 
-        <!-- БАННЕР ИГРЫ BEST ARENA (БЕЗ ТЕКСТА ОПИСАНИЯ И ЗНАЧКА LIVE) -->
+        <!-- БАННЕР ИГРЫ BEST ARENA -->
         <div class="game-promo-banner" id="game-arena-trigger">
             <div class="game-info-side">
                 <h2 class="game-title">Best Arena</h2>
@@ -106,7 +106,7 @@
                 <svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
             </button>
             <div class="header-title-container">
-                <img src="/Images/Logo/logotip.png" alt="Logo" class="logo-img-header-small">
+                <!-- Маленький логотип полностью удален -->
                 <h1 id="case-page-main-title" class="case-title">Ежедневный кейс</h1>
             </div>
             <div style="width:46px;"></div>
@@ -134,14 +134,14 @@
         </div>
     </section>
 
-    <!-- ================= 3. НОВЫЙ ЭКРАН ИГРЫ BEST ARENA ================= -->
+    <!-- ================= 3. ЭКРАН ИГРЫ BEST ARENA ================= -->
     <section id="arena-section" class="app-section hidden">
         <div class="case-open-header">
             <button class="back-btn-square" id="back-to-home-from-arena">
                 <svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
             </button>
             <div class="header-title-container">
-                <img src="/Images/Logo/logotip.png" alt="Logo" class="logo-img-header-small">
+                <!-- Маленький логотип полностью удален -->
                 <h1 class="case-title">Best Arena</h1>
             </div>
             <div style="width:46px;"></div>
@@ -153,6 +153,27 @@
                 <div class="arena-grid-overlay"></div>
                 <!-- Мерцающая неоновая надпись -->
                 <div class="arena-waiting-text">Ждем ставки...</div>
+            </div>
+
+            <!-- БЛОК ПАНЕЛИ СТАВОК (РЕДАКТИРУЕМЫЕ И ДИНАМИЧЕСКИЕ КНОПКИ) -->
+            <div class="betting-row">
+                <button class="bet-edit-btn" id="bet-edit-trigger" title="Настроить ставки">
+                    <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+                        <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
+                    </svg>
+                </button>
+                <button class="bet-button disabled" id="bet-btn-1" data-index="0">
+                    <span class="bet-val">1</span>
+                    <img src="/Images/Items/gram_popolnenie.png" class="bet-coin-icon" alt="GRAM">
+                </button>
+                <button class="bet-button disabled" id="bet-btn-2" data-index="1">
+                    <span class="bet-val">2</span>
+                    <img src="/Images/Items/gram_popolnenie.png" class="bet-coin-icon" alt="GRAM">
+                </button>
+                <button class="bet-button disabled" id="bet-btn-3" data-index="2">
+                    <span class="bet-val">3</span>
+                    <img src="/Images/Items/gram_popolnenie.png" class="bet-coin-icon" alt="GRAM">
+                </button>
             </div>
         </div>
     </section>
@@ -267,8 +288,33 @@
         </nav>
     </div>
 
-    <!-- ================= МОДАЛКИ И УВЕДОМЛЕНИЯ ================= -->
-    <div id="toast-container" class="toast-container"></div>
+    <!-- МОДАЛЬНОЕ ОКНО ДЛЯ ИЗМЕНЕНИЯ СТАВОК -->
+    <div id="edit-bets-modal" class="modal-overlay hidden">
+        <div class="modal-card">
+            <button class="modal-close-x" id="edit-bets-close-btn">&times;</button>
+            <div class="modal-icon">✏️</div>
+            <h2 class="modal-title">Настройка кнопок</h2>
+            <p class="modal-message">Задайте новые суммы для быстрых ставок (не менее 0.1 GRAM):</p>
+            <div class="modal-input-row">
+                <div class="bet-input-wrapper">
+                    <label for="bet-input-1">Кнопка 1</label>
+                    <input type="number" id="bet-input-1" class="modal-deposit-field" step="0.1" min="0.1" value="1">
+                </div>
+                <div class="bet-input-wrapper">
+                    <label for="bet-input-2">Кнопка 2</label>
+                    <input type="number" id="bet-input-2" class="modal-deposit-field" step="0.1" min="0.1" value="2">
+                </div>
+                <div class="bet-input-wrapper">
+                    <label for="bet-input-3">Кнопка 3</label>
+                    <input type="number" id="bet-input-3" class="modal-deposit-field" step="0.1" min="0.1" value="3">
+                </div>
+            </div>
+            <div class="modal-actions" style="margin-top: 20px;">
+                <button id="save-bets-btn" class="modal-btn modal-btn-primary">Сохранить</button>
+                <button id="cancel-bets-btn" class="modal-btn modal-btn-secondary">Отмена</button>
+            </div>
+        </div>
+    </div>
 
     <!-- МОДАЛЬНОЕ ОКНО ДЛЯ ВВОДА СУММЫ ДЕПОЗИТА -->
     <div id="deposit-amount-modal" class="modal-overlay hidden">
@@ -298,9 +344,9 @@
         </div>
     </div>
 
-    <!-- Telegram SDK и TON Connect SDK подключены перед скриптом для бесконфликтной загрузки -->
+    <!-- Telegram SDK и TON Connect SDK подключены для надежной загрузки -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>
-    <script src="js/app.js?v=2.0.3" defer></script>
+    <script src="js/app.js?v=2.0.4" defer></script>
 </body>
-    </html>
+                                                                                                                                                                                                                    </html>
