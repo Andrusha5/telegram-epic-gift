@@ -4,12 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>BestGifts</title>
-    <!-- Основные стили приложения -->
+    <!-- CSS загружается в первую очередь для мгновенного отображения каркаса -->
     <link rel="stylesheet" href="css/style.css">
-    <!-- Telegram WebApp SDK -->
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <!-- TON Connect SDK для привязки кошелька -->
-    <script src="https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>
 </head>
 <body>
 
@@ -17,7 +13,6 @@
     <header class="main-header">
         <div class="header-left">
             <div class="logo-area">
-                <!-- ВАШ ЛОГОТИП В ШАПКЕ ПРИЛОЖЕНИЯ РЯДОМ С НАЗВАНИЕМ BESTGIFTS -->
                 <img src="/Images/Logo/logotip.png" alt="BestGifts" class="logo-img-header" onerror="this.src='https://img.icons8.com/color/96/gift.png';">
                 <span class="logo-text">BESTGIFTS</span>
             </div>
@@ -34,16 +29,13 @@
 
     <!-- ================= 1. ГЛАВНЫЙ ЭКРАН (МЕНЮ) ================= -->
     <section id="home-section" class="app-section">
-        <!-- ПРИВЕТСТВЕННЫЙ БАННЕР -->
         <div class="welcome-banner">
             <h2>Добро пожаловать в BestGifts!</h2>
         </div>
 
         <h2 class="section-title">КЕЙСЫ</h2>
         
-        <!-- СЕТКА КЕЙСОВ -->
         <div class="cases-grid-layout" id="banners-container">
-            <!-- Ежедневный бесплатный кейс -->
             <div class="case-card" id="daily-case-banner">
                 <div class="case-badge free">Бесплатно</div>
                 <div class="case-image-wrapper">
@@ -54,7 +46,6 @@
                 </div>
             </div>
 
-            <!-- Кейс новичка -->
             <div class="case-card" id="newbie-case-banner">
                 <div class="case-badge paid">0.1 GRAM</div>
                 <div class="case-image-wrapper">
@@ -65,7 +56,6 @@
                 </div>
             </div>
 
-            <!-- Кейс бомжа -->
             <div class="case-card locked" id="bomzh-case-banner">
                 <div class="case-badge locked-badge">Скоро</div>
                 <div class="case-image-wrapper">
@@ -76,7 +66,6 @@
                 </div>
             </div>
 
-            <!-- Кейс крутого -->
             <div class="case-card locked" id="krutoy-case-banner">
                 <div class="case-badge locked-badge">Скоро</div>
                 <div class="case-image-wrapper">
@@ -102,22 +91,18 @@
             <div style="width:46px;"></div>
         </div>
 
-        <!-- Рулетка прокрутки -->
         <div class="roulette-viewport">
             <div class="roulette-marker"></div>
             <div class="roulette-track" id="roulette-track"></div>
         </div>
 
-        <!-- Кнопка вращения -->
         <div class="spin-controls">
             <button class="spin-btn" id="spin-case-button">Запустить</button>
-            <!-- Таймер ежедневного кейса -->
             <div id="timer-container" class="timer-box hidden">
                 Возвращайтесь через: <span id="daily-case-timer">24ч 00м 00с</span>
             </div>
         </div>
 
-        <!-- Список наград -->
         <div id="rewards-section-container" class="rewards-section">
             <h3 id="rewards-grid-title" class="sub-title">🏆 Содержимое кейса</h3>
             <div class="rewards-grid" id="rewards-grid"></div>
@@ -126,29 +111,21 @@
 
     <!-- ================= 3. ЭКРАН ИНВЕНТАРЯ ================= -->
     <section id="inventory-section" class="app-section hidden">
-        <!-- Сетка предметов -->
         <div class="inventory-grid" id="inventory-grid"></div>
 
-        <!-- БЛОК ДЕПОЗИТА ПОДАРКОВ (NFT) -->
         <div class="deposit-gift-box">
             <div class="deposit-header-row">
                 <span class="deposit-box-icon">📥</span>
                 <h3>Ввод подарков NFT</h3>
             </div>
             <p class="deposit-gift-desc">1. Отправьте ваш NFT-подарок в Telegram на аккаунт:</p>
-            
-            <!-- Кнопка связи по Telegram -->
             <button id="admin-tg-chat-trigger" class="telegram-send-btn">
                 <span class="send-btn-icon">✈️</span> Отправить на @Sintopa
             </button>
-            
-            <!-- Выпадающий список выбора подарков -->
             <div class="select-container-wrapper">
                 <select id="deposit-item-select" class="deposit-select-field"></select>
                 <div class="custom-select-arrow"></div>
             </div>
-
-            <!-- Кнопка подтверждения передачи -->
             <button id="deposit-confirm-button" class="deposit-confirm-btn">Подтвердить передачу</button>
         </div>
     </section>
@@ -185,18 +162,15 @@
         </div>
 
         <div class="wallet-actions-container">
-            <!-- Кнопка привязки TON кошелька -->
             <button id="connect-wallet-btn" class="connect-wallet-btn">Привязать кошелёк</button>
-            <!-- Пополнение баланса -->
             <button id="deposit-balance-btn" class="deposit-balance-btn" disabled>Пополнить баланс</button>
             <p id="deposit-notice-text" class="deposit-notice">Пополнение доступно после привязки кошелька</p>
         </div>
     </section>
 
-    <!-- ================= ПАРЯЩЕЕ Web3 МЕНЮ НАВИГАЦИИ ================= -->
+    <!-- ================= ПАРЯЩЕЕ МЕНЮ НАВИГАЦИИ ================= -->
     <div class="floating-nav-container">
         <nav class="bottom-nav">
-            <!-- Вкладка Инвентарь -->
             <button class="nav-tab" data-target="inventory">
                 <span class="nav-svg-icon">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -209,7 +183,6 @@
                 <div class="nav-dot"></div>
             </button>
 
-            <!-- Вкладка Меню -->
             <button class="nav-tab active" data-target="home">
                 <span class="nav-svg-icon">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -221,7 +194,6 @@
                 <div class="nav-dot"></div>
             </button>
 
-            <!-- Вкладка Рейтинг -->
             <button class="nav-tab" data-target="rating">
                 <span class="nav-svg-icon">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -234,16 +206,14 @@
         </nav>
     </div>
 
-    <!-- ================= МОДАЛКИ И УВЕДОМЛЕНИЯ ================= -->
     <div id="toast-container" class="toast-container"></div>
 
-    <!-- МОДАЛЬНОЕ ОКНО ДЛЯ ВВОДА СУММЫ ДЕПОЗИТА -->
     <div id="deposit-amount-modal" class="modal-overlay hidden">
         <div class="modal-card">
             <button class="modal-close-x" id="deposit-modal-close-btn">&times;</button>
             <div class="modal-icon">💎</div>
             <h2 class="modal-title">Пополнение баланса</h2>
-            <p class="modal-message">Введите сумму в TON, которую вы хотите внести на баланс (минимальная сумма пополнения — 0.1 TON):</p>
+            <p class="modal-message">Введите сумму в TON, которую вы хотите внести на баланс (минимально — 0.1 TON):</p>
             <div class="modal-input-wrapper">
                 <input type="number" id="modal-deposit-input" class="modal-deposit-field" placeholder="0.1" step="0.1" min="0.1">
             </div>
@@ -254,7 +224,6 @@
         </div>
     </div>
 
-    <!-- ОБЩЕЕ СИСТЕМНОЕ МОДАЛЬНОЕ ОКНО -->
     <div id="custom-modal" class="modal-overlay hidden">
         <div class="modal-card">
             <button class="modal-close-x" id="modal-close-btn">&times;</button>
@@ -265,7 +234,9 @@
         </div>
     </div>
 
-    <!-- Главный JS файл приложения -->
-    <script src="js/app.js"></script>
+    <!-- Загружаем SDK асинхронно, чтобы не задерживать запуск Mini App -->
+    <script src="https://telegram.org/js/telegram-web-app.js" defer></script>
+    <script src="https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js" defer></script>
+    <script src="js/app.js" defer></script>
 </body>
-                        </html>
+                </html>
