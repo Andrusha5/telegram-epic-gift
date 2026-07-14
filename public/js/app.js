@@ -39,6 +39,14 @@ function formatWalletAddress(rawAddress) {
     return friendly.substring(0, 4) + "-..." + friendly.substring(friendly.length - 4);
 }
 
+// ФУНКЦИЯ ДЛЯ ПРЕДЗАГРУЗКИ КАРТИНOК (Обеспечивает моментальную работу)
+function preloadImages(urls) {
+    urls.forEach(url => {
+        const img = new Image();
+        img.src = url;
+    });
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
     const API_BASE_URL = window.location.origin;
     let currentUser = {};
@@ -292,7 +300,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     return;
                 }
 
-                // Запрашиваем компиляцию чистого, 100% валидного BOC у сервера, предотвращая зависания на клиенте
+                // Запрашиваем компиляцию чистого, 100% валидного BOC у сервера (полная защита от вылетов)
                 const payloadRes = await fetch(`${API_BASE_URL}/api/generate_payload?text=${userId}`);
                 const payloadData = await payloadRes.json();
                 const payloadBase64 = payloadData.payload;
@@ -306,7 +314,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         {
                             address: adminAddress,
                             amount: nanoAmount,
-                            payload: payloadBase64 // Чистый BOC комментарий без вылетов
+                            payload: payloadBase64 // Чистый безотказный BOC
                         }
                     ]
                 };
@@ -317,7 +325,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if (result) {
                     showNotification("Транзакция отправлена! Проверяем...", "⏳");
                     
-                    // Повышенная частота проверки (раз в 3 секунды) для мгновенного начисления
+                    // Проверяем 1 раз в 3 секунды для мгновенного зачисления
                     let checkCount = 0;
                     const checkInterval = setInterval(async () => {
                         checkCount++;
@@ -402,6 +410,20 @@ document.addEventListener('DOMContentLoaded', async () => {
         { id: 117, name: "Пополнение 0.01 GRAM (Новичок)", icon: GRAMCOIN_ICON_URL, price: "0.01 GRAM", rawPrice: 0.01, isGold: false, type: "balance" },
         { id: 118, name: "Пополнение 0.005 GRAM (Новичок)", icon: GRAMCOIN_ICON_URL, price: "0.005 GRAM", rawPrice: 0.005, isGold: false, type: "balance" }
     ];
+
+    // Запускаем фоновую загрузку всех картинок в память
+    const allImagesToPreload = [
+        "/Images/Logo/logotip.png",
+        GRAMCOIN_ICON_URL,
+        "/Images/Cases/freebox.png",
+        "/Images/Cases/keysnovichka.png",
+        "/Images/Cases/bomzh.png",
+        "/Images/Cases/krutoy.png"
+    ];
+    [...GIFT_POOL, ...NEWBIE_GIFT_POOL].forEach(item => {
+        if (item.icon) allImagesToPreload.push(item.icon);
+    });
+    preloadImages(allImagesToPreload);
 
     function navigateTo(target) {
         const sections = [
@@ -564,7 +586,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (!res.ok) throw new Error();
             currentUser = await res.json();
         } catch (e) {
-            console.error("Ошибка загрузки пользовательских данных:", e);
+            console.error("Ошибка загрузки данных:", e);
             currentUser = {
                 balance: 0.000,
                 id: userId,
@@ -576,7 +598,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         updateBalanceUI();
         
-        // СТАБИЛЬНЫЙ ФИКС АВАТАРКИ: Запрос идет на серверный прокси-маршрут
+        // Стабильная загрузка аватарок через внутренний прокси
         const mainAvatar = document.getElementById('user-avatar');
         if (mainAvatar) {
             mainAvatar.src = `${API_BASE_URL}/api/avatar/${currentUser.id}`;
