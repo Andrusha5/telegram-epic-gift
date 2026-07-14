@@ -2,7 +2,7 @@ const express = require('express');
 const path = require('path');
 const crypto = require('crypto');
 const axios = require('axios');
-const cors = require('cors'); // Поддержка CORS для стабильной загрузки логотипа кошельками
+const cors = require('cors'); // Разрешает кросс-доменные запросы для кошельков
 require('dotenv').config();
 
 process.on('unhandledRejection', (reason, promise) => {
@@ -33,54 +33,56 @@ app.use(cors());
 app.use(express.json());
 
 // ---------------------------------------------------------------------------
-// ГАРАНТИРОВАННЫЙ БЕЗОПАСНЫЙ СЕРВЕРНЫЙ КОМПИЛЯТОР ТЕКСТОВЫХ КОММЕНТАРИЕВ BOC
-// Устраняет ошибку: "Payload is invalid" (Index 0 > 0 is out of bounds)
+// ВЫСОКОКЛАССНЫЙ СЕРВЕРНЫЙ КОМПИЛЯТОР BOC ДЛЯ ТЕКСТОВЫХ КОММЕНТАРИЕВ TON
+// Исключает ошибку: "Payload is invalid" (Index 0 > 0 is out of bounds)
 // ---------------------------------------------------------------------------
 function serializeTextCommentBoc(text) {
     const textBytes = Buffer.from(text, 'utf8');
-    const dataLen = 4 + textBytes.length; // 4 пустых байта префикса + байты строки
+    const payload = Buffer.concat([Buffer.alloc(4), textBytes]); // 4 нулевых байта префикса текстового сообщения
 
-    const d1 = 0; // Нет дочерних ячеек, не экзотическая
-    const d2 = dataLen * 2; // Выравнивание (byte-aligned)
+    const d1 = 0; // refs = 0, exotic = 0, level = 0
+    
+    // Каноническое выравнивание TVM: добавляем маркер заполнения (padding bit 1)
+    const paddedPayload = Buffer.concat([payload, Buffer.from([0x80])]);
+    const d2 = payload.length * 2 + 1; // bits_descriptor: (floor(bits/8)*2) + 1 (маркер нечетных бит)
 
-    const cellContentLen = 2 + dataLen; //Descriptors (2 байта) + payload (dataLen)
+    const cellData = Buffer.concat([
+        Buffer.from([d1, d2]),
+        paddedPayload
+    ]);
 
-    // Сборка 100% совместимого с TON Virtual Machine заголовка Bag of Cells без CRC
+    const cellContentLen = cellData.length;
+
+    // Сборка Single-Cell BOC
     const header = Buffer.from([
         0xb5, 0xee, 0x9c, 0x72, // BOC Magic
-        0x01,                   // has_idx=0, has_crc32c=0, size_bytes=1 (флаги без капризных CRC)
+        0x01,                   // flags: has_idx=0, has_crc32c=0, size_bytes=1
         0x01,                   // off_bytes = 1
         0x01,                   // cell_count = 1
         0x01,                   // root_count = 1
         0x00,                   // absent_count = 0
-        cellContentLen,         // tot_cells_size (1 byte)
+        cellContentLen,         // tot_cells_size
         0x00                    // root_list (root index 0)
     ]);
 
-    const cellData = Buffer.alloc(2 + dataLen);
-    cellData[0] = d1;
-    cellData[1] = d2;
-    cellData.writeUInt32BE(0, 2); // 32-битный пустой заголовок (комментарий)
-    textBytes.copy(cellData, 6);
-
-    const finalBoc = Buffer.concat([header, cellData]);
-    return finalBoc.toString('base64');
+    return Buffer.concat([header, cellData]).toString('base64');
 }
 
 // ---------------------------------------------------------------------------
 // ДИНАМИЧЕСКИЙ МАНИФЕСТ С АБСОЛЮТНЫМИ ССЫЛКАМИ ПОД ВАШ ЛОГОТИП
-// Размещен ВЫШЕ static middleware для избежания конфликтов и перезаписи
+// Перенесен в самое начало для безупречной обработки TON Connect
 // ---------------------------------------------------------------------------
 app.get('/tonconnect-manifest.json', (req, res) => {
     const host = req.get('host');
-    const protocol = req.secure || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
+    // Всегда форсируем безопасный https протокол для TON Connect
+    const protocol = 'https';
     const appUrl = process.env.WEB_APP_URL || `${protocol}://${host}`;
     res.setHeader('Content-Type', 'application/json');
-    res.setHeader('Access-Control-Allow-Origin', '*'); // Доступность для всех кошельков
+    res.setHeader('Access-Control-Allow-Origin', '*'); 
     res.json({
         "url": appUrl,
         "name": "BestGifts",
-        "iconUrl": `${appUrl}/Images/Logo/logotip.png`, // Абсолютная ссылка решает проблему с логотипом
+        "iconUrl": `${appUrl}/Images/Logo/logotip.png`, // Абсолютная ссылка решает проблему с логотипом BestGifts
         "termsOfUseUrl": appUrl,
         "privacyPolicyUrl": appUrl
     });
