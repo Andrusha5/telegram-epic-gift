@@ -9,7 +9,7 @@ if (!global.botInstance) {
 }
 const bot = global.botInstance;
 
-// ПОЛУЧЕНИЕ СВЕЖЕЙ АВАТАРКИ ЧЕРЕЗ API TELEGRAM
+// Надежное получение аватара пользователя
 async function getUserAvatarUrl(userId) {
     try {
         const photos = await bot.getUserProfilePhotos(userId, { limit: 1 });
@@ -24,11 +24,11 @@ async function getUserAvatarUrl(userId) {
     return null;
 }
 
-// ПРОВЕРКА ПОДПИСКИ ПОЛЬЗОВАТЕЛЯ НА ТЕЛЕГРАМ КАНАЛ
+// Проверка подписки на канал
 async function checkUserSubscription(userId) {
     try {
         const channelUsername = process.env.CHANNEL_USERNAME;
-        if (!channelUsername) return true; // Если канал не привязан, пускаем всех
+        if (!channelUsername) return true; 
 
         const cleanUsername = channelUsername.replace('@', '').trim();
         const chatMember = await bot.getChatMember('@' + cleanUsername, userId);
@@ -41,7 +41,6 @@ async function checkUserSubscription(userId) {
     }
 }
 
-// ОБРАБОТЧИК КНОПОК ДЕПОЗИТА (ОДОБРИТЬ / ОТКЛОНИТЬ)
 bot.on('callback_query', async (callbackQuery) => {
     const actionData = callbackQuery.data;
     const queryId = callbackQuery.id;
@@ -54,7 +53,7 @@ bot.on('callback_query', async (callbackQuery) => {
     bot.answerCallbackQuery(queryId).catch(() => {});
 
     const parts = actionData.split('_');
-    const action = parts[1]; // "app" (одобрить) или "rej" (отклонить)
+    const action = parts[1]; 
     const targetUserId = String(parts[2]); 
     const targetItemId = parseInt(parts[3], 10); 
 
@@ -68,7 +67,6 @@ bot.on('callback_query', async (callbackQuery) => {
 
         if (!item) {
              await client.query('ROLLBACK');
-             console.error(`Предмет с ID ${targetItemId} не найден.`);
              return;
         }
 
