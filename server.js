@@ -2,7 +2,6 @@ const express = require('express');
 const path = require('path');
 const crypto = require('crypto');
 const axios = require('axios');
-const cors = require('cors'); // Разрешает кросс-доменные запросы для кошельков
 require('dotenv').config();
 
 process.on('unhandledRejection', (reason, promise) => {
@@ -29,8 +28,25 @@ const CHANNEL_USERNAME = process.env.CHANNEL_USERNAME || "";
 const ADMIN_TON_ADDRESS = process.env.ADMIN_TON_ADDRESS; 
 const TONCENTER_API_KEY = process.env.TONCENTER_API_KEY; 
 
-app.use(cors());
+// Резервируем память под JSON-парсер
 app.use(express.json());
+
+// ---------------------------------------------------------------------------
+// НАДЁЖНАЯ ВСТРОЕННАЯ (НАТИВНАЯ) НАСТРОЙКА CORS БЕЗ ВНЕШНИХ БИБЛИОТЕК
+// Решает проблему с развертыванием на Render и обеспечивает доступ кошелькам
+// ---------------------------------------------------------------------------
+app.use((req, res, next) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, PATCH, DELETE');
+    res.setHeader('Access-Control-Allow-Headers', 'X-Requested-With, content-type, x-telegram-init-data');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    
+    // Мгновенный ответ на preflight-запросы (OPTIONS)
+    if (req.method === 'OPTIONS') {
+        return res.sendStatus(200);
+    }
+    next();
+});
 
 // ---------------------------------------------------------------------------
 // ВЫСОКОКЛАССНЫЙ СЕРВЕРНЫЙ КОМПИЛЯТОР BOC ДЛЯ ТЕКСТОВЫХ КОММЕНТАРИЕВ TON
@@ -70,19 +86,18 @@ function serializeTextCommentBoc(text) {
 
 // ---------------------------------------------------------------------------
 // ДИНАМИЧЕСКИЙ МАНИФЕСТ С АБСОЛЮТНЫМИ ССЫЛКАМИ ПОД ВАШ ЛОГОТИП
-// Перенесен в самое начало для безупречной обработки TON Connect
+// Перенесен в самый начало для безупречной обработки TON Connect кошельками
 // ---------------------------------------------------------------------------
 app.get('/tonconnect-manifest.json', (req, res) => {
     const host = req.get('host');
-    // Всегда форсируем безопасный https протокол для TON Connect
-    const protocol = 'https';
+    const protocol = 'https'; // Всегда HTTPS для защиты TON Connect
     const appUrl = process.env.WEB_APP_URL || `${protocol}://${host}`;
     res.setHeader('Content-Type', 'application/json');
     res.setHeader('Access-Control-Allow-Origin', '*'); 
     res.json({
         "url": appUrl,
         "name": "BestGifts",
-        "iconUrl": `${appUrl}/Images/Logo/logotip.png`, // Абсолютная ссылка решает проблему с логотипом BestGifts
+        "iconUrl": `${appUrl}/Images/Logo/logotip.png`, // Ссылка на ваш логотип для кошелька
         "termsOfUseUrl": appUrl,
         "privacyPolicyUrl": appUrl
     });
@@ -105,14 +120,14 @@ app.get('/api/avatar/:userId', async (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
-// ПОДКЛЮЧЕНИЕ СТАТИЧЕСКИХ РЕСУРСОВ С КЕШИРОВАНИЕМ ДЛЯ МОМЕНТАЛЬНОЙ ЗАГРУЗКИ
+// ПОДКЛЮЧЕНИЕ СТАТИЧЕСКИХ РЕСУРСОВ С КЕШИРОВАНИЕМ ДЛЯ МОМЕНТАЛЬНОЙ ЗАГРУЗКИ КАРТИНОК
 // ---------------------------------------------------------------------------
 app.use(express.static(path.join(__dirname, 'public'), {
     maxAge: '1y',
-    setHeaders: (res, path) => {
-        res.setHeader('Access-Control-Allow-Origin', '*'); // Разрешаем кошелькам кешировать логотип
-        if (path.endsWith('.png') || path.endsWith('.jpg') || path.endsWith('.jpeg') || path.endsWith('.gif') || path.endsWith('.webp')) {
-            res.setHeader('Cache-Control', 'public, max-age=31536000, immutable'); // Кеширование картинок на 1 год
+    setHeaders: (res, filePath) => {
+        res.setHeader('Access-Control-Allow-Origin', '*'); 
+        if (filePath.endsWith('.png') || filePath.endsWith('.jpg') || filePath.endsWith('.jpeg') || filePath.endsWith('.gif') || filePath.endsWith('.webp')) {
+            res.setHeader('Cache-Control', 'public, max-age=31536000, immutable'); // Кеширование в браузере игрока на 1 год
         }
     }
 }));
