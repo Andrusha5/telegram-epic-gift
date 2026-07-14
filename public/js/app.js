@@ -1,4 +1,3 @@
-// --- БЕЗОПАСНЫЙ СЛОЙ ИНИЦИАЛИЗАЦИИ SDK ТЕЛЕГРАМ ---
 const tg = (window.Telegram && window.Telegram.WebApp) ? window.Telegram.WebApp : {
     expand: () => {},
     ready: () => {},
@@ -28,9 +27,6 @@ function getFriendlyAddress(rawAddress) {
         if (typeof TON_CONNECT_UI !== 'undefined' && TON_CONNECT_UI.toUserFriendlyAddress) {
             return TON_CONNECT_UI.toUserFriendlyAddress(rawAddress);
         }
-        if (typeof TonConnectUI !== 'undefined' && TonConnectUI.toUserFriendlyAddress) {
-            return TonConnectUI.toUserFriendlyAddress(rawAddress);
-        }
     } catch(e) {}
     return rawAddress; 
 }
@@ -54,12 +50,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     let isNewbieCaseMode = false; 
     const GRAMCOIN_ICON_URL = "/Images/Items/gram_popolnenie.png"; 
 
-    // Настройки быстрых ставок Best Arena (По умолчанию: 1, 2, 3)
     let customBets = [1, 2, 3];
-
-    // --- СТРУКТУРЫ ИГРЫ BEST ARENA ---
     let arenaPlayers = []; 
     let arenaPollInterval = null;
+    let isBallAnimating = false;
+    let currentRoundSignature = null;
 
     const safeSetText = (el, val) => { if (el) el.innerText = val; };
     const initialName = tg.initDataUnsafe?.user?.username || tg.initDataUnsafe?.user?.first_name || "Пользователь";
@@ -114,12 +109,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (saved) {
                 customBets = JSON.parse(saved);
             }
-        } catch (e) {
-            console.error("Ошибка чтения настроек ставок:", e);
-        }
+        } catch (e) {}
     }
 
-    // Восстановление аватара пользователя
     function loadCachedUserData() {
         try {
             const cachedData = localStorage.getItem(`user_cache_${userId}`);
@@ -136,9 +128,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     mainAvatar.onerror = () => { mainAvatar.src = "https://img.icons8.com/color/96/user.png"; };
                 }
             }
-        } catch (e) {
-            console.error("Ошибка при чтении кэша профиля:", e);
-        }
+        } catch (e) {}
     }
 
     function saveUserDataToCache(userData) {
@@ -285,11 +275,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         } else {
             document.addEventListener('ton-connect-ui-loaded', initTonConnect);
         }
-    } catch (err) {
-        console.error("TON Connect Error:", err);
-    }
+    } catch (err) {}
 
-    // Модалка пополнения
     if (elements.depositBalanceBtn) {
         elements.depositBalanceBtn.addEventListener('click', () => {
             if (elements.depositAmountModal) {
@@ -360,7 +347,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         checkCount++;
                         if (checkCount > 15) {
                             clearInterval(checkInterval);
-                            showNotification("Баланс зачислится после подтверждения сетью TON.", "⏳");
+                            showNotification("Баланс обновится при подтверждении сетью TON.", "⏳");
                             return;
                         }
 
@@ -411,26 +398,28 @@ document.addEventListener('DOMContentLoaded', async () => {
         const avatarsContainer = document.getElementById('arena-avatars-container');
         if (!svg || !avatarsContainer) return;
 
+        // Если шарик катится — не очищаем холст, чтобы не стереть движущийся шарик
+        if (isBallAnimating) {
+            return;
+        }
+
         svg.innerHTML = '';
         avatarsContainer.innerHTML = '';
 
         const N = arenaPlayers.length;
         if (N === 0) return;
 
-        const W = 280;
-        const H = 280;
+        const W = 320; // Увеличенный размер
+        const H = 320;
 
-        // Расчет общей суммы ставок в текущем раунде
         const totalBetSum = arenaPlayers.reduce((sum, p) => sum + parseFloat(p.bet), 0);
 
         let currentX = 0;
 
         arenaPlayers.forEach((player) => {
-            // Расчет процентной доли игрока на поле
             const percentage = totalBetSum > 0 ? (parseFloat(player.bet) / totalBetSum) : (1 / N);
             const segmentWidth = W * percentage;
 
-            // Рендеринг сегмента в виде прямоугольника
             const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
             rect.setAttribute("x", currentX.toFixed(1));
             rect.setAttribute("y", "0");
@@ -439,14 +428,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             rect.setAttribute("fill", player.color);
             svg.appendChild(rect);
 
-            // Определение центральной точки для размещения аватарки
             const centerX = currentX + (segmentWidth / 2);
             const centerY = H / 2;
 
-            // Динамический размер аватарки (масштабируется по ширине сегмента, чтобы помещалась в границы)
             const calculatedAvatarSize = Math.min(64, Math.max(16, segmentWidth * 0.4));
-
-            // Добавление аватарки в контейнер
             createAvatarElement(centerX, centerY, player.avatar, calculatedAvatarSize);
 
             currentX += segmentWidth;
@@ -487,7 +472,128 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    // Высокочастотный опрос сервера (Поллинг) для синхронизации онлайн-состояния
+    // Симуляция траектории физического шарика (Pre-flight path finder)
+    function simulateBallPath(targetX, boardWidth = 320, boardHeight = 320, ballRadius = 8) {
+        const friction = 0.985;
+        for (let trial = 0; trial < 1000; trial++) {
+            const startX = boardWidth / 2;
+            const startY = boardHeight / 2;
+
+            const angle = Math.random() * Math.PI * 2;
+            const speed = 14 + Math.random() * 4;
+
+            let vx = Math.cos(angle) * speed;
+            let vy = Math.sin(angle) * speed;
+
+            let x = startX;
+            let y = startY;
+
+            let path = [];
+            let currentVx = vx;
+            let currentVy = vy;
+            let currentX = x;
+            let currentY = y;
+
+            while (Math.abs(currentVx) > 0.1 || Math.abs(currentVy) > 0.1) {
+                currentX += currentVx;
+                currentY += currentVy;
+
+                if (currentX - ballRadius < 0) {
+                    currentX = ballRadius;
+                    currentVx = -currentVx;
+                } else if (currentX + ballRadius > boardWidth) {
+                    currentX = boardWidth - ballRadius;
+                    currentVx = -currentVx;
+                }
+
+                if (currentY - ballRadius < 0) {
+                    currentY = ballRadius;
+                    currentVy = -currentVy;
+                } else if (currentY + ballRadius > boardHeight) {
+                    currentY = boardHeight - ballRadius;
+                    currentVy = -currentVy;
+                }
+
+                currentVx *= friction;
+                currentVy *= friction;
+
+                path.push({ x: currentX, y: currentY });
+            }
+
+            if (Math.abs(currentX - targetX) < 12) {
+                return { path };
+            }
+        }
+        return null;
+    }
+
+    // Анимация катящегося шарика в реальном времени
+    function animateBouncingBall(targetX, onComplete) {
+        if (isBallAnimating) return;
+        isBallAnimating = true;
+
+        const canvas = document.getElementById('arena-svg-canvas');
+        if (!canvas) return;
+
+        let ballElement = document.getElementById('physics-ball');
+        if (ballElement) ballElement.remove();
+
+        ballElement = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+        ballElement.setAttribute("id", "physics-ball");
+        ballElement.setAttribute("r", "8");
+        ballElement.setAttribute("fill", "#ffffff");
+        ballElement.setAttribute("stroke", "#8d3df5");
+        ballElement.setAttribute("stroke-width", "2.5");
+        ballElement.setAttribute("filter", "drop-shadow(0px 0px 8px #ffffff)");
+        canvas.appendChild(ballElement);
+
+        const W = 320;
+        const H = 320;
+
+        let simulation = simulateBallPath(targetX, W, H, 8);
+        if (!simulation) {
+            let frame = 0;
+            const totalFrames = 120;
+            const step = () => {
+                if (frame >= totalFrames) {
+                    isBallAnimating = false;
+                    onComplete();
+                    return;
+                }
+                const t = frame / totalFrames;
+                const easeOut = 1 - Math.pow(1 - t, 3);
+                const currentX = (W / 2) + (targetX - (W / 2)) * easeOut;
+                const currentY = (H / 2);
+                ballElement.setAttribute("cx", currentX);
+                ballElement.setAttribute("cy", currentY);
+                frame++;
+                requestAnimationFrame(step);
+            };
+            requestAnimationFrame(step);
+            return;
+        }
+
+        let frameIndex = 0;
+        const path = simulation.path;
+
+        const renderFrame = () => {
+            if (frameIndex >= path.length) {
+                isBallAnimating = false;
+                onComplete();
+                return;
+            }
+
+            const pos = path[frameIndex];
+            ballElement.setAttribute("cx", pos.x.toFixed(1));
+            ballElement.setAttribute("cy", pos.y.toFixed(1));
+
+            frameIndex++;
+            requestAnimationFrame(renderFrame);
+        };
+
+        requestAnimationFrame(renderFrame);
+    }
+
     function startArenaPolling() {
         if (arenaPollInterval) return;
 
@@ -513,10 +619,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                     color: bet.color
                 }));
 
-                // Отрисовка обновленного поля
                 drawArenaSegments();
 
-                // Синхронизация состояния таймера
                 const statusText = document.getElementById('arena-status-text');
                 const countdownTimer = document.getElementById('arena-countdown-timer');
 
@@ -527,16 +631,35 @@ document.addEventListener('DOMContentLoaded', async () => {
                         countdownTimer.innerText = state.timeLeft;
                     }
                 } else if (state.status === 'finished') {
-                    if (statusText) {
-                        statusText.classList.remove('hidden');
-                        statusText.innerText = "Игра началась!";
-                    }
-                    if (countdownTimer) {
-                        countdownTimer.classList.add('hidden');
+                    const signature = state.winnerId + "_" + state.totalPool;
+                    if (currentRoundSignature !== signature && state.winnerX) {
+                        currentRoundSignature = signature;
+                        
+                        if (statusText) {
+                            statusText.classList.remove('hidden');
+                            statusText.innerText = "Шарик запущен...";
+                        }
+                        if (countdownTimer) countdownTimer.classList.add('hidden');
+
+                        animateBouncingBall(state.winnerX, () => {
+                            const isWeWinner = (String(state.winnerId) === String(userId));
+                            
+                            if (isWeWinner) {
+                                showCustomModal({
+                                    icon: '🏆',
+                                    title: 'Победа!',
+                                    message: `🎉 Поздравляем! Белый шарик остановился на вашем секторе! Вы получили весь банк: +${parseFloat(state.totalPool).toFixed(3)} GRAM!`,
+                                    buttons: [{ text: 'Забрать!', primary: true }]
+                                });
+                                showNotification(`Зачислено: +${parseFloat(state.totalPool).toFixed(3)} GRAM!`, "💎");
+                            } else {
+                                showNotification(`Игрок ${state.winnerName} выиграл ${parseFloat(state.totalPool).toFixed(3)} GRAM!`, "🏆");
+                            }
+                            fetchUserData();
+                        });
                     }
                 } else {
-                    // waiting
-                    if (statusText) {
+                    if (statusText && !isBallAnimating) {
                         statusText.classList.remove('hidden');
                         statusText.innerText = "Ждем ставки...";
                     }
@@ -547,9 +670,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                 renderBetButtons();
 
-            } catch (err) {
-                console.error("Ошибка поллинга арены:", err);
-            }
+            } catch (err) {}
         };
 
         poll();
@@ -581,7 +702,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         renderBetButtons();
     }
 
-    // Мгновенная обработка клика по ставке
     const handleBetClick = async (e) => {
         const btn = e.currentTarget;
         if (btn.classList.contains('disabled')) return;
@@ -589,7 +709,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         const betValue = parseFloat(btn.getAttribute('data-bet'));
         if (isNaN(betValue) || betValue < 0.1) return;
 
-        // Кратковременная блокировка кнопки для защиты от двойного клика на период запроса
         btn.classList.add('disabled');
         btn.disabled = true;
 
@@ -622,7 +741,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('bet-btn-2').addEventListener('click', handleBetClick);
     document.getElementById('bet-btn-3').addEventListener('click', handleBetClick);
 
-    // Модалка настройки ставок
+    // Настройка ставок
     const editBetsModal = document.getElementById('edit-bets-modal');
     const betEditTrigger = document.getElementById('bet-edit-trigger');
     const editBetsClose = document.getElementById('edit-bets-close-btn');
@@ -645,10 +764,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (editBetsClose) editBetsClose.addEventListener('click', closeEditBetsModal);
     if (cancelBetsBtn) cancelBetsBtn.addEventListener('click', closeEditBetsModal);
 
-    // Автоматическая блокировка ввода более 3 знаков после запятой
     const enforceThreeDecimals = (e) => {
         let val = e.target.value;
-        val = val.replace(/[^0-9.]/g, ''); // Только числа и одна точка
+        val = val.replace(/[^0-9.]/g, ''); 
         const dots = val.split('.');
         if (dots.length > 2) {
             val = dots[0] + '.' + dots.slice(1).join('');
@@ -672,7 +790,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             let b2 = parseFloat(document.getElementById('bet-input-2').value);
             let b3 = parseFloat(document.getElementById('bet-input-3').value);
 
-            // Округление до 3 знаков после запятой перед сохранением
             b1 = parseFloat(b1.toFixed(3));
             b2 = parseFloat(b2.toFixed(3));
             b3 = parseFloat(b3.toFixed(3));
@@ -787,7 +904,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (elements.arenaSection) elements.arenaSection.classList.remove('hidden');
             if (elements.bottomNavigation) elements.bottomNavigation.classList.add('hidden');
             resetArenaGame(); 
-            startArenaPolling(); // Запуск мультиплеерного опроса при входе на арену
+            startArenaPolling();
         }
     }
 
@@ -829,9 +946,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             navigateTo('case');
         });
     }
-
-    if (elements.bomzhCaseBanner) elements.bomzhCaseBanner.addEventListener('click', () => { showNotification("Кейс бомжа скоро появится!", "🎒"); });
-    if (elements.krutoyCaseBanner) elements.krutoyCaseBanner.addEventListener('click', () => { showNotification("Кейс крутого в разработке!", "😎"); });
 
     const backToHome = document.getElementById('back-to-home-button');
     if (backToHome) backToHome.addEventListener('click', () => navigateTo('home'));
@@ -923,9 +1037,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             currentUser = await res.json();
             
             saveUserDataToCache(currentUser);
-        } catch (e) {
-            console.error("Используются кэшированные данные");
-        }
+        } catch (e) {}
 
         updateBalanceUI();
         
