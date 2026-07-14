@@ -30,6 +30,84 @@ const TONCENTER_API_KEY = process.env.TONCENTER_API_KEY;
 
 app.use(express.json());
 
+// Инициализация структуры базы данных
+async function initDb() {
+    try {
+        await query(`
+            CREATE TABLE IF NOT EXISTS users (
+                id BIGINT PRIMARY KEY,
+                username VARCHAR(255),
+                first_name VARCHAR(255),
+                last_name VARCHAR(255),
+                balance NUMERIC(20, 3) DEFAULT 0.000,
+                avatar_url TEXT,
+                last_daily_case_open TIMESTAMP DEFAULT '2000-01-01 00:00:00',
+                daily_case_notified BOOLEAN DEFAULT FALSE,
+                is_admin BOOLEAN DEFAULT FALSE
+            );
+        `);
+        await query(`
+            CREATE TABLE IF NOT EXISTS arena_active_bets (
+                user_id BIGINT PRIMARY KEY,
+                amount NUMERIC(20, 3) NOT NULL,
+                color VARCHAR(7) NOT NULL,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        `);
+        // При запуске очищаем старые сессии раундов
+        await query('TRUNCATE arena_active_bets');
+    } catch (err) {
+        console.error("DB Init Error:", err);
+    }
+}
+initDb();
+
+// Хранилище игрового состояния арены на сервере
+let arenaGameState = {
+    status: 'waiting', // 'waiting', 'countdown', 'finished'
+    timeLeft: 15
+};
+
+// Фоновый глобальный таймер раундов
+setInterval(async () => {
+    try {
+        const activeBetsRes = await query('SELECT COUNT(DISTINCT user_id) as count FROM arena_active_bets');
+        const playerCount = parseInt(activeBetsRes.rows[0].count);
+
+        if (playerCount >= 2) {
+            if (arenaGameState.status === 'waiting') {
+                arenaGameState.status = 'countdown';
+                arenaGameState.timeLeft = 15;
+            } else if (arenaGameState.status === 'countdown') {
+                arenaGameState.timeLeft--;
+                if (arenaGameState.timeLeft <= 0) {
+                    arenaGameState.status = 'finished';
+                    arenaGameState.timeLeft = 0;
+                    
+                    // По завершении таймера даем 5 секунд на показ результатов и очищаем стол
+                    setTimeout(async () => {
+                        try {
+                            await query('TRUNCATE arena_active_bets');
+                            arenaGameState.status = 'waiting';
+                            arenaGameState.timeLeft = 15;
+                        } catch (err) {
+                            console.error("Ошибка при очистке арены:", err);
+                        }
+                    }, 5000);
+                }
+            }
+        } else {
+            // Если игроков меньше двух, возвращаем в ожидание
+            if (arenaGameState.status !== 'finished') {
+                arenaGameState.status = 'waiting';
+                arenaGameState.timeLeft = 15;
+            }
+        }
+    } catch (err) {
+        console.error("Ошибка таймера арены:", err);
+    }
+}, 1000);
+
 app.use((req, res, next) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, PATCH, DELETE');
@@ -175,23 +253,28 @@ app.use(async (req, res, next) => {
     next();
 });
 
+// ЭНДПОИНТ РАЗМЕЩЕНИЯ И УВЕЛИЧЕНИЯ СТАВКИ В BEST ARENA
 app.post('/api/place_bet', async (req, res) => {
     if (!req.telegramUser || !req.telegramUser.id) {
         return res.status(401).json({ error: 'Unauthorized' });
     }
     const userId = req.telegramUser.id;
     const { amount } = req.body;
-    const betVal = parseFloat(amount);
+    let betVal = parseFloat(amount);
 
     if (isNaN(betVal) || betVal < 0.1) {
         return res.status(400).json({ error: "Минимальная ставка — 0.1 GRAM" });
     }
+    
+    // Жесткое ограничение округлением до 3 знаков после запятой на сервере
+    betVal = parseFloat(betVal.toFixed(3));
 
     let client;
     try {
         client = await pool.connect();
         await client.query('BEGIN');
 
+        // Проверка и лок баланса
         const userRes = await client.query('SELECT balance FROM users WHERE id = $1 FOR UPDATE', [userId]);
         const user = userRes.rows[0];
 
@@ -203,7 +286,7 @@ app.post('/api/place_bet', async (req, res) => {
         const balance = parseFloat(user.balance || 0);
         if (balance < betVal) {
             await client.query('ROLLBACK');
-            return res.status(400).json({ error: "Недостаточно баланса для ставки" });
+            return res.status(400).json({ error: "Недостаточно баланса" });
         }
 
         const newBalance = balance - betVal;
@@ -211,13 +294,60 @@ app.post('/api/place_bet', async (req, res) => {
         await client.query('INSERT INTO transactions (user_id, type, amount, details) VALUES ($1, $2, $3, $4)', 
             [userId, 'bet_arena', betVal, `Ставка в игре Best Arena: -${betVal} GRAM`]);
 
+        // Поиск активной ставки в текущем раунде
+        const activeBetRes = await client.query('SELECT amount, color FROM arena_active_bets WHERE user_id = $1 FOR UPDATE', [userId]);
+        
+        if (activeBetRes.rows.length > 0) {
+            // Если игрок уже на поле, добавляем к его ставке сумму и оставляем его первоначальный цвет
+            const newAmount = parseFloat(activeBetRes.rows[0].amount) + betVal;
+            await client.query('UPDATE arena_active_bets SET amount = $1, updated_at = NOW() WHERE user_id = $2', [newAmount, userId]);
+        } else {
+            // Если игрок делает первую ставку, выдаем случайный цвет
+            const colors = ['#d500f9', '#00e5ff', '#ffd600', '#00e676', '#ff1744', '#ff9100', '#2979ff'];
+            const assignedColor = colors[Math.floor(Math.random() * colors.length)];
+            await client.query('INSERT INTO arena_active_bets (user_id, amount, color) VALUES ($1, $2, $3)', [userId, betVal, assignedColor]);
+        }
+
         await client.query('COMMIT');
         res.json({ success: true, newBalance: newBalance });
     } catch (err) {
         if (client) await client.query('ROLLBACK');
-        res.status(500).json({ error: "Ошибка проведения транзакции" });
+        console.error("Ошибка при ставке:", err);
+        res.status(500).json({ error: "Ошибка проведения транзакции на сервере" });
     } finally {
         if (client) client.release();
+    }
+});
+
+// ЭНДПОИНТ ПОЛУЧЕНИЯ ТЕКУЩЕГО ОНЛАЙН СОСТОЯНИЯ ТУРНИРА ARENA
+app.get('/api/arena/state', async (req, res) => {
+    try {
+        const betsRes = await query(`
+            SELECT b.user_id, b.amount, b.color, u.username, u.first_name, u.avatar_url 
+            FROM arena_active_bets b
+            JOIN users u ON b.user_id = u.id
+            ORDER BY b.amount DESC
+        `);
+        
+        const bets = betsRes.rows.map(row => ({
+            userId: row.user_id,
+            username: row.username || row.first_name || "Игрок",
+            avatar: row.avatar_url || "https://img.icons8.com/color/96/user.png",
+            amount: parseFloat(row.amount),
+            color: row.color
+        }));
+        
+        const totalPool = bets.reduce((sum, b) => sum + b.amount, 0);
+        
+        res.json({
+            status: arenaGameState.status,
+            timeLeft: arenaGameState.timeLeft,
+            bets: bets,
+            totalPool: totalPool
+        });
+    } catch (err) {
+        console.error("Ошибка при получении состояния арены:", err);
+        res.status(500).json({ error: "Внутренняя ошибка сервера" });
     }
 });
 
@@ -285,7 +415,7 @@ app.post('/api/verify-payment', async (req, res) => {
                 await client.query('INSERT INTO transactions (user_id, type, amount, details) VALUES ($1, $2, $3, $4)', [userId, 'deposit_ton', amount, `Пополнение: Хэш ${foundTransaction.transaction_id.hash}`]);
                 await client.query('COMMIT');
                 if (bot && userId) {
-                    bot.sendMessage(userId, `🎉 <b>Баланс пополнен!</b>\n\n💰 Зачислено: <b>${gramAmount.toFixed(2)} GRAM</b>`, { parse_mode: 'HTML' }).catch(console.error);
+                    bot.sendMessage(userId, `🎉 <b>Баланс успешно пополнен!</b>\n\n💰 На игровой счет зачислено: <b>${gramAmount.toFixed(2)} GRAM</b>`, { parse_mode: 'HTML' }).catch(console.error);
                 }
                 return res.json({ success: true, newBalance: gramAmount });
             } catch (dbError) {
@@ -302,6 +432,7 @@ app.post('/api/verify-payment', async (req, res) => {
     }
 });
 
+// Профиль пользователя
 app.get('/api/user', async (req, res) => {
     if (!req.telegramUser || !req.telegramUser.id) return res.status(401).json({ error: 'Unauthorized' });
     try {
@@ -317,6 +448,7 @@ app.get('/api/user', async (req, res) => {
     } catch (error) { res.status(500).json({ error: 'Internal server error' }); }
 });
 
+// Получение инвентаря
 app.get('/api/inventory', async (req, res) => {
     if (!req.telegramUser || !req.telegramUser.id) return res.status(401).json({ error: 'Unauthorized' });
     try {
@@ -331,6 +463,7 @@ app.get('/api/inventory', async (req, res) => {
     } catch (error) { res.status(500).json({ error: 'Internal server error' }); }
 });
 
+// Ежедневный бесплатный кейс
 app.post('/api/open_daily_case', async (req, res) => {
     if (!req.telegramUser || !req.telegramUser.id) return res.status(401).json({ error: 'Unauthorized' });
     const userId = req.telegramUser.id;
@@ -374,13 +507,14 @@ app.post('/api/open_daily_case', async (req, res) => {
         const adminId = process.env.ADMIN_TELEGRAM_ID;
         if (adminId && bot && wonItem.type !== 'balance') {
             const fullName = [user.first_name, user.last_name].filter(Boolean).join(' ') || 'Пользователь';
-            const adminMsg = `🎉 <b>Выигрыш в Ежедневном кейсе!</b>\n\n🎁 <b>Подарок:</b> ${wonItem.name} (ID: ${wonItem.item_id}, Цена: ${wonItem.value} GRAM)\n👤 <b>Пользователь:</b> <a href="tg://user?id=${userId}">${fullName}</a>`;
+            const adminMsg = `🎉 <b>Выигран подарок в Ежедневном кейсе!</b>\n\n🎁 <b>Подарок:</b> ${wonItem.name} (ID: ${wonItem.item_id}, Цена: ${wonItem.value} GRAM)\n👤 <b>Пользователь:</b> <a href="tg://user?id=${userId}">${fullName}</a>`;
             bot.sendMessage(adminId, adminMsg, { parse_mode: 'HTML' }).catch(console.error);
         }
         res.json({ success: true, wonItem: { id: wonItem.item_id, name: wonItem.name, price: wonItem.value + " GRAM", type: wonItem.type }, newBalance: newBalance });
     } catch (error) { if (client) await client.query('ROLLBACK'); res.status(500).json({ error: 'Ошибка' }); } finally { if (client) client.release(); }
 });
 
+// Кейс Новичка
 app.post('/api/open_newbie_case', async (req, res) => {
     if (!req.telegramUser || !req.telegramUser.id) return res.status(401).json({ error: 'Unauthorized' });
     const userId = req.telegramUser.id;
@@ -418,13 +552,14 @@ app.post('/api/open_newbie_case', async (req, res) => {
         const adminId = process.env.ADMIN_TELEGRAM_ID;
         if (adminId && bot && wonItem.type !== 'balance') {
             const fullName = [user.first_name, user.last_name].filter(Boolean).join(' ') || 'Пользователь';
-            const adminMsg = `🎉 <b>Выигрыш в Кейсе Новичка!</b>\n\n🎁 <b>Подарок:</b> ${wonItem.name} (ID: ${wonItem.item_id}, Цена: ${wonItem.value} GRAM)\n👤 <b>Пользователь:</b> <a href="tg://user?id=${userId}">${fullName}</a>`;
+            const adminMsg = `🎉 <b>Выигран подарок в Кейсе Новичка!</b>\n\n🎁 <b>Подарок:</b> ${wonItem.name} (ID: ${wonItem.item_id}, Цена: ${wonItem.value} GRAM)\n👤 <b>Пользователь:</b> <a href="tg://user?id=${userId}">${fullName}</a>`;
             bot.sendMessage(adminId, adminMsg, { parse_mode: 'HTML' }).catch(console.error);
         }
         res.json({ success: true, wonItem: { id: wonItem.item_id, name: wonItem.name, price: wonItem.value + " GRAM", type: wonItem.type }, newBalance: newBalance });
     } catch (error) { if (client) await client.query('ROLLBACK'); res.status(500).json({ error: 'Ошибка' }); } finally { if (client) client.release(); }
 });
 
+// Продажа подарка
 app.post('/api/sell_gift', async (req, res) => {
     if (!req.telegramUser || !req.telegramUser.id) return res.status(401).json({ error: 'Unauthorized' });
     const userId = req.telegramUser.id;
@@ -435,7 +570,7 @@ app.post('/api/sell_gift', async (req, res) => {
         await client.query('BEGIN');
         const inventoryRes = await client.query('SELECT quantity FROM user_inventory WHERE user_id = $1 AND item_id = $2 FOR UPDATE', [userId, itemId]);
         const item = inventoryRes.rows[0];
-        if (!item || item.quantity < 1) { await client.query('ROLLBACK'); return res.status(400).json({ error: 'Предмет не найден.' }); }
+        if (!item || item.quantity < 1) { await client.query('ROLLBACK'); return res.status(400).json({ error: 'У вас нет предмета.' }); }
         await client.query('UPDATE user_inventory SET quantity = quantity - 1 WHERE user_id = $1 AND item_id = $2', [userId, itemId]);
         const userRes = await client.query('SELECT username, first_name, last_name, balance FROM users WHERE id = $1 FOR UPDATE', [userId]);
         const user = userRes.rows[0];
@@ -446,6 +581,7 @@ app.post('/api/sell_gift', async (req, res) => {
     } catch (error) { if (client) await client.query('ROLLBACK'); res.status(500).json({ error: 'Ошибка' }); } finally { if (client) client.release(); }
 });
 
+// Вывод подарка
 app.post('/api/withdraw_gift', async (req, res) => {
     if (!req.telegramUser || !req.telegramUser.id) return res.status(401).json({ error: 'Unauthorized' });
     const userId = req.telegramUser.id;
@@ -476,6 +612,7 @@ app.post('/api/withdraw_gift', async (req, res) => {
     } catch (error) { if (client) await client.query('ROLLBACK'); res.status(500).json({ error: 'Ошибка' }); } finally { if (client) client.release(); }
 });
 
+// Заявка на депозит
 app.post('/api/deposit_gift_request', async (req, res) => {
     if (!req.telegramUser || !req.telegramUser.id) return res.status(401).json({ error: 'Unauthorized' });
     const userId = req.telegramUser.id;
