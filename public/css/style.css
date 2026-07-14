@@ -39,7 +39,7 @@ body {
     color: #ffffff;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     margin: 0;
-    padding: 110px 16px 125px 16px; /* Оптимальные отступы под плавающие меню */
+    padding: 114px 16px 125px 16px; /* Оптимальные отступы под плавающие меню */
     box-sizing: border-box;
     overflow-x: hidden;
 }
@@ -71,7 +71,7 @@ body {
     top: 0;
     left: 0;
     width: 100%;
-    height: 98px; /* Увеличено для идеального вертикального баланса */
+    height: 98px; /* Идеальный вертикальный баланс */
     background: rgba(11, 9, 20, 0.94);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
@@ -96,7 +96,7 @@ body {
     gap: 8px;
 }
 
-/* Крупный круглый логотип BestGifts (34px) */
+/* Круглый логотип BestGifts (34px) */
 .logo-img-header {
     width: 34px;
     height: 34px;
@@ -141,24 +141,24 @@ body {
     font-size: 15px;
     font-weight: 800;
     color: #ffffff;
-    max-width: 140px; /* Увеличено, чтобы 15 символов помещались красиво */
+    max-width: 140px; /* Идеальное отображение до 15 символов */
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
 
-/* Крупный, приподнятый баланс в шапке */
+/* Приподнятый баланс в шапке */
 .balance-pill {
     background: rgba(0, 230, 118, 0.08);
     border: 1.5px solid rgba(0, 230, 118, 0.4);
     box-shadow: 0 0 12px rgba(0, 230, 118, 0.2);
     border-radius: 20px;
-    padding: 10px 18px; /* Увеличен размер кнопки баланса */
+    padding: 8px 14px;
     display: flex;
     align-items: center;
     gap: 6px;
     cursor: pointer;
-    margin-top: -6px; /* Поднят чуть выше */
+    margin-top: -12px; /* Поднят выше, чтобы юзернейм помещался свободно */
     transition: transform 0.1s, box-shadow 0.2s;
 }
 
@@ -201,14 +201,14 @@ body {
 }
 
 /* ==========================================================================
-   БАННЕР ИГРЫ "BEST ARENA" С АППАРАТНОЙ АНИМАЦИЕЙ (БЕЗ ТЕКСТА ОПИСАНИЯ И LIVE)
+   БАННЕР ИГРЫ "BEST ARENA" С АППАРАТНОЙ АНИМАЦИЕЙ
    ========================================================================== */
 .game-promo-banner {
     width: 100%;
     background: linear-gradient(135deg, #131024 0%, #1c143c 100%);
     border: 2px solid #3a355c;
     border-radius: 24px;
-    padding: 24px 20px; /* Увеличена высота под новый дизайн */
+    padding: 24px 20px;
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -237,7 +237,7 @@ body {
 }
 
 .game-title {
-    font-size: 26px; /* Сделано крупнее */
+    font-size: 26px; 
     font-weight: 900;
     margin: 0;
     color: #ffffff;
@@ -264,7 +264,7 @@ body {
     overflow: hidden;
 }
 
-/* 60 FPS Оптимизация: Раздельные слои рендеринга для аппаратного ускорения (GPU) */
+/* Оптимизация 60 FPS: Аппаратная анимация (GPU) */
 .ball-x-container {
     position: absolute;
     width: 12px;
@@ -283,7 +283,7 @@ body {
     animation: bounceY 1.7s linear infinite alternate;
 }
 
-/* Pixel-perfect физика: 70px арена - 1.5px*2 рамки - 12px шар = 55px чистого пути */
+/* Идеальный отскок шарика */
 @keyframes bounceX {
     from { transform: translate3d(0, 0, 0); }
     to { transform: translate3d(55px, 0, 0); }
@@ -292,6 +292,75 @@ body {
 @keyframes bounceY {
     from { transform: translate3d(0, 0, 0); }
     to { transform: translate3d(0, 55px, 0); }
+}
+
+/* ==========================================================================
+   СТИЛИ НОВОГО ЭКРАНА ИГРЫ "BEST ARENA"
+   ========================================================================== */
+.arena-game-container {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    margin-top: 36px;
+    box-sizing: border-box;
+}
+
+/* Большое квадратное поле со скругленными углами */
+.arena-big-box {
+    width: 280px;
+    height: 280px;
+    background: radial-gradient(circle, #1a163a 0%, #0d091e 100%);
+    border: 3px solid #3a355c;
+    border-radius: 36px;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.7), inset 0 0 20px rgba(141, 61, 245, 0.2);
+    overflow: hidden;
+}
+
+/* Сетка внутри игрового поля */
+.arena-grid-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-image: 
+        linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    background-position: center;
+    pointer-events: none;
+}
+
+/* Мерцающая, переливающаяся надпись по центру */
+.arena-waiting-text {
+    font-size: 22px;
+    font-weight: 900;
+    color: #ffffff;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.8), 0 0 20px rgba(255, 255, 255, 0.4);
+    z-index: 5;
+    animation: pulseGlow 1.8s ease-in-out infinite alternate;
+    text-align: center;
+}
+
+@keyframes pulseGlow {
+    0% {
+        opacity: 0.3;
+        transform: scale(0.96);
+        text-shadow: 0 0 5px rgba(255, 255, 255, 0.4);
+    }
+    100% {
+        opacity: 1;
+        transform: scale(1.04);
+        text-shadow: 0 0 20px rgba(255, 255, 255, 1), 0 0 30px rgba(141, 61, 245, 0.6);
+    }
 }
 
 /* ==========================================================================
