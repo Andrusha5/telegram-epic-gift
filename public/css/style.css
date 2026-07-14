@@ -15,7 +15,6 @@
     --purple-gradient: linear-gradient(135deg, #22184c 0%, #0d091a 100%);
 }
 
-/* ФИКС: Полное удаление синей рамки выделения (Tap Highlight) при тапах */
 * {
     -webkit-tap-highlight-color: transparent !important;
     -webkit-tap-highlight-color: rgba(0, 0, 0, 0) !important;
@@ -39,7 +38,7 @@ body {
     color: #ffffff;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     margin: 0;
-    padding: 114px 16px 125px 16px; /* Оптимальные отступы под плавающие меню */
+    padding: 114px 16px 125px 16px;
     box-sizing: border-box;
     overflow-x: hidden;
 }
@@ -71,7 +70,7 @@ body {
     top: 0;
     left: 0;
     width: 100%;
-    height: 98px; /* Идеальный вертикальный баланс */
+    height: 98px;
     background: rgba(11, 9, 20, 0.94);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
@@ -96,7 +95,6 @@ body {
     gap: 8px;
 }
 
-/* Круглый логотип BestGifts (34px) */
 .logo-img-header {
     width: 34px;
     height: 34px;
@@ -129,18 +127,16 @@ body {
     box-shadow: 0 0 12px var(--accent-purple-glow);
 }
 
-/* Поле для юзернейма до 15 символов с защитой от сдвига */
 .header-username {
     font-size: 15px;
     font-weight: 800;
     color: #ffffff;
-    max-width: 140px; /* Идеальное отображение до 15 символов */
+    max-width: 140px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
 
-/* Приподнятый баланс в шапке */
 .balance-pill {
     background: rgba(0, 230, 118, 0.08);
     border: 1.5px solid rgba(0, 230, 118, 0.4);
@@ -151,12 +147,12 @@ body {
     align-items: center;
     gap: 6px;
     cursor: pointer;
-    margin-top: -12px; /* Поднят выше, чтобы юзернейм помещался свободно */
+    margin-top: -12px;
     transition: transform 0.1s, box-shadow 0.2s;
 }
 
 #user-balance-pill-value {
-    font-size: 17px; /* Увеличенный размер цифр баланса */
+    font-size: 17px;
     font-weight: 900;
     color: #00e676;
 }
@@ -194,7 +190,7 @@ body {
 }
 
 /* ==========================================================================
-   БАННЕР ИГРЫ "BEST ARENA" С АППАРАТНОЙ АНИМАЦИЕЙ
+   БАННЕР ИГРЫ "BEST ARENA"
    ========================================================================== */
 .game-promo-banner {
     width: 100%;
@@ -246,7 +242,6 @@ body {
     z-index: 2;
 }
 
-/* Анимированный бокс-арена */
 .arena-box {
     width: 70px;
     height: 70px;
@@ -257,7 +252,6 @@ body {
     overflow: hidden;
 }
 
-/* Оптимизация 60 FPS: Аппаратная анимация (GPU) */
 .ball-x-container {
     position: absolute;
     width: 12px;
@@ -276,7 +270,6 @@ body {
     animation: bounceY 1.7s linear infinite alternate;
 }
 
-/* Идеальный отскок шарика */
 @keyframes bounceX {
     from { transform: translate3d(0, 0, 0); }
     to { transform: translate3d(55px, 0, 0); }
@@ -288,7 +281,7 @@ body {
 }
 
 /* ==========================================================================
-   СТИЛИ НОВОГО ЭКРАНА ИГРЫ "BEST ARENA" С ДИНАМИЧЕСКИМ РАЗДЕЛЕНИЕМ ПОЛЯ
+   ИГРОВОЕ ПОЛЕ BEST ARENA С ДИНАМИЧЕСКИМИ СЕГМЕНТАМИ
    ========================================================================== */
 .arena-game-container {
     width: 100%;
@@ -300,7 +293,6 @@ body {
     box-sizing: border-box;
 }
 
-/* Большое квадратное поле со скругленными углами */
 .arena-big-box {
     width: 280px;
     height: 280px;
@@ -315,7 +307,6 @@ body {
     overflow: hidden;
 }
 
-/* Холст SVG для красивого закрашивания поля */
 .arena-canvas {
     position: absolute;
     top: 0;
@@ -325,7 +316,6 @@ body {
     z-index: 1;
 }
 
-/* Сетка внутри игрового поля */
 .arena-grid-overlay {
     position: absolute;
     top: 0;
@@ -341,8 +331,13 @@ body {
     z-index: 2;
 }
 
-/* Мерцающая неоновая надпись */
+/* СТРОГО ЦЕНТРИРОВАННЫЙ ТЕКСТ */
 .arena-waiting-text {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    margin: 0;
     font-size: 20px;
     font-weight: 900;
     color: #ffffff;
@@ -352,10 +347,15 @@ body {
     z-index: 5;
     animation: pulseGlow 1.8s ease-in-out infinite alternate;
     text-align: center;
+    white-space: nowrap;
 }
 
-/* Круглый неоновый таймер по центру */
+/* Круглый таймер */
 .arena-timer-circle {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
     width: 78px;
     height: 78px;
     border-radius: 50%;
@@ -369,10 +369,8 @@ body {
     font-weight: 900;
     color: #ffffff;
     z-index: 6;
-    animation: timerPulse 1s ease-in-out infinite;
 }
 
-/* Слой для аватарок игроков */
 .arena-avatars-overlay {
     position: absolute;
     top: 0;
@@ -383,30 +381,23 @@ body {
     pointer-events: none;
 }
 
-/* Стили аватарок игроков на поле */
 .arena-player-avatar-node {
     position: absolute;
-    width: 38px;
-    height: 38px;
     border-radius: 50%;
     border: 2px solid #ffffff;
     box-shadow: 0 2px 8px rgba(0,0,0,0.5);
     transform: translate(-50%, -50%);
-}
-
-@keyframes timerPulse {
-    0% { transform: scale(1); }
-    50% { transform: scale(1.08); box-shadow: 0 0 25px rgba(141, 61, 245, 0.6); }
-    100% { transform: scale(1); }
+    object-fit: cover;
+    transition: width 0.3s, height 0.3s;
 }
 
 @keyframes pulseGlow {
-    0% { opacity: 0.3; transform: scale(0.96); }
-    100% { opacity: 1; transform: scale(1.04); }
+    0% { opacity: 0.3; }
+    100% { opacity: 1; }
 }
 
 /* ==========================================================================
-   КНОПКИ СТАВОК (АККУРАТНЫЕ И ЭЛЕГАНТНЫЕ - КАК НА СКРИНШОТЕ)
+   КВАДРАТНЫЕ АККУРАТНЫЕ КНОПКИ СТАВОК (В СТИЛЕ СКРИНШОТА)
    ========================================================================== */
 .betting-row {
     display: flex;
@@ -418,11 +409,11 @@ body {
     box-sizing: border-box;
 }
 
-/* Круглая кнопка изменения ставки (карандашик) */
+/* Квадратный карандашик со скругленными углами */
 .bet-edit-btn {
-    width: 46px;
-    height: 46px;
-    border-radius: 50%;
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
     background: rgba(255, 255, 255, 0.08);
     border: 1.5px solid rgba(255, 255, 255, 0.15);
     color: #ffffff;
@@ -443,28 +434,27 @@ body {
     background: rgba(141, 61, 245, 0.15);
 }
 
-/* Круглые аккуратные кнопки ставок */
+/* Квадратные кнопки ставок */
 .bet-button {
-    width: 46px;
-    height: 46px;
-    border-radius: 50%;
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
     background: rgba(255, 255, 255, 0.08);
     border: 1.5px solid rgba(255, 255, 255, 0.15);
     color: #ffffff;
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 2px;
+    gap: 4px;
     cursor: pointer;
     font-weight: 700;
-    font-size: 11px;
+    font-size: 13px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
     transition: all 0.15s ease-in-out;
     position: relative;
     box-sizing: border-box;
 }
 
-/* Активное и доступное состояние кнопки */
 .bet-button.active {
     border-color: var(--accent-purple);
     box-shadow: 0 0 10px var(--accent-purple-glow);
@@ -474,7 +464,6 @@ body {
     transform: scale(0.92);
 }
 
-/* Отключенное состояние (баланса не хватает) */
 .bet-button.disabled {
     background: rgba(255, 255, 255, 0.03) !important;
     border-color: rgba(255, 255, 255, 0.05) !important;
@@ -488,8 +477,8 @@ body {
 }
 
 .bet-coin-icon {
-    width: 11px;
-    height: 11px;
+    width: 12px;
+    height: 12px;
     object-fit: contain;
 }
 
@@ -653,7 +642,6 @@ body {
     box-sizing: border-box;
 }
 
-/* Элегантная квадратная кнопка назад */
 .back-btn-square {
     width: 46px;
     height: 46px;
@@ -694,7 +682,6 @@ body {
     margin: 0;
 }
 
-/* Рулетка */
 .roulette-viewport {
     width: 100%;
     height: 124px;
@@ -727,7 +714,7 @@ body {
     top: 11px;
     left: 0;
     height: 100px;
-    will-change: transform; /* Увеличивает FPS на мобильных */
+    will-change: transform;
 }
 
 .roulette-item {
@@ -758,7 +745,6 @@ body {
     color: #ffffff;
 }
 
-/* Спин кнопка */
 .spin-controls {
     width: 100%;
     display: flex;
@@ -804,7 +790,6 @@ body {
     border-radius: 14px;
 }
 
-/* Сетка наград в 2 колонки */
 .rewards-section {
     width: 100%;
     text-align: left;
@@ -933,7 +918,6 @@ body {
     text-align: center;
 }
 
-/* Блок ввода подарков */
 .deposit-gift-box {
     background: rgba(19, 16, 36, 0.95);
     border: 1.5px solid var(--border-color);
@@ -972,7 +956,6 @@ body {
     margin: 0;
 }
 
-/* Синяя Web3 кнопка прямой связи */
 .telegram-send-btn {
     background: rgba(0, 136, 204, 0.08);
     border: 1.5px solid rgba(0, 136, 204, 0.35);
@@ -1006,7 +989,6 @@ body {
     font-size: 16px;
 }
 
-/* Кастомный красивый выпадающий Web3 список */
 .select-container-wrapper {
     position: relative;
     width: 100%;
@@ -1047,7 +1029,6 @@ body {
     pointer-events: none;
 }
 
-/* Кнопка подтверждения */
 .deposit-confirm-btn {
     background: linear-gradient(135deg, #8d3df5 0%, #6118c7 100%);
     color: #ffffff;
@@ -1124,7 +1105,6 @@ body {
     margin-bottom: 16px;
 }
 
-/* Иконка монеты GRAM */
 .large-balance-coin-icon {
     width: 36px;
     height: 36px;
@@ -1147,7 +1127,6 @@ body {
     box-sizing: border-box;
 }
 
-/* Поле ввода в модалке */
 .modal-input-wrapper {
     width: 100%;
     box-sizing: border-box;
@@ -1255,7 +1234,7 @@ body {
 }
 
 /* ==========================================================================
-   ПАРЯЩИЙ НАВИГАЦИОННЫЙ БАР С ПОДСВЕТКОЙ (Web3 СТИЛЬ)
+   ПАРЯЩИЙ НАВИГАЦИОННЫЙ БАР С ПОДСВЕТКОЙ
    ========================================================================== */
 .floating-nav-container {
     position: fixed;
@@ -1323,7 +1302,6 @@ body {
     transition: color 0.2s;
 }
 
-/* Точка-индикатор под вкладкой */
 .nav-dot {
     position: absolute;
     bottom: 6px;
@@ -1336,7 +1314,6 @@ body {
     transition: opacity 0.2s, transform 0.2s, box-shadow 0.2s;
 }
 
-/* Подсветка активной вкладки */
 .nav-tab.active .nav-svg-icon {
     color: #ffffff;
     filter: drop-shadow(0 0 6px var(--accent-purple));
