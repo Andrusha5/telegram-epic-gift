@@ -4,13 +4,13 @@ const pool = db.pool || db;
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
 
-// Синглтон для исключения дублирования вебхуков в Node.js
+// Инициализация синглтона бота
 if (!global.botInstance) {
     global.botInstance = new TelegramBot(token, { polling: true });
 }
 const bot = global.botInstance;
 
-// --- ПОЛУЧЕНИЕ СВЕЖЕЙ АВАТАРКИ ПОЛЬЗОВАТЕЛЯ ЧЕРЕЗ API TELEGRAM ---
+// ПОЛУЧЕНИЕ СВЕЖЕЙ АВАТАРКИ ЧЕРЕЗ API TELEGRAM
 async function getUserAvatarUrl(userId) {
     try {
         const photos = await bot.getUserProfilePhotos(userId, { limit: 1 });
@@ -25,11 +25,11 @@ async function getUserAvatarUrl(userId) {
     return null;
 }
 
-// --- ПРОВЕРКА ПОДПИСКИ ПОЛЬЗОВАТЕЛЯ НА ТЕЛЕГРАМ КАНАЛ ---
+// ПРОВЕРКА ПОДПИСКИ ПОЛЬЗОВАТЕЛЯ НА ТЕЛЕГРАМ КАНАЛ
 async function checkUserSubscription(userId) {
     try {
         const channelUsername = process.env.CHANNEL_USERNAME;
-        if (!channelUsername) return true; // Если канал не привязан, разрешаем всем
+        if (!channelUsername) return true; // Если канал не привязан, пускаем всех
 
         const cleanUsername = channelUsername.replace('@', '').trim();
         const chatMember = await bot.getChatMember('@' + cleanUsername, userId);
@@ -42,7 +42,7 @@ async function checkUserSubscription(userId) {
     }
 }
 
-// --- ОБРАБОТЧИК КНОПОК ДЕПОЗИТА (ОДОБРИТЬ / ОТКЛОНИТЬ) ---
+// ОБРАБОТЧИК КНОПОК ДЕПОЗИТА (ОДОБРИТЬ / ОТКЛОНИТЬ)
 bot.on('callback_query', async (callbackQuery) => {
     const actionData = callbackQuery.data;
     const queryId = callbackQuery.id;
@@ -52,7 +52,7 @@ bot.on('callback_query', async (callbackQuery) => {
         return; 
     }
 
-    // Мгновенно скрываем индикатор загрузки кнопки у администратора
+    // Мгновенно убираем часики загрузки у администратора
     bot.answerCallbackQuery(queryId).catch(() => {});
 
     const parts = actionData.split('_');
