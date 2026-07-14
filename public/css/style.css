@@ -15,16 +15,27 @@
     --purple-gradient: linear-gradient(135deg, #22184c 0%, #0d091a 100%);
 }
 
+/* КРИТИЧЕСКИЙ ФИКС: Удаление синего мигающего квадрата при тапах по всему приложению */
+* {
+    -webkit-tap-highlight-color: transparent !important;
+    -webkit-user-select: none;
+    user-select: none;
+    outline: none !important;
+}
+
+input, select, textarea {
+    -webkit-user-select: text;
+    user-select: text;
+}
+
 body {
     background-color: var(--bg-color);
     color: #ffffff;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     margin: 0;
-    padding: 110px 16px 125px 16px; /* Большие отступы под шапку и плавающее меню */
+    padding: 110px 16px 125px 16px; /* Оптимальные отступы для хедера и парящего меню */
     box-sizing: border-box;
     overflow-x: hidden;
-    user-select: none;
-    -webkit-user-select: none;
 }
 
 .hidden {
@@ -54,7 +65,7 @@ body {
     top: 0;
     left: 0;
     width: 100%;
-    height: 94px; /* Оптимальная высота под крупный аватар */
+    height: 94px; 
     background: rgba(11, 9, 20, 0.92);
     backdrop-filter: blur(14px);
     -webkit-backdrop-filter: blur(14px);
@@ -99,7 +110,7 @@ body {
 }
 
 .header-avatar {
-    width: 48px; /* Сильно увеличенный аватар */
+    width: 48px;
     height: 48px;
     border-radius: 50%;
     border: 2px solid var(--accent-purple);
@@ -108,7 +119,7 @@ body {
 }
 
 .header-username {
-    font-size: 16px; /* Юзернейм стал значительно больше */
+    font-size: 16px;
     font-weight: 800;
     color: #ffffff;
 }
@@ -236,7 +247,7 @@ body {
 
 .case-image-wrapper {
     width: 100%;
-    height: 114px; /* Одинаковый размер под все новые 3D-изображения */
+    height: 114px; 
     display: flex;
     align-items: center;
     justify-content: center;
@@ -258,7 +269,7 @@ body {
 .case-info {
     width: 100%;
     display: flex;
-    justify-content: center; /* Центровка без стрелок */
+    justify-content: center; 
     align-items: center;
     padding: 0 4px;
 }
@@ -287,7 +298,7 @@ body {
     box-sizing: border-box;
 }
 
-/* Элегантная квадратная кнопка назад */
+/* Премиальная квадратная кнопка назад с неоновой фиолетовой подсветкой */
 .back-btn-square {
     width: 46px;
     height: 46px;
@@ -570,7 +581,7 @@ body {
     text-align: center;
 }
 
-/* Премиальный блок ввода подарков (под ваш скриншот) */
+/* Дизайнерский блок ввода подарков (в соответствии с вашим скриншотом) */
 .deposit-gift-box {
     background: rgba(19, 16, 36, 0.95);
     border: 1.5px solid var(--border-color);
@@ -892,15 +903,15 @@ body {
 }
 
 /* ==========================================================================
-   ПАРЯЩИЙ НАВИГАЦИОННЫЙ БАР С ПОДДСВЕТКОЙ (Web3)
+   ПАРЯЩИЙ НАВИГАЦИОННЫЙ БАР С ПОДСВЕТКОЙ (Web3 СТИЛЬ)
    ========================================================================== */
 .floating-nav-container {
     position: fixed;
-    bottom: 16px; /* Расстояние от краев */
+    bottom: 16px; 
     left: 16px;   
     right: 16px;  
     z-index: 2000;
-    pointer-events: none; /* Пропускает тапы за пределами меню */
+    pointer-events: none; 
 }
 
 .bottom-nav {
@@ -908,13 +919,13 @@ body {
     backdrop-filter: blur(15px);
     -webkit-backdrop-filter: blur(15px);
     border: 1.5px solid var(--border-color);
-    border-radius: 24px; /* Мягкие скругления */
+    border-radius: 24px; 
     height: 74px;
     display: flex;
     align-items: center;
     justify-content: space-around;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
-    pointer-events: auto; /* Делает кликабельным само меню */
+    pointer-events: auto; 
 }
 
 .nav-tab {
@@ -994,7 +1005,7 @@ body {
    ========================================================================== */
 .toast-container {
     position: fixed;
-    bottom: 102px; /* Позиционировано над парящим навигационным меню */
+    bottom: 102px; 
     left: 50%;
     transform: translateX(-50%);
     width: 90%;
@@ -1018,7 +1029,7 @@ body {
     box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.5);
     pointer-events: auto;
     opacity: 0;
-    transform: translateY(20px); /* Анимация всплытия */
+    transform: translateY(20px); 
     transition: opacity 0.3s, transform 0.3s;
 }
 
