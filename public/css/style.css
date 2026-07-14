@@ -105,13 +105,6 @@ body {
     box-shadow: 0 0 12px var(--accent-purple-glow);
 }
 
-.logo-img-header-small {
-    width: 24px;
-    height: 24px;
-    object-fit: contain;
-    border-radius: 50%;
-}
-
 .logo-text {
     font-size: 16px;
     font-weight: 900;
@@ -303,7 +296,7 @@ body {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    margin-top: 36px;
+    margin-top: 24px;
     box-sizing: border-box;
 }
 
@@ -337,7 +330,7 @@ body {
     pointer-events: none;
 }
 
-/* Мерцающая, переливающаяся надпись по центру */
+/* Мерцающая неоновая надпись */
 .arena-waiting-text {
     font-size: 22px;
     font-weight: 900;
@@ -361,6 +354,126 @@ body {
         transform: scale(1.04);
         text-shadow: 0 0 20px rgba(255, 255, 255, 1), 0 0 30px rgba(141, 61, 245, 0.6);
     }
+}
+
+/* КНОПКИ СТАВОК (КРАСИВАЯ СЕТКА ИЗ 4 СФЕР) */
+.betting-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    margin-top: 32px;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.bet-edit-btn {
+    width: 58px;
+    height: 58px;
+    border-radius: 50%;
+    background: #1d1b33;
+    border: 2px solid #3a355c;
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+    transition: transform 0.1s, border-color 0.2s, background-color 0.2s;
+}
+
+.bet-edit-btn:active {
+    transform: scale(0.92);
+}
+
+.bet-edit-btn:hover {
+    border-color: var(--accent-purple);
+}
+
+.bet-button {
+    width: 58px;
+    height: 58px;
+    border-radius: 50%;
+    background: #1c143c;
+    border: 2.5px solid #452a8c;
+    color: #ffffff;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    cursor: pointer;
+    font-weight: 900;
+    font-size: 14px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+    transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    position: relative;
+    box-sizing: border-box;
+}
+
+/* Активная кнопка: Достаточно средств на балансе */
+.bet-button.active {
+    background: linear-gradient(135deg, #24144e 0%, #3e1b78 100%);
+    border-color: var(--accent-purple);
+    box-shadow: 0 0 14px var(--accent-purple-glow), 0 4px 10px rgba(0, 0, 0, 0.5);
+}
+
+.bet-button.active:active {
+    transform: scale(0.92);
+    box-shadow: 0 0 6px var(--accent-purple-glow);
+}
+
+/* Выключенное состояние (Баланс ниже стоимости) */
+.bet-button.disabled {
+    background: #14131d !important;
+    border-color: #24222c !important;
+    color: #4a4857 !important;
+    box-shadow: none !important;
+    cursor: not-allowed;
+}
+
+.bet-button.disabled .bet-coin-icon {
+    filter: grayscale(1) opacity(0.2);
+}
+
+.bet-coin-icon {
+    width: 14px;
+    height: 14px;
+    object-fit: contain;
+}
+
+/* РАСКЛАДКА ПОЛЕЙ ДЛЯ РЕДАКТИРОВАНИЯ СТАВОК В МОДАЛКЕ */
+.modal-input-row {
+    display: flex;
+    gap: 8px;
+    justify-content: space-between;
+    width: 100%;
+    box-sizing: border-box;
+    margin-top: 16px;
+}
+
+.bet-input-wrapper {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.bet-input-wrapper label {
+    font-size: 11px;
+    font-weight: 800;
+    color: var(--light-text-color);
+    text-transform: uppercase;
+    text-align: center;
+    letter-spacing: 0.5px;
+}
+
+.bet-input-wrapper input {
+    padding: 12px 6px !important;
+    font-size: 15px !important;
+    border-radius: 12px !important;
+    text-align: center !important;
+    background: #0b0914 !important;
 }
 
 /* ==========================================================================
@@ -563,6 +676,7 @@ body {
     top: 11px;
     left: 0;
     height: 100px;
+    will-change: transform; /* Увеличивает FPS на мобильных */
 }
 
 .roulette-item {
@@ -1324,4 +1438,4 @@ body {
 .modal-btn-secondary {
     background: #241c44;
     color: #ffffff;
-   }
+                                                                    }
