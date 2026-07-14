@@ -30,7 +30,6 @@ const TONCENTER_API_KEY = process.env.TONCENTER_API_KEY;
 
 app.use(express.json());
 
-// НАСТРОЙКА КРОСС-ДОМЕННОГО ДОСТУПА (CORS)
 app.use((req, res, next) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, PATCH, DELETE');
@@ -42,7 +41,6 @@ app.use((req, res, next) => {
     next();
 });
 
-// АВТОМАТИЧЕСКИЙ СБРОС КЭША TELEGRAM
 app.use((req, res, next) => {
     const url = req.url;
     if (url.endsWith('.html') || url.endsWith('.js') || url.endsWith('.css') || url === '/' || url === '/index.html') {
@@ -54,7 +52,6 @@ app.use((req, res, next) => {
     next();
 });
 
-// СЕРВЕРНЫЙ КОМПИЛЯТОР BOC ДЛЯ ТЕКСТОВЫХ КОММЕНТАРИЕВ TON
 function serializeTextCommentBoc(text) {
     const textBytes = Buffer.from(text, 'utf8');
     const payload = Buffer.concat([Buffer.alloc(4), textBytes]); 
@@ -84,7 +81,6 @@ function serializeTextCommentBoc(text) {
     return Buffer.concat([header, cellData]).toString('base64');
 }
 
-// ДИНАМИЧЕСКИЙ МАНИФЕСТ
 app.get('/tonconnect-manifest.json', (req, res) => {
     const host = req.get('host');
     const protocol = 'https'; 
@@ -100,7 +96,6 @@ app.get('/tonconnect-manifest.json', (req, res) => {
     });
 });
 
-// КЛИЕНТСКИЙ АВАТАР-ПРОКСИ
 app.get('/api/avatar/:userId', async (req, res) => {
     const userId = req.params.userId;
     try {
@@ -116,7 +111,6 @@ app.get('/api/avatar/:userId', async (req, res) => {
     }
 });
 
-// ПОДКЛЮЧЕНИЕ СТАТИЧЕСКИХ РЕСУРСОВ
 app.use(express.static(path.join(__dirname, 'public'), {
     maxAge: '1y',
     setHeaders: (res, filePath) => {
@@ -127,14 +121,12 @@ app.use(express.static(path.join(__dirname, 'public'), {
     }
 }));
 
-// Сопоставление комментариев транзакций TON
 function matchTransactionComment(tx, userId) {
     if (!tx.in_msg) return false;
     const comment = tx.in_msg.message || "";
     return comment.trim() === String(userId).trim();
 }
 
-// MIDDLEWARE ДЛЯ АВТОРИЗАЦИИ ТЕЛЕГРАМ
 app.use(async (req, res, next) => {
     const initData = req.body?.initData || req.headers['x-telegram-init-data'] || req.query.initData;
     if (!initData) {
@@ -183,7 +175,6 @@ app.use(async (req, res, next) => {
     next();
 });
 
-// ЭНДПОИНТ ДЛЯ ОПЛАТЫ СТАВКИ В BEST ARENA С БАЛАНСА
 app.post('/api/place_bet', async (req, res) => {
     if (!req.telegramUser || !req.telegramUser.id) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -224,13 +215,12 @@ app.post('/api/place_bet', async (req, res) => {
         res.json({ success: true, newBalance: newBalance });
     } catch (err) {
         if (client) await client.query('ROLLBACK');
-        res.status(500).json({ error: "Ошибка проведения транзакции на сервере" });
+        res.status(500).json({ error: "Ошибка проведения транзакции" });
     } finally {
         if (client) client.release();
     }
 });
 
-// Endpoint для безопасного получения Payload с сервера
 app.get('/api/generate_payload', (req, res) => {
     const text = req.query.text;
     if (!text) return res.status(400).json({ error: "Missing text parameter" });
@@ -295,7 +285,7 @@ app.post('/api/verify-payment', async (req, res) => {
                 await client.query('INSERT INTO transactions (user_id, type, amount, details) VALUES ($1, $2, $3, $4)', [userId, 'deposit_ton', amount, `Пополнение: Хэш ${foundTransaction.transaction_id.hash}`]);
                 await client.query('COMMIT');
                 if (bot && userId) {
-                    bot.sendMessage(userId, `🎉 <b>Баланс успешно пополнен!</b>\n\n💰 На игровой счет зачислено: <b>${gramAmount.toFixed(2)} GRAM</b>`, { parse_mode: 'HTML' }).catch(console.error);
+                    bot.sendMessage(userId, `🎉 <b>Баланс пополнен!</b>\n\n💰 Зачислено: <b>${gramAmount.toFixed(2)} GRAM</b>`, { parse_mode: 'HTML' }).catch(console.error);
                 }
                 return res.json({ success: true, newBalance: gramAmount });
             } catch (dbError) {
@@ -312,7 +302,6 @@ app.post('/api/verify-payment', async (req, res) => {
     }
 });
 
-// Профиль пользователя
 app.get('/api/user', async (req, res) => {
     if (!req.telegramUser || !req.telegramUser.id) return res.status(401).json({ error: 'Unauthorized' });
     try {
@@ -328,7 +317,6 @@ app.get('/api/user', async (req, res) => {
     } catch (error) { res.status(500).json({ error: 'Internal server error' }); }
 });
 
-// Получение инвентаря
 app.get('/api/inventory', async (req, res) => {
     if (!req.telegramUser || !req.telegramUser.id) return res.status(401).json({ error: 'Unauthorized' });
     try {
@@ -343,14 +331,13 @@ app.get('/api/inventory', async (req, res) => {
     } catch (error) { res.status(500).json({ error: 'Internal server error' }); }
 });
 
-// Ежедневный бесплатный кейс
 app.post('/api/open_daily_case', async (req, res) => {
     if (!req.telegramUser || !req.telegramUser.id) return res.status(401).json({ error: 'Unauthorized' });
     const userId = req.telegramUser.id;
     let client;
     try {
         const isSubscribed = await checkUserSubscription(userId);
-        if (!isSubscribed) return res.status(403).json({ error: "Для открытия кейса необходимо быть подписчиком канала @" + CHANNEL_USERNAME });
+        if (!isSubscribed) return res.status(403).json({ error: "Подпишитесь на канал @" + CHANNEL_USERNAME });
 
         client = await pool.connect();
         await client.query('BEGIN');
@@ -387,14 +374,13 @@ app.post('/api/open_daily_case', async (req, res) => {
         const adminId = process.env.ADMIN_TELEGRAM_ID;
         if (adminId && bot && wonItem.type !== 'balance') {
             const fullName = [user.first_name, user.last_name].filter(Boolean).join(' ') || 'Пользователь';
-            const adminMsg = `🎉 <b>Выигран подарок в Ежедневном кейсе!</b>\n\n🎁 <b>Подарок:</b> ${wonItem.name} (ID: ${wonItem.item_id}, Цена: ${wonItem.value} GRAM)\n👤 <b>Пользователь:</b> <a href="tg://user?id=${userId}">${fullName}</a>\n🆔 <b>Telegram ID:</b> <code>${userId}</code>\n\n💬 <a href="tg://user?id=${userId}">Открыть чат (Вечная ссылка)</a>`;
+            const adminMsg = `🎉 <b>Выигрыш в Ежедневном кейсе!</b>\n\n🎁 <b>Подарок:</b> ${wonItem.name} (ID: ${wonItem.item_id}, Цена: ${wonItem.value} GRAM)\n👤 <b>Пользователь:</b> <a href="tg://user?id=${userId}">${fullName}</a>`;
             bot.sendMessage(adminId, adminMsg, { parse_mode: 'HTML' }).catch(console.error);
         }
         res.json({ success: true, wonItem: { id: wonItem.item_id, name: wonItem.name, price: wonItem.value + " GRAM", type: wonItem.type }, newBalance: newBalance });
     } catch (error) { if (client) await client.query('ROLLBACK'); res.status(500).json({ error: 'Ошибка' }); } finally { if (client) client.release(); }
 });
 
-// Кейс Новичка
 app.post('/api/open_newbie_case', async (req, res) => {
     if (!req.telegramUser || !req.telegramUser.id) return res.status(401).json({ error: 'Unauthorized' });
     const userId = req.telegramUser.id;
@@ -432,14 +418,13 @@ app.post('/api/open_newbie_case', async (req, res) => {
         const adminId = process.env.ADMIN_TELEGRAM_ID;
         if (adminId && bot && wonItem.type !== 'balance') {
             const fullName = [user.first_name, user.last_name].filter(Boolean).join(' ') || 'Пользователь';
-            const adminMsg = `🎉 <b>Выигран подарок в Кейсе Новичка!</b>\n\n🎁 <b>Подарок:</b> ${wonItem.name} (ID: ${wonItem.item_id}, Цена: ${wonItem.value} GRAM)\n👤 <b>Пользователь:</b> <a href="tg://user?id=${userId}">${fullName}</a>\n🆔 <b>Telegram ID:</b> <code>${userId}</code>\n\n💬 <a href="tg://user?id=${userId}">Открыть чат (Вечная ссылка)</a>`;
+            const adminMsg = `🎉 <b>Выигрыш в Кейсе Новичка!</b>\n\n🎁 <b>Подарок:</b> ${wonItem.name} (ID: ${wonItem.item_id}, Цена: ${wonItem.value} GRAM)\n👤 <b>Пользователь:</b> <a href="tg://user?id=${userId}">${fullName}</a>`;
             bot.sendMessage(adminId, adminMsg, { parse_mode: 'HTML' }).catch(console.error);
         }
         res.json({ success: true, wonItem: { id: wonItem.item_id, name: wonItem.name, price: wonItem.value + " GRAM", type: wonItem.type }, newBalance: newBalance });
     } catch (error) { if (client) await client.query('ROLLBACK'); res.status(500).json({ error: 'Ошибка' }); } finally { if (client) client.release(); }
 });
 
-// Продажа подарка
 app.post('/api/sell_gift', async (req, res) => {
     if (!req.telegramUser || !req.telegramUser.id) return res.status(401).json({ error: 'Unauthorized' });
     const userId = req.telegramUser.id;
@@ -450,7 +435,7 @@ app.post('/api/sell_gift', async (req, res) => {
         await client.query('BEGIN');
         const inventoryRes = await client.query('SELECT quantity FROM user_inventory WHERE user_id = $1 AND item_id = $2 FOR UPDATE', [userId, itemId]);
         const item = inventoryRes.rows[0];
-        if (!item || item.quantity < 1) { await client.query('ROLLBACK'); return res.status(400).json({ error: 'У вас нет предмета.' }); }
+        if (!item || item.quantity < 1) { await client.query('ROLLBACK'); return res.status(400).json({ error: 'Предмет не найден.' }); }
         await client.query('UPDATE user_inventory SET quantity = quantity - 1 WHERE user_id = $1 AND item_id = $2', [userId, itemId]);
         const userRes = await client.query('SELECT username, first_name, last_name, balance FROM users WHERE id = $1 FOR UPDATE', [userId]);
         const user = userRes.rows[0];
@@ -461,7 +446,6 @@ app.post('/api/sell_gift', async (req, res) => {
     } catch (error) { if (client) await client.query('ROLLBACK'); res.status(500).json({ error: 'Ошибка' }); } finally { if (client) client.release(); }
 });
 
-// Вывод подарка
 app.post('/api/withdraw_gift', async (req, res) => {
     if (!req.telegramUser || !req.telegramUser.id) return res.status(401).json({ error: 'Unauthorized' });
     const userId = req.telegramUser.id;
@@ -485,16 +469,13 @@ app.post('/api/withdraw_gift', async (req, res) => {
             const fullName = [user.first_name, user.last_name].filter(Boolean).join(' ') || 'Пользователь';
             const msg = `📤 <b>Запрос на вывод подарка!</b>\n\n` +
                         `🎁 <b>Подарок:</b> ${itemDetails.name} (${parseFloat(itemDetails.value).toFixed(3)} GRAM)\n` +
-                        `👤 <b>Пользователь:</b> <a href="tg://user?id=${userId}">${fullName}</a>\n` +
-                        `🆔 <b>Telegram ID:</b> <code>${userId}</code>\n\n` +
-                        `💬 <a href="tg://user?id=${userId}">Открыть чат (Вечная ссылка)</a>`;
+                        `👤 <b>Пользователь:</b> <a href="tg://user?id=${userId}">${fullName}</a>`;
             bot.sendMessage(adminId, msg, { parse_mode: 'HTML' }).catch(console.error);
         }
         res.json({ success: true });
     } catch (error) { if (client) await client.query('ROLLBACK'); res.status(500).json({ error: 'Ошибка' }); } finally { if (client) client.release(); }
 });
 
-// Заявка на депозит
 app.post('/api/deposit_gift_request', async (req, res) => {
     if (!req.telegramUser || !req.telegramUser.id) return res.status(401).json({ error: 'Unauthorized' });
     const userId = req.telegramUser.id;
@@ -510,9 +491,7 @@ app.post('/api/deposit_gift_request', async (req, res) => {
             const fullName = [user.first_name, user.last_name].filter(Boolean).join(' ') || 'Пользователь';
             const msg = `📥 <b>Новый запрос на депозит!</b>\n\n` +
                         `🎁 <b>Предмет:</b> ${itemDetails.name} (ID: ${itemId})\n` +
-                        `👤 <b>Пользователь:</b> <a href="tg://user?id=${userId}">${fullName}</a>\n` +
-                        `🆔 <b>Telegram ID:</b> <code>${userId}</code>\n\n` +
-                        `💬 <a href="tg://user?id=${userId}">Открыть чат (Вечная ссылка)</a>`;
+                        `👤 <b>Пользователь:</b> <a href="tg://user?id=${userId}">${fullName}</a>`;
             bot.sendMessage(adminId, msg, {
                 parse_mode: 'HTML',
                 reply_markup: {
