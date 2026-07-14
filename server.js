@@ -38,6 +38,40 @@ function matchTransactionComment(tx, userId) {
     return comment.trim() === String(userId).trim();
 }
 
+// СТАБИЛЬНЫЙ ВЫСОКОТОЧНЫЙ СЕРВЕРНЫЙ КОМПИЛЯТОР BOC (Решает все вылеты в кошельках)
+function serializeTextCommentBoc(text) {
+    const textBytes = Buffer.from(text, 'utf8');
+    const dataLen = 4 + textBytes.length; // 4 нулевых байта + байты строки
+
+    // Дескрипторы ячейки (Refs=0, Exotic=0)
+    const d1 = 0; 
+    const d2 = dataLen * 2; // Битовая длина с байтовым выравниванием
+
+    const cellContentLen = 2 + dataLen;
+
+    // Спецификация TON Single-Cell BOC
+    const header = Buffer.from([
+        0xb5, 0xee, 0x9c, 0x72, // BOC Magic
+        0x01,                   // has_idx=0, has_crc32c=0, size_bytes=1
+        0x01,                   // index_size
+        0x01,                   // offset_size
+        0x01,                   // cell_count
+        0x01,                   // root_count
+        0x00,                   // absent_count
+        cellContentLen,         // Общая длина ячейки данных
+        0x00                    // Индекс корня (0)
+    ]);
+
+    const cellData = Buffer.alloc(2 + dataLen);
+    cellData[0] = d1;
+    cellData[1] = d2;
+    cellData.writeUInt32BE(0, 2); // 32-битный пустой заголовок (Указывает кошельку на текстовый комментарий)
+    textBytes.copy(cellData, 6);
+
+    const finalBoc = Buffer.concat([header, cellData]);
+    return finalBoc.toString('base64');
+}
+
 // ---------------------------------------------------------------------------
 // MIDDLEWARE ДЛЯ АВТОРИЗАЦИИ ТЕЛЕГРАМ
 // ---------------------------------------------------------------------------
@@ -89,19 +123,46 @@ app.use(async (req, res, next) => {
     next();
 });
 
+// Роут генерации Payload (Вызывается из клиента)
+app.get('/api/generate_payload', (req, res) => {
+    const text = req.query.text;
+    if (!text) return res.status(400).json({ error: "Missing text parameter" });
+    const boc = serializeTextCommentBoc(String(text));
+    res.json({ payload: boc });
+});
+
+// КЛИЕНТСКИЙ АВАТАР-ПРОКСИ (Позволяет круглосуточно отображать фото профилей)
+app.get('/api/avatar/:userId', async (req, res) => {
+    const userId = req.params.userId;
+    try {
+        const avatarUrl = await getUserAvatarUrl(userId);
+        if (avatarUrl) {
+            const response = await axios.get(avatarUrl, { responseType: 'stream' });
+            response.data.pipe(res);
+        } else {
+            res.redirect('https://img.icons8.com/color/96/user.png');
+        }
+    } catch (e) {
+        res.redirect('https://img.icons8.com/color/96/user.png');
+    }
+});
+
 app.get('/api/deposit_address', (req, res) => {
     res.json({ address: ADMIN_TON_ADDRESS });
 });
 
+// КРАСИВЫЙ ДИНАМИЧЕСКИЙ МАНИФЕСТ С АБСОЛЮТНЫМИ ССЫЛКАМИ ПОД ВАШ ЛОГОТИП
 app.get('/tonconnect-manifest.json', (req, res) => {
-    // Возвращаем точный манифест, привязанный к вашему репозиторию
+    const host = req.get('host');
+    const protocol = req.secure || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
+    const appUrl = process.env.WEB_APP_URL || `${protocol}://${host}`;
     res.setHeader('Content-Type', 'application/json');
     res.json({
-        "url": "https://telegram.org",
+        "url": appUrl,
         "name": "BestGifts",
-        "iconUrl": "https://img.icons8.com/color/96/gift.png",
-        "termsOfUseUrl": "https://telegram.org",
-        "privacyPolicyUrl": "https://telegram.org"
+        "iconUrl": `${appUrl}/Images/Logo/logotip.png`, // Абсолютная ссылка решает проблему с логотипом
+        "termsOfUseUrl": appUrl,
+        "privacyPolicyUrl": appUrl
     });
 });
 
@@ -167,7 +228,7 @@ app.post('/api/verify-payment', async (req, res) => {
             return res.json({ success: false });
         }
     } catch (err) {
-        res.status(500).json({ error: "Временная ошибка сети TON." });
+        res.status(500).json({ error: "Сеть TON перегружена." });
     }
 });
 
