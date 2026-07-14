@@ -32,7 +32,6 @@ app.use(express.json());
 
 // ---------------------------------------------------------------------------
 // НАСТРОЙКА КРОСС-ДОМЕННОГО ДОСТУПА (CORS) БЕЗ ВНЕШНИХ МОДУЛЕЙ
-// Предотвращает ошибки MODULE_NOT_FOUND на хостингах
 // ---------------------------------------------------------------------------
 app.use((req, res, next) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -46,18 +45,32 @@ app.use((req, res, next) => {
 });
 
 // ---------------------------------------------------------------------------
+// ОПТИМИЗАЦИЯ КЭШИРОВАНИЯ И АВТОМАТИЧЕСКИЙ СБРОС КЭША TELEGRAM
+// Блокирует кэш для кода, чтобы изменения сразу появлялись в приложении
+// ---------------------------------------------------------------------------
+app.use((req, res, next) => {
+    const url = req.url;
+    // Файлы кода всегда запрашиваются заново без сохранения старой сессии
+    if (url.endsWith('.html') || url.endsWith('.js') || url.endsWith('.css') || url === '/' || url === '/index.html') {
+        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
+        res.setHeader('Surrogate-Control', 'no-store');
+    }
+    next();
+});
+
+// ---------------------------------------------------------------------------
 // ВЫСОКОКЛАССНЫЙ СЕРВЕРНЫЙ КОМПИЛЯТОР BOC ДЛЯ ТЕКСТОВЫХ КОММЕНТАРИЕВ TON
-// Исключает ошибку: "Payload is invalid" (Index 0 > 0 is out of bounds)
+// Исключает ошибку: "Payload is invalid"
 // ---------------------------------------------------------------------------
 function serializeTextCommentBoc(text) {
     const textBytes = Buffer.from(text, 'utf8');
-    const payload = Buffer.concat([Buffer.alloc(4), textBytes]); // 4 нулевых байта префикса текстового сообщения
+    const payload = Buffer.concat([Buffer.alloc(4), textBytes]); 
 
-    const d1 = 0; // refs = 0, exotic = 0, level = 0
-    
-    // Каноническое выравнивание TVM: добавляем маркер заполнения (padding bit 1)
+    const d1 = 0; 
     const paddedPayload = Buffer.concat([payload, Buffer.from([0x80])]);
-    const d2 = payload.length * 2 + 1; // bits_descriptor: (floor(bits/8)*2) + 1 (маркер нечетных бит)
+    const d2 = payload.length * 2 + 1; 
 
     const cellData = Buffer.concat([
         Buffer.from([d1, d2]),
@@ -66,16 +79,15 @@ function serializeTextCommentBoc(text) {
 
     const cellContentLen = cellData.length;
 
-    // Сборка Single-Cell BOC
     const header = Buffer.from([
-        0xb5, 0xee, 0x9c, 0x72, // BOC Magic
-        0x01,                   // flags: has_idx=0, has_crc32c=0, size_bytes=1
-        0x01,                   // off_bytes = 1
-        0x01,                   // cell_count = 1
-        0x01,                   // root_count = 1
-        0x00,                   // absent_count = 0
-        cellContentLen,         // tot_cells_size
-        0x00                    // root_list (root index 0)
+        0xb5, 0xee, 0x9c, 0x72, 
+        0x01,                   
+        0x01,                   
+        0x01,                   
+        0x01,                   
+        0x00,                   
+        cellContentLen,         
+        0x00                    
     ]);
 
     return Buffer.concat([header, cellData]).toString('base64');
@@ -83,24 +95,23 @@ function serializeTextCommentBoc(text) {
 
 // ---------------------------------------------------------------------------
 // ДИНАМИЧЕСКИЙ МАНИФЕСТ С АБСОЛЮТНЫМИ ССЫЛКАМИ ПОД ВАШ ЛОГОТИП
-// Перенесен в самое начало для безупречной обработки TON Connect кошельками
 // ---------------------------------------------------------------------------
 app.get('/tonconnect-manifest.json', (req, res) => {
     const host = req.get('host');
-    const protocol = 'https'; // Всегда HTTPS для защиты TON Connect
+    const protocol = 'https'; 
     const appUrl = process.env.WEB_APP_URL || `${protocol}://${host}`;
     res.setHeader('Content-Type', 'application/json');
     res.setHeader('Access-Control-Allow-Origin', '*'); 
     res.json({
         "url": appUrl,
         "name": "BestGifts",
-        "iconUrl": `${appUrl}/Images/Logo/logotip.png`, // Ссылка на ваш логотип для кошелька
+        "iconUrl": `${appUrl}/Images/Logo/logotip.png`, 
         "termsOfUseUrl": appUrl,
         "privacyPolicyUrl": appUrl
     });
 });
 
-// КЛИЕНТСКИЙ АВАТАР-ПРОКСИ: Позволяет круглосуточно отображать фото профилей без обрыва сессий
+// КЛИЕНТСКИЙ АВАТАР-ПРОКСИ
 app.get('/api/avatar/:userId', async (req, res) => {
     const userId = req.params.userId;
     try {
@@ -116,15 +127,13 @@ app.get('/api/avatar/:userId', async (req, res) => {
     }
 });
 
-// ---------------------------------------------------------------------------
-// ПОДКЛЮЧЕНИЕ СТАТИЧЕСКИХ РЕСУРСОВ С КЕШИРОВАНИЕМ ДЛЯ МОМЕНТАЛЬНОЙ ЗАГРУЗКИ КАРТИНОК
-// ---------------------------------------------------------------------------
+// ПОДКЛЮЧЕНИЕ СТАТИЧЕСКИХ РЕСУРСОВ
 app.use(express.static(path.join(__dirname, 'public'), {
     maxAge: '1y',
     setHeaders: (res, filePath) => {
         res.setHeader('Access-Control-Allow-Origin', '*'); 
         if (filePath.endsWith('.png') || filePath.endsWith('.jpg') || filePath.endsWith('.jpeg') || filePath.endsWith('.gif') || filePath.endsWith('.webp')) {
-            res.setHeader('Cache-Control', 'public, max-age=31536000, immutable'); // Кеширование в браузере игрока на 1 год
+            res.setHeader('Cache-Control', 'public, max-age=31536000, immutable'); 
         }
     }
 }));
