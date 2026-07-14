@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>BestGifts</title>
-    <!-- CSS загружается в первую очередь для мгновенной отрисовки каркаса -->
-    <link rel="stylesheet" href="css/style.css">
+    <!-- CSS с уникальным версионным маркером для мгновенного сброса кэша Telegram -->
+    <link rel="stylesheet" href="css/style.css?v=2.0.2">
 </head>
 <body>
 
@@ -13,7 +13,7 @@
     <header class="main-header">
         <div class="header-left">
             <div class="logo-area">
-                <!-- Увеличенный круглый логотип BestGifts с мягким свечением -->
+                <!-- Увеличенный круглый логотип BestGifts -->
                 <img src="/Images/Logo/logotip.png" alt="BestGifts" class="logo-img-header" onerror="this.src='https://img.icons8.com/color/96/gift.png';">
                 <span class="logo-text">BESTGIFTS</span>
             </div>
@@ -35,16 +35,16 @@
             <h2>Добро пожаловать в BestGifts!</h2>
         </div>
 
-        <!-- НОВЫЙ БАННЕР ИГРЫ BEST ARENA С АНИМАЦИЕЙ БЕЗ НАДПИСЕЙ НА КАРТИНКЕ -->
+        <!-- БАННЕР ИГРЫ BEST ARENA (БЕЗ ТЕКСТА ОПИСАНИЯ И ЗНАЧКА LIVE) -->
         <div class="game-promo-banner" id="game-arena-trigger">
             <div class="game-info-side">
-                <div class="live-badge">LIVE ИГРА</div>
                 <h2 class="game-title">Best Arena</h2>
-                <p class="game-desc">Многопользовательское поле битвы полигонов</p>
             </div>
             <div class="game-animation-side">
                 <div class="arena-box">
-                    <div class="bouncing-ball"></div>
+                    <div class="ball-x-container">
+                        <div class="bouncing-ball"></div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -275,9 +275,7 @@
         </div>
     </div>
 
-    <!-- Загружаем SDK и файлы асинхронно, предотвращая любые задержки -->
-    <script src="https://telegram.org/js/telegram-web-app.js" defer></script>
-    <script src="https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js" defer></script>
-    <script src="js/app.js" defer></script>
+    <!-- Загружаем JS-скрипт с маркером версии против кэша -->
+    <script src="js/app.js?v=2.0.2" defer></script>
 </body>
-        </html>
+    </html>
