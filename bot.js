@@ -4,13 +4,13 @@ const pool = db.pool || db;
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
 
-// Инициализация синглтона для бота
+// Синглтон для исключения дублирования вебхуков в Node.js
 if (!global.botInstance) {
     global.botInstance = new TelegramBot(token, { polling: true });
 }
 const bot = global.botInstance;
 
-// --- ФУНКЦИЯ ПОЛУЧЕНИЯ СВЕЖЕЙ АВАТАРКИ ЧЕРЕЗ TELEGRAM API ---
+// --- ПОЛУЧЕНИЕ СВЕЖЕЙ АВАТАРКИ ПОЛЬЗОВАТЕЛЯ ЧЕРЕЗ API TELEGRAM ---
 async function getUserAvatarUrl(userId) {
     try {
         const photos = await bot.getUserProfilePhotos(userId, { limit: 1 });
@@ -25,7 +25,7 @@ async function getUserAvatarUrl(userId) {
     return null;
 }
 
-// --- ФУНКЦИЯ ПРОВЕРКИ ПОДПИСКИ ПОЛЬЗОВАТЕЛЯ НА КАНАЛ ---
+// --- ПРОВЕРКА ПОДПИСКИ ПОЛЬЗОВАТЕЛЯ НА ТЕЛЕГРАМ КАНАЛ ---
 async function checkUserSubscription(userId) {
     try {
         const channelUsername = process.env.CHANNEL_USERNAME;
@@ -52,7 +52,7 @@ bot.on('callback_query', async (callbackQuery) => {
         return; 
     }
 
-    // Мгновенно убираем часики загрузки у администратора
+    // Мгновенно скрываем индикатор загрузки кнопки у администратора
     bot.answerCallbackQuery(queryId).catch(() => {});
 
     const parts = actionData.split('_');
