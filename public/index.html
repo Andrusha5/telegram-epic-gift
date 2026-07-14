@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>BestGifts</title>
-    <!-- Версионный маркер ?v=2.0.7 гарантирует моментальный сброс кэша в Telegram -->
-    <link rel="stylesheet" href="css/style.css?v=2.0.7">
+    <!-- Версионный маркер ?v=2.0.8 гарантирует моментальный сброс кэша в Telegram -->
+    <link rel="stylesheet" href="css/style.css?v=2.0.8">
 </head>
 <body>
 
@@ -13,7 +13,6 @@
     <header class="main-header">
         <div class="header-left">
             <div class="logo-area">
-                <!-- Увеличенный круглый логотип BestGifts -->
                 <img src="/Images/Logo/logotip.png" alt="BestGifts" class="logo-img-header" onerror="this.src='https://img.icons8.com/color/96/gift.png';">
                 <span class="logo-text">BESTGIFTS</span>
             </div>
@@ -30,7 +29,6 @@
 
     <!-- ================= 1. ГЛАВНЫЙ ЭКРАН (МЕНЮ) ================= -->
     <section id="home-section" class="app-section">
-        <!-- ПРИВЕТСТВЕННЫЙ БАННЕР -->
         <div class="welcome-banner">
             <h2>Добро пожаловать в BestGifts!</h2>
         </div>
@@ -51,9 +49,7 @@
 
         <h2 class="section-title">КЕЙСЫ</h2>
         
-        <!-- СЕТКА КЕЙСОВ -->
         <div class="cases-grid-layout" id="banners-container">
-            <!-- Ежедневный бесплатный кейс -->
             <div class="case-card" id="daily-case-banner">
                 <div class="case-badge free">Бесплатно</div>
                 <div class="case-image-wrapper">
@@ -64,7 +60,6 @@
                 </div>
             </div>
 
-            <!-- Кейс новичка -->
             <div class="case-card" id="newbie-case-banner">
                 <div class="case-badge paid">0.1 GRAM</div>
                 <div class="case-image-wrapper">
@@ -75,7 +70,6 @@
                 </div>
             </div>
 
-            <!-- Кейс бомжа -->
             <div class="case-card locked" id="bomzh-case-banner">
                 <div class="case-badge locked-badge">Скоро</div>
                 <div class="case-image-wrapper">
@@ -86,7 +80,6 @@
                 </div>
             </div>
 
-            <!-- Кейс крутого -->
             <div class="case-card locked" id="krutoy-case-banner">
                 <div class="case-badge locked-badge">Скоро</div>
                 <div class="case-image-wrapper">
@@ -111,22 +104,18 @@
             <div style="width:46px;"></div>
         </div>
 
-        <!-- Рулетка прокрутки -->
         <div class="roulette-viewport">
             <div class="roulette-marker"></div>
             <div class="roulette-track" id="roulette-track"></div>
         </div>
 
-        <!-- Кнопка вращения -->
         <div class="spin-controls">
             <button class="spin-btn" id="spin-case-button">Запустить</button>
-            <!-- Таймер ежедневного кейса -->
             <div id="timer-container" class="timer-box hidden">
                 Возвращайтесь через: <span id="daily-case-timer">24ч 00м 00с</span>
             </div>
         </div>
 
-        <!-- Список наград -->
         <div id="rewards-section-container" class="rewards-section">
             <h3 id="rewards-grid-title" class="sub-title">🏆 Содержимое кейса</h3>
             <div class="rewards-grid" id="rewards-grid"></div>
@@ -146,24 +135,23 @@
         </div>
 
         <div class="arena-game-container">
+            <!-- УВЕЛИЧЕННОЕ ИГРОВОЕ ПОЛЕ ДО 320x320px -->
             <div class="arena-big-box" id="arena-box-container">
-                <!-- Контейнер для динамических SVG-сегментов игроков -->
+                <!-- SVG-холст для динамической отрисовки сегментов и катящегося шара -->
                 <svg id="arena-svg-canvas" class="arena-canvas"></svg>
                 
-                <!-- Внутренняя сетка игрового поля -->
                 <div class="arena-grid-overlay"></div>
                 
-                <!-- Строго центрированная неоновая надпись -->
+                <!-- Строго центрированный неоновый текст ожидания -->
                 <div class="arena-waiting-text" id="arena-status-text">Ждем ставки...</div>
                 
-                <!-- Элемент круглого таймера по центру (изначально скрыт) -->
+                <!-- Строго центрированный неоновый таймер БЕЗ ЧЕРНОГО КРУГА -->
                 <div class="arena-timer-circle hidden" id="arena-countdown-timer">15</div>
 
-                <!-- Контейнер для аватарок поверх секторов -->
                 <div class="arena-avatars-overlay" id="arena-avatars-container"></div>
             </div>
 
-            <!-- БЛОК ПАНЕЛИ СТАВОК (КВАДРАТНЫЕ АККУРАТНЫЕ КНОПКИ С СКРУГЛЕННЫМИ УГЛАМИ) -->
+            <!-- КВАДРАТНЫЕ КНОПКИ СТАВОК СО СКРУГЛЕННЫМИ УГЛАМИ -->
             <div class="betting-row">
                 <button class="bet-edit-btn" id="bet-edit-trigger">
                     <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
@@ -188,10 +176,8 @@
 
     <!-- ================= 4. ЭКРАН ИНВЕНТАРЯ ================= -->
     <section id="inventory-section" class="app-section hidden">
-        <!-- Сетка предметов -->
         <div class="inventory-grid" id="inventory-grid"></div>
 
-        <!-- БЛОК ДЕПОЗИТА ПОДАРКОВ (NFT) -->
         <div class="deposit-gift-box">
             <div class="deposit-header-row">
                 <span class="deposit-box-icon">📥</span>
@@ -288,7 +274,7 @@
         </nav>
     </div>
 
-    <!-- МОДАЛЬНОЕ ОКНО НАСТРОЙКИ СТАВОК (ОГРАНИЧЕНИЕ 3 ЦИФРЫ ПОСЛЕ ЗАПЯТОЙ) -->
+    <!-- МОДАЛЬНОЕ ОКНО НАСТРОЙКИ СТАВОК -->
     <div id="edit-bets-modal" class="modal-overlay hidden">
         <div class="modal-card">
             <button class="modal-close-x" id="edit-bets-close-btn">&times;</button>
@@ -316,7 +302,6 @@
         </div>
     </div>
 
-    <!-- МОДАЛЬНОЕ ОКНО ДЛЯ ВВОДА СУММЫ ДЕПОЗИТА -->
     <div id="deposit-amount-modal" class="modal-overlay hidden">
         <div class="modal-card">
             <button class="modal-close-x" id="deposit-modal-close-btn">&times;</button>
@@ -333,7 +318,6 @@
         </div>
     </div>
 
-    <!-- ОБЩЕЕ СИСТЕМНОЕ МОДАЛЬНОЕ ОКНО -->
     <div id="custom-modal" class="modal-overlay hidden">
         <div class="modal-card">
             <button class="modal-close-x" id="modal-close-btn">&times;</button>
@@ -344,9 +328,10 @@
         </div>
     </div>
 
-    <!-- Telegram SDK и TON Connect SDK подключены перед скриптом -->
+    <div id="toast-container" class="toast-container"></div>
+
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>
-    <script src="js/app.js?v=2.0.7" defer></script>
+    <script src="js/app.js?v=2.0.8" defer></script>
 </body>
-    </html>
+                                                                                                                                                                        </html>
