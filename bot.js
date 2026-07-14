@@ -4,7 +4,6 @@ const pool = db.pool || db;
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
 
-// Инициализация синглтона бота
 if (!global.botInstance) {
     global.botInstance = new TelegramBot(token, { polling: true });
 }
@@ -52,7 +51,6 @@ bot.on('callback_query', async (callbackQuery) => {
         return; 
     }
 
-    // Мгновенно убираем часики загрузки у администратора
     bot.answerCallbackQuery(queryId).catch(() => {});
 
     const parts = actionData.split('_');
@@ -65,7 +63,6 @@ bot.on('callback_query', async (callbackQuery) => {
         client = await pool.connect();
         await client.query('BEGIN');
 
-        // Получаем информацию о предмете
         const itemRes = await client.query('SELECT name, value FROM items WHERE id = $1', [targetItemId]);
         const item = itemRes.rows[0];
 
@@ -76,13 +73,11 @@ bot.on('callback_query', async (callbackQuery) => {
         }
 
         if (action === 'app') {
-            // Гарантируем, что пользователь создан в таблице users
             await client.query(
                 `INSERT INTO users (id, first_name, balance) VALUES ($1, $2, 0) ON CONFLICT (id) DO NOTHING`,
                 [targetUserId, 'Пользователь']
             );
 
-            // Добавляем подарок в инвентарь
             const checkInv = await client.query(
                 'SELECT quantity FROM user_inventory WHERE user_id = $1 AND item_id = $2',
                 [targetUserId, targetItemId]
@@ -102,13 +97,11 @@ bot.on('callback_query', async (callbackQuery) => {
 
             await client.query('COMMIT');
 
-            // Редактируем сообщение для админа, сохраняя вечную ссылку
             await bot.editMessageText(
                 message.text + `\n\n🟢 <b>Статус:</b> ЗАЯВКА ОДОБРЕНА (Предмет передан)`,
                 { chat_id: message.chat.id, message_id: message.message_id, parse_mode: 'HTML' }
             ).catch(() => {});
 
-            // Отправляем игроку уведомление
             const userMsg = `📥 <b>Ваш депозит подтвержден!</b>\n\n` +
                             `🎁 Подарок <b>${item.name}</b> успешно добавлен в ваш инвентарь.\n` +
                             `🎒 Откройте «Инвентарь» в приложении, чтобы распорядиться им!`;
