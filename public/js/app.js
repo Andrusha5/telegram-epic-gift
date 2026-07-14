@@ -1,8 +1,18 @@
-const tg = window.Telegram.WebApp;
+// --- БЕЗОПАСНЫЙ СЛОЙ ИНИЦИАЛИЗАЦИИ SDK ТЕЛЕГРАМ ---
+// Защищает скрипт от любых падений в случае задержки загрузки CDN-скриптов
+const tg = (window.Telegram && window.Telegram.WebApp) ? window.Telegram.WebApp : {
+    expand: () => {},
+    ready: () => {},
+    initData: "",
+    initDataUnsafe: { user: { id: "guest_user_id", username: "Пользователь", first_name: "Пользователь" } },
+    openLink: (url) => window.open(url, '_blank'),
+    openTelegramLink: (url) => window.open(url, '_blank')
+};
+
 tg.expand();
 tg.ready();
 
-// Ограничивает длину юзернейма до 15 символов, предотвращая сдвиг хедера
+// Ограничивает длину юзернейма ровно до 15 символов
 function formatUsername(name) {
     if (!name) return "Пользователь";
     return name.length > 15 ? name.substring(0, 15) + "..." : name;
@@ -33,7 +43,7 @@ function formatWalletAddress(rawAddress) {
     return friendly.substring(0, 4) + "-..." + friendly.substring(friendly.length - 4);
 }
 
-// Загружает файлы картинок в кэш устройства
+// Фоновый предзагрузчик изображений в локальную память телефона
 function preloadImages(urls) {
     urls.forEach(url => {
         const img = new Image();
@@ -46,6 +56,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     let currentUser = {};
     let isNewbieCaseMode = false; 
     const GRAMCOIN_ICON_URL = "/Images/Items/gram_popolnenie.png"; 
+
+    // --- МГНОВЕННОЕ УСТРАНЕНИЕ СЕРОГО ЭКРАНА С НАДПИСЬЮ "Загрузка..." ---
+    const safeSetText = (el, val) => { if (el) el.innerText = val; };
+    const initialName = tg.initDataUnsafe?.user?.username || tg.initDataUnsafe?.user?.first_name || "Пользователь";
+    safeSetText(document.getElementById('user-username'), formatUsername(initialName));
 
     let userId = tg.initDataUnsafe?.user?.id;
     if (!userId) {
@@ -63,6 +78,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         inventorySection: document.getElementById('inventory-section'),
         ratingSection: document.getElementById('rating-section'), 
         balanceSection: document.getElementById('balance-section'), 
+        arenaSection: document.getElementById('arena-section'), // Новый элемент
         rouletteTrack: document.getElementById('roulette-track'),
         spinBtn: document.getElementById('spin-case-button'),
         balanceDisplayPill: document.getElementById('user-balance-pill-value'),
@@ -89,10 +105,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         adminTgChatTrigger: document.getElementById('admin-tg-chat-trigger')
     };
 
-    const safeSetText = (el, val) => { if (el) el.innerText = val; };
-
     // -----------------------------------------------------------------------
-    // ОПТИМИЗАЦИЯ СКОРОСТИ ЗАПУСКА: Загрузка из LocalStorage
+    // МГНОВЕННЫЙ ИМПОРТ ИЗ ЛОКАЛЬНОГО КЭША (Для моментальной загрузки UI)
     // -----------------------------------------------------------------------
     function loadCachedUserData() {
         try {
@@ -108,12 +122,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if (mainAvatar) {
                     mainAvatar.src = cache.avatar_url || `${API_BASE_URL}/api/avatar/${userId}`;
                 }
-            } else {
-                const rawName = tg.initDataUnsafe?.user?.username || tg.initDataUnsafe?.user?.first_name || "Пользователь";
-                safeSetText(document.getElementById('user-username'), formatUsername(rawName));
             }
         } catch (e) {
-            console.error("Cache read error", e);
+            console.error("Ошибка при чтении кэша профиля:", e);
         }
     }
 
@@ -123,7 +134,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         } catch (e) {}
     }
 
-    // Запускаем мгновенный импорт сохраненного профиля
+    // Сразу считываем кэш, избавляя приложение от любых задержек при старте
     loadCachedUserData();
 
     function showNotification(message, icon = '🎁') {
@@ -366,11 +377,24 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    // Перенаправление на игру Best Arena
+    // Перенаправление на новую вкладку игры Best Arena
     const gameTrigger = document.getElementById('game-arena-trigger');
     if (gameTrigger) {
         gameTrigger.addEventListener('click', () => {
-            showNotification("Игра Best Arena находится в разработке!", "⏳");
+            navigateTo('arena');
+        });
+    }
+
+    const backFromArena = document.getElementById('back-to-home-from-arena');
+    if (backFromArena) {
+        backFromArena.addEventListener('click', () => {
+            navigateTo('home');
+        });
+    }
+
+    if (elements.adminTgChatTrigger) {
+        elements.adminTgChatTrigger.addEventListener('click', () => {
+            tg.openTelegramLink("https://t.me/Sintopa");
         });
     }
 
@@ -430,7 +454,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     function navigateTo(target) {
         const sections = [
             elements.homeSection, elements.caseSection, elements.inventorySection, 
-            elements.ratingSection, elements.balanceSection
+            elements.ratingSection, elements.balanceSection, elements.arenaSection // Добавлен в список
         ];
         sections.forEach(s => { if (s) s.classList.add('hidden'); });
         
@@ -454,6 +478,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (elements.caseSection) elements.caseSection.classList.remove('hidden');
             if (elements.bottomNavigation) elements.bottomNavigation.classList.add('hidden'); 
             initRouletteTrack();
+        } else if (target === 'arena') { // Навигация на арену
+            if (elements.arenaSection) elements.arenaSection.classList.remove('hidden');
+            if (elements.bottomNavigation) elements.bottomNavigation.classList.add('hidden');
         }
     }
 
