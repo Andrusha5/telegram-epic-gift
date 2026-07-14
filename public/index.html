@@ -17,7 +17,8 @@
     <header class="main-header">
         <div class="header-left">
             <div class="logo-area">
-                <span class="logo-icon">🎁</span>
+                <!-- Логотип BestGifts вместо эмодзи подарка -->
+                <img src="/Images/Logo/logotip.png" alt="BestGifts" class="logo-img-header" onerror="this.src='https://img.icons8.com/color/96/gift.png';">
                 <span class="logo-text">BESTGIFTS</span>
             </div>
             <div class="user-profile-pill">
@@ -46,7 +47,7 @@
             <div class="case-card" id="daily-case-banner">
                 <div class="case-badge free">Бесплатно</div>
                 <div class="case-image-wrapper">
-                    <img src="/Images/Cases/freebox.png" onerror="this.src='https://img.icons8.com/color/96/gift.png';" alt="Ежедневный кейс">
+                    <img src="/Images/Cases/freebox.png" loading="lazy" onerror="this.src='https://img.icons8.com/color/96/gift.png';" alt="Ежедневный кейс">
                 </div>
                 <div class="case-info">
                     <span class="case-name">Ежедневный кейс</span>
@@ -57,7 +58,7 @@
             <div class="case-card" id="newbie-case-banner">
                 <div class="case-badge paid">0.1 GRAM</div>
                 <div class="case-image-wrapper">
-                    <img src="/Images/Cases/keysnovichka.png" onerror="this.src='https://img.icons8.com/color/96/gift.png';" alt="Кейс новичка">
+                    <img src="/Images/Cases/keysnovichka.png" loading="lazy" onerror="this.src='https://img.icons8.com/color/96/gift.png';" alt="Кейс новичка">
                 </div>
                 <div class="case-info">
                     <span class="case-name">Кейс новичка</span>
@@ -68,7 +69,7 @@
             <div class="case-card locked" id="bomzh-case-banner">
                 <div class="case-badge locked-badge">Скоро</div>
                 <div class="case-image-wrapper">
-                    <img src="/Images/Cases/bomzh.png" onerror="this.src='https://img.icons8.com/color/96/beggar.png';" alt="Кейс бомжа">
+                    <img src="/Images/Cases/bomzh.png" loading="lazy" onerror="this.src='https://img.icons8.com/color/96/beggar.png';" alt="Кейс бомжа">
                 </div>
                 <div class="case-info">
                     <span class="case-name">Кейс бомжа</span>
@@ -79,7 +80,7 @@
             <div class="case-card locked" id="krutoy-case-banner">
                 <div class="case-badge locked-badge">Скоро</div>
                 <div class="case-image-wrapper">
-                    <img src="/Images/Cases/krutoy.png" onerror="this.src='https://img.icons8.com/color/96/cool.png';" alt="Кейс крутого">
+                    <img src="/Images/Cases/krutoy.png" loading="lazy" onerror="this.src='https://img.icons8.com/color/96/cool.png';" alt="Кейс крутого">
                 </div>
                 <div class="case-info">
                     <span class="case-name">Кейс крутого</span>
@@ -95,7 +96,7 @@
                 <svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
             </button>
             <div class="header-title-container">
-                <span class="logo-icon-small">🎁</span>
+                <img src="/Images/Logo/logotip.png" alt="Logo" class="logo-img-header-small">
                 <h1 id="case-page-main-title" class="case-title">Ежедневный кейс</h1>
             </div>
             <div style="width:46px;"></div>
@@ -128,7 +129,7 @@
         <!-- Сетка предметов -->
         <div class="inventory-grid" id="inventory-grid"></div>
 
-        <!-- БЛОК ДЕПОЗИТА ПОДАРКОВ (СТИЛЬ СКРИНШОТА) -->
+        <!-- БЛОК ДЕПОЗИТА ПОДАРКОВ (NFT) -->
         <div class="deposit-gift-box">
             <div class="deposit-header-row">
                 <span class="deposit-box-icon">📥</span>
@@ -267,4 +268,4 @@
     <!-- Главный JS файл приложения -->
     <script src="js/app.js"></script>
 </body>
-                </html>
+                    </html>
