@@ -11,7 +11,6 @@ const tg = (window.Telegram && window.Telegram.WebApp) ? window.Telegram.WebApp 
 tg.expand();
 tg.ready();
 
-// Ограничивает длину юзернейма ровно до 15 символов
 function formatUsername(name) {
     if (!name) return "Пользователь";
     return name.length > 15 ? name.substring(0, 15) + "..." : name;
@@ -42,7 +41,6 @@ function formatWalletAddress(rawAddress) {
     return friendly.substring(0, 4) + "-..." + friendly.substring(friendly.length - 4);
 }
 
-// Фоновый предзагрузчик изображений в локальную память телефона
 function preloadImages(urls) {
     urls.forEach(url => {
         const img = new Image();
@@ -112,7 +110,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         adminTgChatTrigger: document.getElementById('admin-tg-chat-trigger')
     };
 
-    // Загрузка кастомных конфигураций ставок из localStorage
     function loadSavedBets() {
         try {
             const saved = localStorage.getItem(`custom_bets_${userId}`);
@@ -124,7 +121,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    // Загрузка профиля из локального кэша для снижения лагов
+    // Восстановление аватара пользователя из кэша
     function loadCachedUserData() {
         try {
             const cachedData = localStorage.getItem(`user_cache_${userId}`);
@@ -138,6 +135,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const mainAvatar = document.getElementById('user-avatar');
                 if (mainAvatar) {
                     mainAvatar.src = cache.avatar_url || `${API_BASE_URL}/api/avatar/${userId}`;
+                    mainAvatar.onerror = () => { mainAvatar.src = "https://img.icons8.com/color/96/user.png"; };
                 }
             }
         } catch (e) {
@@ -293,7 +291,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         console.error("TON Connect Error:", err);
     }
 
-    // Модальное пополнение баланса
+    // Модалка пополнения
     if (elements.depositBalanceBtn) {
         elements.depositBalanceBtn.addEventListener('click', () => {
             if (elements.depositAmountModal) {
@@ -364,7 +362,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         checkCount++;
                         if (checkCount > 15) {
                             clearInterval(checkInterval);
-                            showNotification("Баланс обновится автоматически при подтверждении сетью TON.", "⏳");
+                            showNotification("Баланс обновится при подтверждении сетью TON.", "⏳");
                             return;
                         }
 
@@ -409,22 +407,22 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    // Цвета для игроков (Красивые яркие неоновые оттенки)
+    // Случайные неоновые цвета
     const PLAYER_NEON_COLORS = [
-        '#00e676', // Зеленый
-        '#0088cc', // Синий
-        '#ff3d00', // Оранжевый
-        '#e040fb', // Фиолетовый
-        '#ffd600', // Желтый
+        '#d500f9', // Фиолетовый
         '#00e5ff', // Бирюзовый
-        '#ff1744'  // Красный
+        '#ffd600', // Желтый
+        '#00e676', // Зеленый
+        '#ff1744', // Красный
+        '#ff9100', // Оранжевый
+        '#2979ff'  // Синий
     ];
 
-    function getRandomColor(index) {
-        return PLAYER_NEON_COLORS[index % PLAYER_NEON_COLORS.length];
+    function getRandomColor() {
+        return PLAYER_NEON_COLORS[Math.floor(Math.random() * PLAYER_NEON_COLORS.length)];
     }
 
-    // Генерация и построение многоугольных сегментов поля в SVG
+    // Динамический рендеринг сегментов в зависимости от суммы ставок (Пропорционально)
     function drawArenaSegments() {
         const svg = document.getElementById('arena-svg-canvas');
         const avatarsContainer = document.getElementById('arena-avatars-container');
@@ -438,136 +436,41 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         const W = 280;
         const H = 280;
-        const cx = W / 2;
-        const cy = H / 2;
 
-        if (N === 1) {
-            // 1 Игрок: Поле полностью закрашено одним цветом
+        // Расчет общей суммы ставок в текущем раунде
+        const totalBetSum = arenaPlayers.reduce((sum, p) => sum + parseFloat(p.bet), 0);
+
+        let currentX = 0;
+
+        arenaPlayers.forEach((player, index) => {
+            // Расчет процентной доли игрока на поле
+            const percentage = totalBetSum > 0 ? (parseFloat(player.bet) / totalBetSum) : (1 / N);
+            const segmentWidth = W * percentage;
+
+            // Рендеринг сегмента в виде прямоугольника
             const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-            rect.setAttribute("width", "100%");
+            rect.setAttribute("x", currentX.toFixed(1));
+            rect.setAttribute("y", "0");
+            rect.setAttribute("width", segmentWidth.toFixed(1));
             rect.setAttribute("height", "100%");
-            rect.setAttribute("fill", arenaPlayers[0].color);
+            rect.setAttribute("fill", player.color);
             svg.appendChild(rect);
 
-            // Аватарка по центру
-            createAvatarElement(cx, cy, arenaPlayers[0].avatar);
-            return;
-        }
+            // Определение центральной точки для размещения аватарки
+            const centerX = currentX + (segmentWidth / 2);
+            const centerY = H / 2;
 
-        if (N === 2) {
-            // 2 Игрока: Поле красиво делится пополам по диагонали
-            const poly1 = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
-            poly1.setAttribute("points", `0,0 ${W},0 0,${H}`);
-            poly1.setAttribute("fill", arenaPlayers[0].color);
-            svg.appendChild(poly1);
+            // Динамический размер аватарки (не более 64px и не менее 16px, масштабируется по ширине сегмента)
+            const calculatedAvatarSize = Math.min(64, Math.max(16, segmentWidth * 0.4));
 
-            const poly2 = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
-            poly2.setAttribute("points", `${W},0 ${W},${H} 0,${H}`);
-            poly2.setAttribute("fill", arenaPlayers[1].color);
-            svg.appendChild(poly2);
+            // Добавление аватарки в контейнер
+            createAvatarElement(centerX, centerY, player.avatar, calculatedAvatarSize);
 
-            // Размещение аватарок на серединах сегментов
-            createAvatarElement(W * 0.33, H * 0.33, arenaPlayers[0].avatar);
-            createAvatarElement(W * 0.66, H * 0.66, arenaPlayers[1].avatar);
-            return;
-        }
-
-        // 3 и более игроков: Равные сектора от центра к краям квадрата
-        const corners = [
-            { x: W, y: 0 },   // Top Right
-            { x: W, y: H },   // Bottom Right
-            { x: 0, y: H },   // Bottom Left
-            { x: 0, y: 0 }    // Top Left
-        ];
-
-        // Нахождение пересечения луча из центра с рамкой квадрата W x H
-        function getSquareIntersection(angle) {
-            const cos = Math.cos(angle);
-            const sin = Math.sin(angle);
-            let tMin = Infinity;
-            let targetX = cx;
-            let targetY = cy;
-
-            // Пересечение с границами x=0, x=W, y=0, y=H
-            const sides = [
-                { x1: 0, y1: 0, x2: 0, y2: H },
-                { x1: W, y1: 0, x2: W, y2: H },
-                { x1: 0, y1: 0, x2: W, y2: 0 },
-                { x1: 0, y1: H, x2: W, y2: H }
-            ];
-
-            for (const s of sides) {
-                const den = (s.x1 - s.x2) * sin - (s.y1 - s.y2) * cos;
-                if (Math.abs(den) < 1e-6) continue;
-                const t = ((s.x1 - cx) * (s.y1 - s.y2) - (s.y1 - cy) * (s.x1 - s.x2)) / den;
-                if (t > 0 && t < tMin) {
-                    tMin = t;
-                    targetX = cx + t * cos;
-                    targetY = cy + t * sin;
-                }
-            }
-            return { x: targetX, y: targetY };
-        }
-
-        // Получение углов секторов
-        const angles = [];
-        for (let i = 0; i <= N; i++) {
-            angles.push((i * 2 * Math.PI) / N - Math.PI / 2);
-        }
-
-        for (let i = 0; i < N; i++) {
-            const aStart = angles[i];
-            const aEnd = angles[i + 1];
-
-            const pStart = getSquareIntersection(aStart);
-            const pEnd = getSquareIntersection(aEnd);
-
-            // Формируем точки для многоугольника
-            const points = [{ x: cx, y: cy }, pStart];
-
-            // Нам нужно добавить угловые точки квадрата, если сектор охватывает их
-            const cornerAngles = [
-                { angle: Math.atan2(-cy, cx), pt: corners[0] }, // ~ -45deg
-                { angle: Math.atan2(cy, cx), pt: corners[1] },  // ~ 45deg
-                { angle: Math.atan2(cy, -cx), pt: corners[2] }, // ~ 135deg
-                { angle: Math.atan2(-cy, -cx), pt: corners[3] } // ~ -135deg
-            ];
-
-            // Нормализуем углы к диапазону [aStart, aEnd]
-            cornerAngles.forEach(c => {
-                let normA = c.angle;
-                while (normA < aStart) normA += 2 * Math.PI;
-                while (normA > aEnd) normA -= 2 * Math.PI;
-
-                if (normA >= aStart && normA <= aEnd) {
-                    points.push(c.pt);
-                }
-            });
-
-            points.push(pEnd);
-
-            // Создаем SVG элемент полигона
-            const polygon = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
-            const ptsStr = points.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
-            polygon.setAttribute("points", ptsStr);
-            polygon.setAttribute("fill", arenaPlayers[i].color);
-            svg.appendChild(polygon);
-
-            // Вычисляем среднюю точку (центроид) полигона для размещения аватарки
-            let sumX = 0, sumY = 0;
-            points.forEach(p => { sumX += p.x; sumY += p.y; });
-            const avgX = sumX / points.length;
-            const avgY = sumY / points.length;
-
-            // Сдвиг аватарок ближе к краю от центра для лучшей читаемости
-            const fX = cx + (avgX - cx) * 1.15;
-            const fY = cy + (avgY - cy) * 1.15;
-
-            createAvatarElement(fX, fY, arenaPlayers[i].avatar);
-        }
+            currentX += segmentWidth;
+        });
     }
 
-    function createAvatarElement(x, y, src) {
+    function createAvatarElement(x, y, src, size) {
         const container = document.getElementById('arena-avatars-container');
         if (!container) return;
         const img = document.createElement('img');
@@ -575,11 +478,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         img.src = src;
         img.style.left = `${x}px`;
         img.style.top = `${y}px`;
+        img.style.width = `${size}px`;
+        img.style.height = `${size}px`;
         img.onerror = () => { img.src = "https://img.icons8.com/color/96/user.png"; };
         container.appendChild(img);
     }
 
-    // Рендер и адаптация кнопок быстрых ставок
     function renderBetButtons() {
         const balance = parseFloat(currentUser.balance || 0);
         for (let i = 0; i < 3; i++) {
@@ -600,7 +504,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    // Инициализация запуска таймера арены
     function startArenaTimer() {
         if (arenaCountdownInterval) return;
 
@@ -620,9 +523,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (arenaCountdownTime <= 0) {
                 clearInterval(arenaCountdownInterval);
                 arenaCountdownInterval = null;
-                // Фаза завершения раунда / Начало игры
                 if (countdownTimer) countdownTimer.innerText = "🏁";
-                showNotification("Игра началась! Определяем победителя...", "🎮");
+                showNotification("Определяем победителя...", "🎮");
                 
                 setTimeout(() => {
                     resetArenaGame();
@@ -631,7 +533,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         }, 1000);
     }
 
-    // Сброс арены в исходное состояние
     function resetArenaGame() {
         clearInterval(arenaCountdownInterval);
         arenaCountdownInterval = null;
@@ -655,10 +556,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         renderBetButtons();
     }
 
-    // Обработчик события нажатия на ставку
+    // Мгновенный клик без задержек на мобильных устройствах
     const handleBetClick = async (e) => {
         if (hasUserBet) {
-            showNotification("Вы уже сделали ставку в этом раунде!", "🎮");
+            showNotification("Вы уже сделали ставку!", "🎮");
             return;
         }
 
@@ -683,45 +584,45 @@ document.addEventListener('DOMContentLoaded', async () => {
             const data = await res.json();
             
             if (res.ok && data.success) {
-                showNotification(`Ставка принята: -${betValue} GRAM`, "🎮");
+                showNotification(`Ставка сделана: -${betValue} GRAM`, "🎮");
                 currentUser.balance = data.newBalance;
                 updateBalanceUI();
                 hasUserBet = true;
 
-                // Добавление текущего пользователя на поле
+                // Добавление первого игрока (Вас)
                 const myAvatar = document.getElementById('user-avatar')?.src || "https://img.icons8.com/color/96/user.png";
                 arenaPlayers.push({
                     id: userId,
-                    name: "Вы",
                     avatar: myAvatar,
-                    color: getRandomColor(0)
+                    bet: betValue,
+                    color: getRandomColor()
                 });
 
                 drawArenaSegments();
 
-                // Симуляция входа 2-го игрока через 1.5 секунды для демонстрации разделения
+                // Симуляция входа 2-го игрока через 1.5 сек (Ставка 0.5)
                 setTimeout(() => {
                     arenaPlayers.push({
                         id: "bot_1",
-                        name: "Sintopa",
                         avatar: "https://img.icons8.com/color/96/user-male-circle.png",
-                        color: getRandomColor(1)
+                        bet: 0.5,
+                        color: getRandomColor()
                     });
                     drawArenaSegments();
-                    showNotification("Sintopa вошел в игру!", "🎮");
-                    startArenaTimer(); // Запуск таймера, так как теперь игроков больше 1
+                    showNotification("Игрок Sintopa сделал ставку!", "🎮");
+                    startArenaTimer(); 
                 }, 1500);
 
-                // Симуляция входа 3-го игрока через 4 секунды
+                // Симуляция входа 3-го игрока через 4 сек (Ставка 2.5)
                 setTimeout(() => {
                     arenaPlayers.push({
                         id: "bot_2",
-                        name: "CryptoKing",
                         avatar: "https://img.icons8.com/color/96/administrator-male.png",
-                        color: getRandomColor(2)
+                        bet: 2.5,
+                        color: getRandomColor()
                     });
                     drawArenaSegments();
-                    showNotification("CryptoKing сделал ставку!", "🎮");
+                    showNotification("Игрок CryptoKing сделал ставку!", "🎮");
                 }, 4000);
 
             } else {
@@ -729,7 +630,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 fetchUserData();
             }
         } catch (err) {
-            showNotification("Ошибка связи", "⚠️");
+            showNotification("Ошибка связи с сервером", "⚠️");
             fetchUserData();
         } finally {
             renderBetButtons();
@@ -740,7 +641,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('bet-btn-2').addEventListener('click', handleBetClick);
     document.getElementById('bet-btn-3').addEventListener('click', handleBetClick);
 
-    // Модалка настройки ставок
+    // Модалка настройки ставок с валидацией до 3 знаков
     const editBetsModal = document.getElementById('edit-bets-modal');
     const betEditTrigger = document.getElementById('bet-edit-trigger');
     const editBetsClose = document.getElementById('edit-bets-close-btn');
@@ -763,11 +664,30 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (editBetsClose) editBetsClose.addEventListener('click', closeEditBetsModal);
     if (cancelBetsBtn) cancelBetsBtn.addEventListener('click', closeEditBetsModal);
 
+    // Слушатели ввода полей для ограничения 3 знаков после запятой на лету
+    const enforceThreeDecimals = (e) => {
+        const value = e.target.value;
+        if (value.includes('.')) {
+            const parts = value.split('.');
+            if (parts[1].length > 3) {
+                e.target.value = parseFloat(value).toFixed(3);
+            }
+        }
+    };
+    document.getElementById('bet-input-1').addEventListener('input', enforceThreeDecimals);
+    document.getElementById('bet-input-2').addEventListener('input', enforceThreeDecimals);
+    document.getElementById('bet-input-3').addEventListener('input', enforceThreeDecimals);
+
     if (saveBetsBtn) {
         saveBetsBtn.addEventListener('click', () => {
-            const b1 = parseFloat(document.getElementById('bet-input-1').value);
-            const b2 = parseFloat(document.getElementById('bet-input-2').value);
-            const b3 = parseFloat(document.getElementById('bet-input-3').value);
+            let b1 = parseFloat(document.getElementById('bet-input-1').value);
+            let b2 = parseFloat(document.getElementById('bet-input-2').value);
+            let b3 = parseFloat(document.getElementById('bet-input-3').value);
+
+            // Финальное жесткое округление до 3 знаков после запятой
+            b1 = parseFloat(b1.toFixed(3));
+            b2 = parseFloat(b2.toFixed(3));
+            b3 = parseFloat(b3.toFixed(3));
 
             if (isNaN(b1) || b1 < 0.1 || isNaN(b2) || b2 < 0.1 || isNaN(b3) || b3 < 0.1) {
                 showNotification("Сумма ставки не может быть менее 0.1 GRAM!", "⚠️");
@@ -830,7 +750,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         { id: 118, name: "Пополнение 0.005 GRAM (Новичок)", icon: GRAMCOIN_ICON_URL, price: "0.005 GRAM", rawPrice: 0.005, isGold: false, type: "balance" }
     ];
 
-    // Кэширование изображений
     const allImagesToPreload = [
         "/Images/Logo/logotip.png",
         GRAMCOIN_ICON_URL,
