@@ -15,7 +15,7 @@
     --purple-gradient: linear-gradient(135deg, #22184c 0%, #0d091a 100%);
 }
 
-/* ФИКС: Полное удаление синей подсветки нажатий на Android и iOS */
+/* ФИКС: Полное удаление синей рамки выделения (Tap Highlight) при тапах */
 * {
     -webkit-tap-highlight-color: transparent !important;
     -webkit-tap-highlight-color: rgba(0, 0, 0, 0) !important;
@@ -64,7 +64,7 @@ body {
 }
 
 /* ==========================================================================
-   ВЕРХНИЙ БАР (ХЕДЕР) С УВЕЛИЧЕННЫМ ПРОФИЛЕМ
+   ВЕРХНИЙ БАР (ХЕДЕР) С УВЕЛИЧЕННЫМ ПРОФИЛЕМ И КРУПНЫМ ЛОГОТИПОМ
    ========================================================================== */
 .main-header {
     position: fixed;
@@ -87,7 +87,7 @@ body {
 .header-left {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 4px;
 }
 
 .logo-area {
@@ -96,18 +96,18 @@ body {
     gap: 8px;
 }
 
-/* Ваш логотип в шапке с неоновым фиолетовым свечением */
+/* Увеличенный логотип BestGifts (34px) */
 .logo-img-header {
-    width: 26px;
-    height: 26px;
+    width: 34px;
+    height: 34px;
     object-fit: contain;
     border-radius: 50%;
-    box-shadow: 0 0 10px var(--accent-purple-glow);
+    box-shadow: 0 0 12px var(--accent-purple-glow);
 }
 
 .logo-img-header-small {
-    width: 22px;
-    height: 22px;
+    width: 24px;
+    height: 24px;
     object-fit: contain;
     border-radius: 50%;
 }
@@ -124,7 +124,7 @@ body {
 .user-profile-pill {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 10px;
 }
 
 .header-avatar {
@@ -136,26 +136,35 @@ body {
     box-shadow: 0 0 12px var(--accent-purple-glow);
 }
 
+/* Защищенное поле для длинных юзернеймов (до 15 символов) */
 .header-username {
-    font-size: 16px;
+    font-size: 15px;
     font-weight: 800;
     color: #ffffff;
+    max-width: 110px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
+/* Крупный, заметный баланс в шапке */
 .balance-pill {
     background: rgba(0, 230, 118, 0.08);
     border: 1.5px solid rgba(0, 230, 118, 0.4);
-    box-shadow: 0 0 10px rgba(0, 230, 118, 0.15);
+    box-shadow: 0 0 12px rgba(0, 230, 118, 0.2);
     border-radius: 20px;
-    padding: 8px 16px;
+    padding: 10px 18px;
     display: flex;
     align-items: center;
     gap: 6px;
-    font-size: 15px;
-    font-weight: 800;
-    color: #00e676;
     cursor: pointer;
     transition: transform 0.1s, box-shadow 0.2s;
+}
+
+#user-balance-pill-value {
+    font-size: 17px;
+    font-weight: 900;
+    color: #00e676;
 }
 
 .balance-pill:active {
@@ -191,7 +200,109 @@ body {
 }
 
 /* ==========================================================================
-   СЕТКА КЕЙСОВ И КАРТИНКИ ИЗ РЕПОЗИТОРИЯ
+   БАННЕР ИГРЫ "BEST ARENA" С АНИМАЦИЕЙ ЛЕТАЮЩЕГО ШАРИКА (БЕЗ ТЕКСТА НА КАРТИНКЕ)
+   ========================================================================== */
+.game-promo-banner {
+    width: 100%;
+    background: linear-gradient(135deg, #131024 0%, #1c143c 100%);
+    border: 2px solid #3a355c;
+    border-radius: 24px;
+    padding: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+    box-sizing: border-box;
+    cursor: pointer;
+    overflow: hidden;
+    position: relative;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+    transition: transform 0.2s, border-color 0.2s;
+}
+
+.game-promo-banner:active {
+    transform: scale(0.98);
+}
+
+.game-promo-banner:hover {
+    border-color: var(--accent-purple);
+}
+
+.game-info-side {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    z-index: 2;
+}
+
+.live-badge {
+    background: #ff9500;
+    color: #000000;
+    font-size: 10px;
+    font-weight: 900;
+    padding: 4px 10px;
+    border-radius: 10px;
+    width: fit-content;
+    text-transform: uppercase;
+}
+
+.game-title {
+    font-size: 24px;
+    font-weight: 900;
+    margin: 0;
+    color: #ffffff;
+}
+
+.game-desc {
+    font-size: 13px;
+    color: var(--light-text-color);
+    margin: 0;
+}
+
+.game-animation-side {
+    width: 80px;
+    height: 80px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2;
+}
+
+/* Анимированный бокс-арена без надписей */
+.arena-box {
+    width: 70px;
+    height: 70px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1.5px solid rgba(255, 255, 255, 0.1);
+    border-radius: 14px;
+    position: relative;
+    overflow: hidden;
+}
+
+/* Синий шарик, бесконечно отскакивающий от краев */
+.bouncing-ball {
+    width: 12px;
+    height: 12px;
+    background: #0088cc;
+    border-radius: 50%;
+    position: absolute;
+    box-shadow: 0 0 10px #0088cc, 0 0 16px #0088cc;
+    animation: bounceX 2.3s linear infinite alternate, 
+               bounceY 1.7s linear infinite alternate;
+}
+
+@keyframes bounceX {
+    from { left: 0; }
+    to { left: calc(100% - 12px); }
+}
+
+@keyframes bounceY {
+    from { top: 0; }
+    to { top: calc(100% - 12px); }
+}
+
+/* ==========================================================================
+   СЕТКА КЕЙСОВ
    ========================================================================== */
 .section-title {
     font-size: 15px;
@@ -1151,4 +1262,4 @@ body {
 .modal-btn-secondary {
     background: #241c44;
     color: #ffffff;
-                     }
+   }
