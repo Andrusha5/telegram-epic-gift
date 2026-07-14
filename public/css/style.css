@@ -15,7 +15,6 @@
     --purple-gradient: linear-gradient(135deg, #22184c 0%, #0d091a 100%);
 }
 
-/* Полное удаление синей рамки выделения (Tap Highlight) при тапах */
 * {
     -webkit-tap-highlight-color: transparent !important;
     -webkit-tap-highlight-color: rgba(0, 0, 0, 0) !important;
@@ -64,7 +63,7 @@ body {
 }
 
 /* ==========================================================================
-   ВЕРХНИЙ БАР (ХЕДЕР) С УВЕЛИЧЕННЫМ ПРОФИЛЕМ И КРУПНЫМ ЛОГОТИПОМ
+   ВЕРХНИЙ БАР (ХЕДЕР)
    ========================================================================== */
 .main-header {
     position: fixed;
@@ -282,7 +281,7 @@ body {
 }
 
 /* ==========================================================================
-   ИГРОВОЕ ПОЛЕ BEST ARENA С ДИНАМИЧЕСКИМИ СЕГМЕНТАМИ
+   УВЕЛИЧЕННОЕ ИГРОВОЕ ПОЛЕ BEST ARENA С ДИНАМИЧЕСКИМИ СЕГМЕНТАМИ
    ========================================================================== */
 .arena-game-container {
     width: 100%;
@@ -294,9 +293,10 @@ body {
     box-sizing: border-box;
 }
 
+/* Увеличено до 320x320px */
 .arena-big-box {
-    width: 280px;
-    height: 280px;
+    width: 320px;
+    height: 320px;
     background: #110e25;
     border: 3px solid #2d2654;
     border-radius: 32px;
@@ -332,7 +332,7 @@ body {
     z-index: 2;
 }
 
-/* СТРОГО ЦЕНТРИРОВАННЫЙ ТЕКСТ ПО ЦЕНТРУ ПОЛЯ */
+/* СТРОГО ЦЕНТРИРОВАННЫЙ НЕОНОВЫЙ ТЕКСТ */
 .arena-waiting-text {
     position: absolute;
     top: 50%;
@@ -352,26 +352,24 @@ body {
     pointer-events: none;
 }
 
-/* Неоновый таймер */
+/* ЧИСТЫЙ НЕОНОВЫЙ ТАЙМЕР БЕЗ ЧЕРНОГО КРУГА ИЛИ РАМОК */
 .arena-timer-circle {
     position: absolute;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    width: 78px;
-    height: 78px;
-    border-radius: 50%;
-    background: rgba(11, 9, 20, 0.9);
-    border: 3px solid var(--accent-purple);
-    box-shadow: 0 0 20px var(--accent-purple-glow);
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 32px;
+    font-size: 52px; /* Слегка увеличен шрифт */
     font-weight: 900;
     color: #ffffff;
     z-index: 6;
     pointer-events: none;
+    background: none !important;
+    border: none !important;
+    box-shadow: none !important;
+    text-shadow: 0 0 10px #ffffff, 0 0 20px var(--accent-purple), 0 0 40px rgba(141, 61, 245, 0.6);
 }
 
 .arena-avatars-overlay {
@@ -400,7 +398,7 @@ body {
 }
 
 /* ==========================================================================
-   КВАДРАТНЫЕ АККУРАТНЫЕ КНОПКИ СТАВОК (В СТИЛЕ СКРИНШОТА)
+   КВАДРАТНЫЕ АККУРАТНЫЕ КНОПКИ СТАВОК С СКРУГЛЕННЫМИ УГЛАМИ
    ========================================================================== */
 .betting-row {
     display: flex;
@@ -438,7 +436,7 @@ body {
     background: rgba(141, 61, 245, 0.15);
 }
 
-/* Квадратные аккуратные кнопки ставок */
+/* Квадратные аккуратные кнопки быстрых ставок */
 .bet-button {
     width: 58px;
     height: 58px;
