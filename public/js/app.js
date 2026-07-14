@@ -39,57 +39,6 @@ function formatWalletAddress(rawAddress) {
     return friendly.substring(0, 4) + "-..." + friendly.substring(friendly.length - 4);
 }
 
-// АВТОНОМНЫЙ JS-КОМПИЛЯТОР BOC (РЕШАЕТ ВСЕ ПРОБЛЕМЫ С ПОПОЛНЕНИЕМ БАЛАНСА)
-function serializeCommentBoc(text) {
-    try {
-        const textBytes = new TextEncoder().encode(String(text));
-        const dataLen = 4 + textBytes.length; // 4 нулевых байта + байты строки
-        
-        // Описание структуры ячейки (BOC Cell Descriptor)
-        const desc1 = 0; // Ссылки отсутствуют
-        const desc2 = dataLen * 2; // Выравнивание не требуется (биты кратны 8)
-        
-        const cellContentLen = 2 + dataLen; // Дескрипторы + тело ячейки
-        
-        // Заголовок сериализации TON BOC
-        const header = [
-            0xb5, 0xee, 0x9c, 0x72, // Магический префикс (BOC Magic)
-            0x01,                   // Флаги (без CRC, размер индексов = 1)
-            0x01,                   // Размер индексов ячеек (1)
-            0x01,                   // Размер смещений (1)
-            0x01,                   // Всего ячеек (1)
-            0x01,                   // Корневых ячеек (1)
-            0x00,                   // Отсутствующие ячейки (0)
-            cellContentLen,         // Общая длина контента
-            0x00                    // Индекс корня (0)
-        ];
-        
-        const boc = new Uint8Array(header.length + 2 + dataLen);
-        boc.set(header, 0);
-        boc[header.length] = desc1;
-        boc[header.length + 1] = desc2;
-        
-        // Запись 32-битного пустого префикса (Opcode 0 - указывает кошельку на текст)
-        boc[header.length + 2] = 0;
-        boc[header.length + 3] = 0;
-        boc[header.length + 4] = 0;
-        boc[header.length + 5] = 0;
-        
-        // Запись байт строки
-        boc.set(textBytes, header.length + 6);
-        
-        // Конвертация в Base64 для передачи в TON Connect
-        return btoa(String.fromCharCode.apply(null, boc));
-    } catch (e) {
-        console.error("Критическая ошибка компиляции BOC:", e);
-        // Запасной вариант (сырые байты)
-        const bytes = new TextEncoder().encode(text);
-        const payloadBytes = new Uint8Array(4 + bytes.length);
-        payloadBytes.set(bytes, 4); 
-        return btoa(String.fromCharCode.apply(null, payloadBytes));
-    }
-}
-
 document.addEventListener('DOMContentLoaded', async () => {
     const API_BASE_URL = window.location.origin;
     let currentUser = {};
@@ -297,7 +246,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         console.error("TON Connect Error:", err);
     }
 
-    // Обработчик вызова модального окна депозита
+    // Модальное окно пополнения счета
     if (elements.depositBalanceBtn) {
         elements.depositBalanceBtn.addEventListener('click', () => {
             if (elements.depositAmountModal) {
@@ -343,10 +292,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                     return;
                 }
 
+                // Запрашиваем компиляцию чистого, 100% валидного BOC у сервера, предотвращая зависания на клиенте
+                const payloadRes = await fetch(`${API_BASE_URL}/api/generate_payload?text=${userId}`);
+                const payloadData = await payloadRes.json();
+                const payloadBase64 = payloadData.payload;
+
                 // Перевод TON в нанотоны
                 const nanoAmount = Math.floor(amount * 1000000000).toString();
-                // Генерация 100% валидного BOC-комментария
-                const payloadBase64 = serializeCommentBoc(String(userId));
 
                 const transaction = {
                     validUntil: Math.floor(Date.now() / 1000) + 360,
@@ -359,16 +311,17 @@ document.addEventListener('DOMContentLoaded', async () => {
                     ]
                 };
 
-                showNotification("Подтвердите транзакцию в вашем кошельке...", "⏳");
+                showNotification("Подтвердите транзакцию в кошельке...", "⏳");
                 const result = await tonConnectUI.sendTransaction(transaction);
 
                 if (result) {
                     showNotification("Транзакция отправлена! Проверяем...", "⏳");
                     
+                    // Повышенная частота проверки (раз в 3 секунды) для мгновенного начисления
                     let checkCount = 0;
                     const checkInterval = setInterval(async () => {
                         checkCount++;
-                        if (checkCount > 10) {
+                        if (checkCount > 15) {
                             clearInterval(checkInterval);
                             showNotification("Баланс зачислится автоматически при подтверждении сетью TON.", "⏳");
                             return;
@@ -395,11 +348,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                         } catch (e) {
                             console.error("Ошибка верификации платежа:", e);
                         }
-                    }, 5000);
+                    }, 3000);
                 }
             } catch (err) {
                 console.error("Отказ транзакции:", err);
-                showNotification("Транзакция отменена или произошла ошибка.", "⚠️");
+                showNotification("Транзакция отменена или отклонена кошельком.", "⚠️");
             }
         });
     }
@@ -614,19 +567,19 @@ document.addEventListener('DOMContentLoaded', async () => {
             console.error("Ошибка загрузки пользовательских данных:", e);
             currentUser = {
                 balance: 0.000,
+                id: userId,
                 username: tg.initDataUnsafe?.user?.username || "Пользователь",
                 first_name: tg.initDataUnsafe?.user?.first_name || "Пользователь",
-                avatar_url: "https://img.icons8.com/color/96/user.png",
                 is_admin: false
             };
         }
 
         updateBalanceUI();
-        const avUrls = currentUser.avatar_url || "https://img.icons8.com/color/96/user.png";
         
+        // СТАБИЛЬНЫЙ ФИКС АВАТАРКИ: Запрос идет на серверный прокси-маршрут
         const mainAvatar = document.getElementById('user-avatar');
         if (mainAvatar) {
-            mainAvatar.src = avUrls;
+            mainAvatar.src = `${API_BASE_URL}/api/avatar/${currentUser.id}`;
             mainAvatar.onerror = () => { mainAvatar.src = "https://img.icons8.com/color/96/user.png"; };
         }
 
