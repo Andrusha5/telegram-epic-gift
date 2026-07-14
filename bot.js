@@ -4,7 +4,7 @@ const pool = db.pool || db;
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
 
-// Защита от дублирования процессов на сервере (синглтон)
+// Инициализация синглтона для бота
 if (!global.botInstance) {
     global.botInstance = new TelegramBot(token, { polling: true });
 }
@@ -15,7 +15,7 @@ async function getUserAvatarUrl(userId) {
     try {
         const photos = await bot.getUserProfilePhotos(userId, { limit: 1 });
         if (photos && photos.total_count > 0 && photos.photos[0].length > 0) {
-            const fileId = photos.photos[0][0].file_id; // Берем аватарку в стандартном качестве
+            const fileId = photos.photos[0][0].file_id;
             const file = await bot.getFile(fileId);
             return `https://api.telegram.org/file/bot${token}/${file.file_path}`;
         }
