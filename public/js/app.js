@@ -57,11 +57,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Настройки быстрых ставок Best Arena (По умолчанию: 1, 2, 3)
     let customBets = [1, 2, 3];
 
-    // --- ЛОКАЛЬНЫЕ СТРУКТУРЫ ИГРЫ BEST ARENA ---
+    // --- СТРУКТУРЫ ИГРЫ BEST ARENA ---
     let arenaPlayers = []; 
-    let arenaCountdownInterval = null;
-    let arenaCountdownTime = 15;
-    let hasUserBet = false;
+    let arenaPollInterval = null;
 
     const safeSetText = (el, val) => { if (el) el.innerText = val; };
     const initialName = tg.initDataUnsafe?.user?.username || tg.initDataUnsafe?.user?.first_name || "Пользователь";
@@ -121,7 +119,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    // Восстановление аватара пользователя из кэша
+    // Восстановление аватара пользователя
     function loadCachedUserData() {
         try {
             const cachedData = localStorage.getItem(`user_cache_${userId}`);
@@ -362,7 +360,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         checkCount++;
                         if (checkCount > 15) {
                             clearInterval(checkInterval);
-                            showNotification("Баланс обновится при подтверждении сетью TON.", "⏳");
+                            showNotification("Баланс зачислится после подтверждения сетью TON.", "⏳");
                             return;
                         }
 
@@ -391,7 +389,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // -----------------------------------------------------------------------
-    // ВЫСОКОПРОИЗВОДИТЕЛЬНЫЙ SVG ДВИЖОК ДЛЯ РАЗДЕЛЕНИЯ ПОЛЯ ARENA С АВАТАРКАМИ
+    // ДИНАМИЧЕСКИЙ SVG ДВИЖОК И МУЛЬТИПЛЕЕРНАЯ СИНХРОНИЗАЦИЯ BEST ARENA
     // -----------------------------------------------------------------------
     const gameTrigger = document.getElementById('game-arena-trigger');
     if (gameTrigger) {
@@ -405,21 +403,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         backFromArena.addEventListener('click', () => {
             navigateTo('home');
         });
-    }
-
-    // Случайные неоновые цвета
-    const PLAYER_NEON_COLORS = [
-        '#d500f9', // Фиолетовый
-        '#00e5ff', // Бирюзовый
-        '#ffd600', // Желтый
-        '#00e676', // Зеленый
-        '#ff1744', // Красный
-        '#ff9100', // Оранжевый
-        '#2979ff'  // Синий
-    ];
-
-    function getRandomColor() {
-        return PLAYER_NEON_COLORS[Math.floor(Math.random() * PLAYER_NEON_COLORS.length)];
     }
 
     // Динамический рендеринг сегментов в зависимости от суммы ставок (Пропорционально)
@@ -442,7 +425,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         let currentX = 0;
 
-        arenaPlayers.forEach((player, index) => {
+        arenaPlayers.forEach((player) => {
             // Расчет процентной доли игрока на поле
             const percentage = totalBetSum > 0 ? (parseFloat(player.bet) / totalBetSum) : (1 / N);
             const segmentWidth = W * percentage;
@@ -460,7 +443,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const centerX = currentX + (segmentWidth / 2);
             const centerY = H / 2;
 
-            // Динамический размер аватарки (не более 64px и не менее 16px, масштабируется по ширине сегмента)
+            // Динамический размер аватарки (масштабируется по ширине сегмента, чтобы помещалась в границы)
             const calculatedAvatarSize = Math.min(64, Math.max(16, segmentWidth * 0.4));
 
             // Добавление аватарки в контейнер
@@ -504,42 +487,84 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    function startArenaTimer() {
-        if (arenaCountdownInterval) return;
+    // Высокочастотный опрос сервера (Поллинг) для синхронизации онлайн-состояния
+    function startArenaPolling() {
+        if (arenaPollInterval) return;
 
-        const statusText = document.getElementById('arena-status-text');
-        const countdownTimer = document.getElementById('arena-countdown-timer');
-
-        if (statusText) statusText.classList.add('hidden');
-        if (countdownTimer) {
-            countdownTimer.classList.remove('hidden');
-            countdownTimer.innerText = arenaCountdownTime.toString();
-        }
-
-        arenaCountdownInterval = setInterval(() => {
-            arenaCountdownTime--;
-            if (countdownTimer) countdownTimer.innerText = arenaCountdownTime.toString();
-
-            if (arenaCountdownTime <= 0) {
-                clearInterval(arenaCountdownInterval);
-                arenaCountdownInterval = null;
-                if (countdownTimer) countdownTimer.innerText = "🏁";
-                showNotification("Определяем победителя...", "🎮");
-                
-                setTimeout(() => {
-                    resetArenaGame();
-                }, 4000);
+        const poll = async () => {
+            const arenaSection = document.getElementById('arena-section');
+            if (!arenaSection || arenaSection.classList.contains('hidden')) {
+                stopArenaPolling();
+                return;
             }
-        }, 1000);
+
+            try {
+                const res = await fetch(`${API_BASE_URL}/api/arena/state`, {
+                    headers: { 'X-Telegram-Init-Data': tg.initData || "" }
+                });
+                if (!res.ok) return;
+                const state = await res.json();
+
+                // Синхронизация игроков
+                arenaPlayers = state.bets.map(bet => ({
+                    id: bet.userId,
+                    avatar: bet.avatar || "https://img.icons8.com/color/96/user.png",
+                    bet: parseFloat(bet.amount),
+                    color: bet.color
+                }));
+
+                // Отрисовка обновленного поля
+                drawArenaSegments();
+
+                // Синхронизация состояния таймера
+                const statusText = document.getElementById('arena-status-text');
+                const countdownTimer = document.getElementById('arena-countdown-timer');
+
+                if (state.status === 'countdown') {
+                    if (statusText) statusText.classList.add('hidden');
+                    if (countdownTimer) {
+                        countdownTimer.classList.remove('hidden');
+                        countdownTimer.innerText = state.timeLeft;
+                    }
+                } else if (state.status === 'finished') {
+                    if (statusText) {
+                        statusText.classList.remove('hidden');
+                        statusText.innerText = "Игра началась!";
+                    }
+                    if (countdownTimer) {
+                        countdownTimer.classList.add('hidden');
+                    }
+                } else {
+                    // waiting
+                    if (statusText) {
+                        statusText.classList.remove('hidden');
+                        statusText.innerText = "Ждем ставки...";
+                    }
+                    if (countdownTimer) {
+                        countdownTimer.classList.add('hidden');
+                    }
+                }
+
+                renderBetButtons();
+
+            } catch (err) {
+                console.error("Ошибка поллинга арены:", err);
+            }
+        };
+
+        poll();
+        arenaPollInterval = setInterval(poll, 1000);
+    }
+
+    function stopArenaPolling() {
+        if (arenaPollInterval) {
+            clearInterval(arenaPollInterval);
+            arenaPollInterval = null;
+        }
     }
 
     function resetArenaGame() {
-        clearInterval(arenaCountdownInterval);
-        arenaCountdownInterval = null;
-        arenaCountdownTime = 15;
-        arenaPlayers = [];
-        hasUserBet = false;
-
+        stopArenaPolling();
         const statusText = document.getElementById('arena-status-text');
         const countdownTimer = document.getElementById('arena-countdown-timer');
         const svg = document.getElementById('arena-svg-canvas');
@@ -556,19 +581,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         renderBetButtons();
     }
 
-    // Мгновенный клик без задержек на мобильных устройствах
+    // Мгновенная обработка клика по ставке
     const handleBetClick = async (e) => {
-        if (hasUserBet) {
-            showNotification("Вы уже сделали ставку!", "🎮");
-            return;
-        }
-
         const btn = e.currentTarget;
         if (btn.classList.contains('disabled')) return;
 
         const betValue = parseFloat(btn.getAttribute('data-bet'));
         if (isNaN(betValue) || betValue < 0.1) return;
 
+        // Кратковременная блокировка кнопки для защиты от двойного клика на период запроса
         btn.classList.add('disabled');
         btn.disabled = true;
 
@@ -584,56 +605,16 @@ document.addEventListener('DOMContentLoaded', async () => {
             const data = await res.json();
             
             if (res.ok && data.success) {
-                showNotification(`Ставка сделана: -${betValue} GRAM`, "🎮");
+                showNotification(`Ставка добавлена: -${betValue} GRAM`, "🎮");
                 currentUser.balance = data.newBalance;
                 updateBalanceUI();
-                hasUserBet = true;
-
-                // Добавление первого игрока (Вас)
-                const myAvatar = document.getElementById('user-avatar')?.src || "https://img.icons8.com/color/96/user.png";
-                arenaPlayers.push({
-                    id: userId,
-                    avatar: myAvatar,
-                    bet: betValue,
-                    color: getRandomColor()
-                });
-
-                drawArenaSegments();
-
-                // Симуляция входа 2-го игрока через 1.5 сек (Ставка 0.5)
-                setTimeout(() => {
-                    arenaPlayers.push({
-                        id: "bot_1",
-                        avatar: "https://img.icons8.com/color/96/user-male-circle.png",
-                        bet: 0.5,
-                        color: getRandomColor()
-                    });
-                    drawArenaSegments();
-                    showNotification("Игрок Sintopa сделал ставку!", "🎮");
-                    startArenaTimer(); 
-                }, 1500);
-
-                // Симуляция входа 3-го игрока через 4 сек (Ставка 2.5)
-                setTimeout(() => {
-                    arenaPlayers.push({
-                        id: "bot_2",
-                        avatar: "https://img.icons8.com/color/96/administrator-male.png",
-                        bet: 2.5,
-                        color: getRandomColor()
-                    });
-                    drawArenaSegments();
-                    showNotification("Игрок CryptoKing сделал ставку!", "🎮");
-                }, 4000);
-
             } else {
                 showNotification(data.error || "Ошибка ставки", "⚠️");
-                fetchUserData();
             }
         } catch (err) {
-            showNotification("Ошибка связи с сервером", "⚠️");
-            fetchUserData();
+            showNotification("Ошибка сети", "⚠️");
         } finally {
-            renderBetButtons();
+            fetchUserData();
         }
     };
 
@@ -641,7 +622,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('bet-btn-2').addEventListener('click', handleBetClick);
     document.getElementById('bet-btn-3').addEventListener('click', handleBetClick);
 
-    // Модалка настройки ставок с валидацией до 3 знаков
+    // Модалка настройки ставок
     const editBetsModal = document.getElementById('edit-bets-modal');
     const betEditTrigger = document.getElementById('bet-edit-trigger');
     const editBetsClose = document.getElementById('edit-bets-close-btn');
@@ -664,16 +645,23 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (editBetsClose) editBetsClose.addEventListener('click', closeEditBetsModal);
     if (cancelBetsBtn) cancelBetsBtn.addEventListener('click', closeEditBetsModal);
 
-    // Слушатели ввода полей для ограничения 3 знаков после запятой на лету
+    // Автоматическая блокировка ввода более 3 знаков после запятой
     const enforceThreeDecimals = (e) => {
-        const value = e.target.value;
-        if (value.includes('.')) {
-            const parts = value.split('.');
+        let val = e.target.value;
+        val = val.replace(/[^0-9.]/g, ''); // Только числа и одна точка
+        const dots = val.split('.');
+        if (dots.length > 2) {
+            val = dots[0] + '.' + dots.slice(1).join('');
+        }
+        if (val.includes('.')) {
+            const parts = val.split('.');
             if (parts[1].length > 3) {
-                e.target.value = parseFloat(value).toFixed(3);
+                val = parts[0] + '.' + parts[1].substring(0, 3);
             }
         }
+        e.target.value = val;
     };
+
     document.getElementById('bet-input-1').addEventListener('input', enforceThreeDecimals);
     document.getElementById('bet-input-2').addEventListener('input', enforceThreeDecimals);
     document.getElementById('bet-input-3').addEventListener('input', enforceThreeDecimals);
@@ -684,13 +672,13 @@ document.addEventListener('DOMContentLoaded', async () => {
             let b2 = parseFloat(document.getElementById('bet-input-2').value);
             let b3 = parseFloat(document.getElementById('bet-input-3').value);
 
-            // Финальное жесткое округление до 3 знаков после запятой
+            // Округление до 3 знаков после запятой перед сохранением
             b1 = parseFloat(b1.toFixed(3));
             b2 = parseFloat(b2.toFixed(3));
             b3 = parseFloat(b3.toFixed(3));
 
             if (isNaN(b1) || b1 < 0.1 || isNaN(b2) || b2 < 0.1 || isNaN(b3) || b3 < 0.1) {
-                showNotification("Сумма ставки не может быть менее 0.1 GRAM!", "⚠️");
+                showNotification("Ставка не может быть меньше 0.1 GRAM!", "⚠️");
                 return;
             }
 
@@ -775,25 +763,31 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (target === 'home') {
             if (elements.homeSection) elements.homeSection.classList.remove('hidden');
             setActiveTab('home');
+            stopArenaPolling();
         } else if (target === 'inventory') {
             if (elements.inventorySection) elements.inventorySection.classList.remove('hidden');
             setActiveTab('inventory');
             fetchInventory(); 
             initDepositSelect();
+            stopArenaPolling();
         } else if (target === 'rating') {
             if (elements.ratingSection) elements.ratingSection.classList.remove('hidden');
             setActiveTab('rating');
+            stopArenaPolling();
         } else if (target === 'balance') {
             if (elements.balanceSection) elements.balanceSection.classList.remove('hidden');
             elements.navTabs.forEach(tab => tab.classList.remove('active'));
+            stopArenaPolling();
         } else if (target === 'case') { 
             if (elements.caseSection) elements.caseSection.classList.remove('hidden');
             if (elements.bottomNavigation) elements.bottomNavigation.classList.add('hidden'); 
             initRouletteTrack();
+            stopArenaPolling();
         } else if (target === 'arena') { 
             if (elements.arenaSection) elements.arenaSection.classList.remove('hidden');
             if (elements.bottomNavigation) elements.bottomNavigation.classList.add('hidden');
             resetArenaGame(); 
+            startArenaPolling(); // Запуск мультиплеерного опроса при входе на арену
         }
     }
 
@@ -937,7 +931,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         const mainAvatar = document.getElementById('user-avatar');
         if (mainAvatar) {
-            mainAvatar.src = `${API_BASE_URL}/api/avatar/${currentUser.id}`;
+            const directUrl = currentUser.avatar_url;
+            if (directUrl) {
+                mainAvatar.src = directUrl;
+            } else {
+                mainAvatar.src = `${API_BASE_URL}/api/avatar/${currentUser.id || userId}`;
+            }
             mainAvatar.onerror = () => { mainAvatar.src = "https://img.icons8.com/color/96/user.png"; };
         }
 
