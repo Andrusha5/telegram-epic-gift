@@ -2,9 +2,6 @@ const tg = window.Telegram.WebApp;
 tg.expand();
 tg.ready();
 
-// ==========================================================================
-// ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ И ОЧИСТКА ДАННЫХ
-// ==========================================================================
 function formatItemName(name) {
     if (!name) return "";
     let clean = name.replace(/\.(png|jpg|jpeg)$/i, '');
@@ -17,7 +14,6 @@ function formatUsername(name) {
     return name.length > 10 ? name.substring(0, 10) + "..." : name;
 }
 
-// Преобразование hex-адреса TON в дружественный Base64 (UQA..._YI)
 function getFriendlyAddress(rawAddress) {
     try {
         if (typeof TON_CONNECT_UI !== 'undefined' && TON_CONNECT_UI.toUserFriendlyAddress) {
@@ -25,9 +21,6 @@ function getFriendlyAddress(rawAddress) {
         }
         if (typeof TonConnectUI !== 'undefined' && TonConnectUI.toUserFriendlyAddress) {
             return TonConnectUI.toUserFriendlyAddress(rawAddress);
-        }
-        if (window.TonConnectUI && window.TonConnectUI.toUserFriendlyAddress) {
-            return window.TonConnectUI.toUserFriendlyAddress(rawAddress);
         }
     } catch(e) {}
     return rawAddress; 
@@ -39,7 +32,6 @@ function formatWalletAddress(rawAddress) {
     return friendly.substring(0, 4) + "-..." + friendly.substring(friendly.length - 4);
 }
 
-// ФУНКЦИЯ ДЛЯ ПРЕДЗАГРУЗКИ КАРТИНOК (Обеспечивает моментальную работу)
 function preloadImages(urls) {
     urls.forEach(url => {
         const img = new Image();
@@ -51,7 +43,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     const API_BASE_URL = window.location.origin;
     let currentUser = {};
     let isNewbieCaseMode = false; 
-
     const GRAMCOIN_ICON_URL = "/Images/Items/gram_popolnenie.png"; 
 
     let userId = tg.initDataUnsafe?.user?.id;
@@ -64,21 +55,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     if (!userId) userId = "guest_user_id";
 
-    // Сброс кэша для смены аккаунтов
-    try {
-        const lastSavedUser = localStorage.getItem('last_logged_tg_user');
-        if (lastSavedUser !== String(userId)) {
-            for (let i = localStorage.length - 1; i >= 0; i--) {
-                const key = localStorage.key(i);
-                if (key && (key.includes('ton-connect') || key.includes('ton_connect'))) {
-                    localStorage.removeItem(key);
-                }
-            }
-            localStorage.setItem('last_logged_tg_user', String(userId));
-        }
-    } catch (err) {}
-
-    // Элементы интерфейса
     const elements = {
         homeSection: document.getElementById('home-section'),
         caseSection: document.getElementById('case-section'),
@@ -103,7 +79,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         connectWalletBtn: document.getElementById('connect-wallet-btn'),
         depositBalanceBtn: document.getElementById('deposit-balance-btn'),
         depositNoticeText: document.getElementById('deposit-notice-text'),
-        // Элементы модалки пополнения счета
         depositAmountModal: document.getElementById('deposit-amount-modal'),
         depositModalCloseBtn: document.getElementById('deposit-modal-close-btn'),
         modalDepositInput: document.getElementById('modal-deposit-input'),
@@ -113,6 +88,42 @@ document.addEventListener('DOMContentLoaded', async () => {
     };
 
     const safeSetText = (el, val) => { if (el) el.innerText = val; };
+
+    // -----------------------------------------------------------------------
+    // МГНОВЕННЫЙ ЗАПУСК ИЗ ЛОКАЛЬНОГО КЭША (МГНОВЕННОЕ УСТРАНЕНИЕ СЕРОГО ЭКРАНА)
+    // -----------------------------------------------------------------------
+    function loadCachedUserData() {
+        try {
+            const cachedData = localStorage.getItem(`user_cache_${userId}`);
+            if (cachedData) {
+                const cache = JSON.parse(cachedData);
+                currentUser = cache;
+                updateBalanceUI();
+                const rawName = cache.username || cache.first_name || "Пользователь";
+                safeSetText(document.getElementById('user-username'), formatUsername(rawName));
+                
+                const mainAvatar = document.getElementById('user-avatar');
+                if (mainAvatar) {
+                    mainAvatar.src = cache.avatar_url || `${API_BASE_URL}/api/avatar/${userId}`;
+                }
+            } else {
+                // Временный плейсхолдер до загрузки из БД
+                const rawName = tg.initDataUnsafe?.user?.username || tg.initDataUnsafe?.user?.first_name || "Пользователь";
+                safeSetText(document.getElementById('user-username'), formatUsername(rawName));
+            }
+        } catch (e) {
+            console.error("Cache read error", e);
+        }
+    }
+
+    function saveUserDataToCache(userData) {
+        try {
+            localStorage.setItem(`user_cache_${userId}`, JSON.stringify(userData));
+        } catch (e) {}
+    }
+
+    // Сразу читаем кэш, чтобы интерфейс загрузился за 0.05 сек
+    loadCachedUserData();
 
     function showNotification(message, icon = '🎁') {
         const container = document.getElementById('toast-container');
@@ -126,7 +137,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             <button class="custom-toast-close">&times;</button>
         `;
         container.appendChild(toast);
-        
         setTimeout(() => toast.classList.add('show'), 50);
 
         toast.querySelector('.custom-toast-close').addEventListener('click', () => {
@@ -182,73 +192,74 @@ document.addEventListener('DOMContentLoaded', async () => {
     try {
         const manifestUrl = `${API_BASE_URL}/tonconnect-manifest.json`;
         const customStorage = {
-            setItem: (key, value) => { try { localStorage.setItem(`ton-connect-${userId}-${key}`, value); } catch (e) {} },
-            getItem: (key) => { try { return localStorage.getItem(`ton-connect-${userId}-${key}`); } catch (e) { return null; } },
-            removeItem: (key) => { try { localStorage.removeItem(`ton-connect-${userId}-${key}`); } catch (e) {} }
+            setItem: (key, value) => { try { localStorage.setItem(`tc-${userId}-${key}`, value); } catch (e) {} },
+            getItem: (key) => { try { return localStorage.getItem(`tc-${userId}-${key}`); } catch (e) { return null; } },
+            removeItem: (key) => { try { localStorage.removeItem(`tc-${userId}-${key}`); } catch (e) {} }
         };
-        if (typeof TON_CONNECT_UI !== 'undefined' && TON_CONNECT_UI.TonConnectUI) {
-            tonConnectUI = new TON_CONNECT_UI.TonConnectUI({ manifestUrl, storage: customStorage });
-        } else if (window.TonConnectUI) {
-            tonConnectUI = new window.TonConnectUI({ manifestUrl, storage: customStorage });
-        }
 
-        if (tonConnectUI) {
-            tonConnectUI.onStatusChange(wallet => {
-                if (wallet) {
-                    const displayAddress = formatWalletAddress(wallet.account.address);
-                    
-                    if (elements.connectWalletBtn) {
-                        elements.connectWalletBtn.innerText = `Привязан: (${displayAddress})`;
-                        elements.connectWalletBtn.style.background = 'linear-gradient(135deg, #00e676, #00b34a)';
-                        elements.connectWalletBtn.style.color = '#000000';
-                    }
-                    if (elements.depositBalanceBtn) {
-                        elements.depositBalanceBtn.removeAttribute('disabled');
-                    }
-                    if (elements.depositNoticeText) {
-                        elements.depositNoticeText.innerText = "Кошелек успешно подключен к системе!";
-                        elements.depositNoticeText.style.color = '#00e676';
-                    }
-                } else {
-                    if (elements.connectWalletBtn) {
-                        elements.connectWalletBtn.innerText = 'Привязать кошелёк';
-                        elements.connectWalletBtn.style.background = 'linear-gradient(135deg, var(--accent-purple), #6a0dad)';
-                        elements.connectWalletBtn.style.color = '#ffffff';
-                    }
-                    if (elements.depositBalanceBtn) {
-                        elements.depositBalanceBtn.setAttribute('disabled', 'true');
-                    }
-                    if (elements.depositNoticeText) {
-                        elements.depositNoticeText.innerText = "Пополнение доступно после привязки кошелька";
-                        elements.depositNoticeText.style.color = '#a5a1b8';
-                    }
-                }
-            });
-
-            if (elements.connectWalletBtn) {
-                elements.connectWalletBtn.addEventListener('click', async () => {
-                    if (tonConnectUI.connected) {
-                        showCustomModal({
-                            icon: '🔌',
-                            title: 'Отключить кошелек?',
-                            message: 'Вы уверены, что хотите отвязать текущий TON-кошелек?',
-                            buttons: [
-                                {
-                                    text: 'Отвязать',
-                                    primary: true,
-                                    onClick: async () => {
-                                        await tonConnectUI.disconnect();
-                                        showNotification("Кошелек успешно отвязан", "🔌");
-                                    }
-                                },
-                                { text: 'Отмена', primary: false }
-                            ]
-                        });
+        // Запуск UI после загрузки SDK
+        const initTonConnect = () => {
+            const TC_SDK = window.TON_CONNECT_UI || window.TonConnectUI;
+            if (TC_SDK) {
+                tonConnectUI = new TC_SDK.TonConnectUI({ manifestUrl, storage: customStorage });
+                tonConnectUI.onStatusChange(wallet => {
+                    if (wallet) {
+                        const displayAddress = formatWalletAddress(wallet.account.address);
+                        if (elements.connectWalletBtn) {
+                            elements.connectWalletBtn.innerText = `Привязан: (${displayAddress})`;
+                            elements.connectWalletBtn.style.background = 'linear-gradient(135deg, #00e676, #00b34a)';
+                            elements.connectWalletBtn.style.color = '#000000';
+                        }
+                        if (elements.depositBalanceBtn) elements.depositBalanceBtn.removeAttribute('disabled');
+                        if (elements.depositNoticeText) {
+                            elements.depositNoticeText.innerText = "Кошелек успешно подключен к системе!";
+                            elements.depositNoticeText.style.color = '#00e676';
+                        }
                     } else {
-                        await tonConnectUI.openModal();
+                        if (elements.connectWalletBtn) {
+                            elements.connectWalletBtn.innerText = 'Привязать кошелёк';
+                            elements.connectWalletBtn.style.background = 'linear-gradient(135deg, var(--accent-purple), #6a0dad)';
+                            elements.connectWalletBtn.style.color = '#ffffff';
+                        }
+                        if (elements.depositBalanceBtn) elements.depositBalanceBtn.setAttribute('disabled', 'true');
+                        if (elements.depositNoticeText) {
+                            elements.depositNoticeText.innerText = "Пополнение доступно после привязки кошелька";
+                            elements.depositNoticeText.style.color = '#a5a1b8';
+                        }
                     }
                 });
+
+                if (elements.connectWalletBtn) {
+                    elements.connectWalletBtn.addEventListener('click', async () => {
+                        if (tonConnectUI.connected) {
+                            showCustomModal({
+                                icon: '🔌',
+                                title: 'Отключить кошелек?',
+                                message: 'Вы уверены, что хотите отвязать текущий TON-кошелек?',
+                                buttons: [
+                                    {
+                                        text: 'Отвязать',
+                                        primary: true,
+                                        onClick: async () => {
+                                            await tonConnectUI.disconnect();
+                                            showNotification("Кошелек успешно отвязан", "🔌");
+                                        }
+                                    },
+                                    { text: 'Отмена', primary: false }
+                                ]
+                            });
+                        } else {
+                            await tonConnectUI.openModal();
+                        }
+                    });
+                }
             }
+        };
+
+        if (window.TON_CONNECT_UI || window.TonConnectUI) {
+            initTonConnect();
+        } else {
+            document.addEventListener('ton-connect-ui-loaded', initTonConnect);
         }
     } catch (err) {
         console.error("TON Connect Error:", err);
@@ -273,7 +284,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (elements.depositModalCloseBtn) elements.depositModalCloseBtn.addEventListener('click', closeDepositModal);
     if (elements.modalDepositCancelBtn) elements.modalDepositCancelBtn.addEventListener('click', closeDepositModal);
 
-    // Подтверждение пополнения баланса в модальном окне
+    // Подтверждение пополнения баланса
     if (elements.modalDepositConfirmBtn) {
         elements.modalDepositConfirmBtn.addEventListener('click', async () => {
             const amount = parseFloat(elements.modalDepositInput.value);
@@ -290,7 +301,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             closeDepositModal();
 
             try {
-                // Получаем адрес депозита
                 const res = await fetch(`${API_BASE_URL}/api/deposit_address`);
                 const data = await res.json();
                 const adminAddress = data.address;
@@ -300,12 +310,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                     return;
                 }
 
-                // Запрашиваем компиляцию чистого, 100% валидного BOC у сервера (полная защита от вылетов)
+                // Запрашиваем 100% совместимый BOC
                 const payloadRes = await fetch(`${API_BASE_URL}/api/generate_payload?text=${userId}`);
                 const payloadData = await payloadRes.json();
                 const payloadBase64 = payloadData.payload;
 
-                // Перевод TON в нанотоны
                 const nanoAmount = Math.floor(amount * 1000000000).toString();
 
                 const transaction = {
@@ -314,7 +323,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         {
                             address: adminAddress,
                             amount: nanoAmount,
-                            payload: payloadBase64 // Чистый безотказный BOC
+                            payload: payloadBase64 
                         }
                     ]
                 };
@@ -324,8 +333,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                 if (result) {
                     showNotification("Транзакция отправлена! Проверяем...", "⏳");
-                    
-                    // Проверяем 1 раз в 3 секунды для мгновенного зачисления
                     let checkCount = 0;
                     const checkInterval = setInterval(async () => {
                         checkCount++;
@@ -342,30 +349,23 @@ document.addEventListener('DOMContentLoaded', async () => {
                                     'Content-Type': 'application/json',
                                     'X-Telegram-Init-Data': tg.initData || ""
                                 },
-                                body: JSON.stringify({
-                                    amount: amount,
-                                    userId: userId
-                                })
+                                body: JSON.stringify({ amount: amount, userId: userId })
                             });
                             const verifyData = await verifyRes.json();
                             if (verifyRes.ok && verifyData.success) {
                                 clearInterval(checkInterval);
-                                showNotification(`Баланс успешно пополнен на +${amount.toFixed(2)} GRAM!`, "💎");
+                                showNotification(`Баланс пополнен на +${amount.toFixed(2)} GRAM!`, "💎");
                                 fetchUserData();
                             }
-                        } catch (e) {
-                            console.error("Ошибка верификации платежа:", e);
-                        }
+                        } catch (e) {}
                     }, 3000);
                 }
             } catch (err) {
-                console.error("Отказ транзакции:", err);
                 showNotification("Транзакция отменена или отклонена кошельком.", "⚠️");
             }
         });
     }
 
-    // Перенаправление в ЛС админа при клике в инвентаре
     if (elements.adminTgChatTrigger) {
         elements.adminTgChatTrigger.addEventListener('click', () => {
             tg.openTelegramLink("https://t.me/Sintopa");
@@ -411,7 +411,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         { id: 118, name: "Пополнение 0.005 GRAM (Новичок)", icon: GRAMCOIN_ICON_URL, price: "0.005 GRAM", rawPrice: 0.005, isGold: false, type: "balance" }
     ];
 
-    // Запускаем фоновую загрузку всех картинок в память
+    // Оптимизированная фоновая загрузка картинок
     const allImagesToPreload = [
         "/Images/Logo/logotip.png",
         GRAMCOIN_ICON_URL,
@@ -494,7 +494,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    if (elements.bomzhCaseBanner) elements.bomzhCaseBanner.addEventListener('click', () => { showNotification("Кейс бомжа скоро появится в игре!", "🎒"); });
+    if (elements.bomzhCaseBanner) elements.bomzhCaseBanner.addEventListener('click', () => { showNotification("Кейс бомжа скоро появится!", "🎒"); });
     if (elements.krutoyCaseBanner) elements.krutoyCaseBanner.addEventListener('click', () => { showNotification("Кейс крутого в разработке!", "😎"); });
 
     const backToHome = document.getElementById('back-to-home-button');
@@ -531,7 +531,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             showCustomModal({
                 icon: `<img src="${selectedGift.icon}" style="width:70px;height:70px;object-fit:contain;" onerror="this.src='https://img.icons8.com/color/96/gift.png'">`,
                 title: 'Подтвердить передачу?',
-                message: `Вы действительно отправили подарок "${formatItemName(selectedGift.name)}" на аккаунт @Sintopa в Telegram?\n\nАдминистратор проверит отправку и зачислит его.`,
+                message: `Вы действительно отправили подарок "${formatItemName(selectedGift.name)}" на аккаунт @Sintopa в Telegram?`,
                 buttons: [
                     {
                         text: 'Да, подтверждаю',
@@ -544,13 +544,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                                     body: JSON.stringify({ itemId: itemId })
                                 });
                                 if (res.ok) {
-                                    showNotification(`Заявка на ввод "${formatItemName(selectedGift.name)}" отправлена!`, '📥');
+                                    showNotification(`Заявка на ввод отправлена!`, '📥');
                                 } else {
                                     const errorData = await res.json();
-                                    showNotification(errorData.error || 'Не удалось отправить заявку.', '⚠️');
+                                    showNotification(errorData.error || 'Не удалось отправить.', '⚠️');
                                 }
                             } catch (err) {
-                                showNotification('Ошибка связи с сервером.', '⚠️');
+                                showNotification('Ошибка связи.', '⚠️');
                             }
                         }
                     },
@@ -585,20 +585,15 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
             if (!res.ok) throw new Error();
             currentUser = await res.json();
+            
+            // Сохраняем новые данные в кэш для моментального запуска в следующий раз
+            saveUserDataToCache(currentUser);
         } catch (e) {
-            console.error("Ошибка загрузки данных:", e);
-            currentUser = {
-                balance: 0.000,
-                id: userId,
-                username: tg.initDataUnsafe?.user?.username || "Пользователь",
-                first_name: tg.initDataUnsafe?.user?.first_name || "Пользователь",
-                is_admin: false
-            };
+            console.error("Ошибка загрузки данных, используются данные кэша.");
         }
 
         updateBalanceUI();
         
-        // Стабильная загрузка аватарок через внутренний прокси
         const mainAvatar = document.getElementById('user-avatar');
         if (mainAvatar) {
             mainAvatar.src = `${API_BASE_URL}/api/avatar/${currentUser.id}`;
@@ -606,8 +601,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         const rawName = currentUser.username || currentUser.first_name || "Пользователь";
-        const truncatedName = formatUsername(rawName);
-        safeSetText(document.getElementById('user-username'), truncatedName);
+        safeSetText(document.getElementById('user-username'), formatUsername(rawName));
         updateDailyCaseTimer();
     }
 
@@ -678,7 +672,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (items.length === 0) {
                 elements.inventoryGrid.innerHTML = `
                     <div class="empty-inventory">
-                        🎒 Ваш инвентарь пуст.<br>Открывайте кейсы и выигрывайте призы!
+                        🎒 Ваш инвентарь пуст.<br>Открывайте кейсы!
                     </div>`;
                 return;
             }
@@ -704,7 +698,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     showCustomModal({
                         icon: `<img src="${imageSrc}" style="width:70px;height:70px;object-fit:contain;" onerror="this.src='https://img.icons8.com/color/96/gift.png'">`,
                         title: 'Вывод подарка',
-                        message: `Отправить "${formatItemName(item.name)}" вам в Telegram? Он пропадет из вашего инвентаря.`,
+                        message: `Отправить "${formatItemName(item.name)}" вам в Telegram?`,
                         buttons: [
                             {
                                 text: 'Подтвердить вывод',
@@ -717,7 +711,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                                             body: JSON.stringify({ itemId: item.item_id })
                                         });
                                         if (withdrawRes.ok) {
-                                            showNotification(`Подарок "${formatItemName(item.name)}" в очереди на вывод!`, '📥');
+                                            showNotification(`Подарок в очереди на вывод!`, '📥');
                                             fetchInventory(); 
                                         } else {
                                             const errorData = await withdrawRes.json();
@@ -737,7 +731,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     showCustomModal({
                         icon: '💰',
                         title: 'Продажа подарка',
-                        message: `Вы действительно хотите продать подарок "${formatItemName(item.name)}" за ${item.value} GRAM?`,
+                        message: `Продать подарок "${formatItemName(item.name)}" за ${item.value} GRAM?`,
                         buttons: [
                             {
                                 text: 'Продать за GRAM',
