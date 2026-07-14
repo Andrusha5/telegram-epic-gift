@@ -30,9 +30,7 @@ const TONCENTER_API_KEY = process.env.TONCENTER_API_KEY;
 
 app.use(express.json());
 
-// ---------------------------------------------------------------------------
-// НАСТРОЙКА КРОСС-ДОМЕННОГО ДОСТУПА (CORS) БЕЗ ВНЕШНИХ МОДУЛЕЙ
-// ---------------------------------------------------------------------------
+// НАСТРОЙКА КРОСС-ДОМЕННОГО ДОСТУПА (CORS)
 app.use((req, res, next) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, PATCH, DELETE');
@@ -44,10 +42,7 @@ app.use((req, res, next) => {
     next();
 });
 
-// ---------------------------------------------------------------------------
-// ОПТИМИЗАЦИЯ КЭШИРОВАНИЯ И АВТОМАТИЧЕСКИЙ СБРОС КЭША TELEGRAM
-// Принудительно заставляет браузер скачивать свежие скрипты и стили приложения
-// ---------------------------------------------------------------------------
+// АВТОМАТИЧЕСКИЙ СБРОС КЭША TELEGRAM (Блокирует сохранение старых сессий кода)
 app.use((req, res, next) => {
     const url = req.url;
     if (url.endsWith('.html') || url.endsWith('.js') || url.endsWith('.css') || url === '/' || url === '/index.html') {
@@ -59,10 +54,7 @@ app.use((req, res, next) => {
     next();
 });
 
-// ---------------------------------------------------------------------------
-// ВЫСОКОКЛАССНЫЙ СЕРВЕРНЫЙ КОМПИЛЯТОР BOC ДЛЯ ТЕКСТОВЫХ КОММЕНТАРИЕВ TON
-// Исключает ошибку: "Payload is invalid"
-// ---------------------------------------------------------------------------
+// СЕРВЕРНЫЙ КОМПИЛЯТОР BOC ДЛЯ ТЕКСТОВЫХ КОММЕНТАРИЕВ TON
 function serializeTextCommentBoc(text) {
     const textBytes = Buffer.from(text, 'utf8');
     const payload = Buffer.concat([Buffer.alloc(4), textBytes]); 
@@ -92,9 +84,7 @@ function serializeTextCommentBoc(text) {
     return Buffer.concat([header, cellData]).toString('base64');
 }
 
-// ---------------------------------------------------------------------------
-// ДИНАМИЧЕСКИЙ МАНИФЕСТ С АБСОЛЮТНЫМИ ССЫЛКАМИ ПОД ВАШ ЛОГОТИП
-// ---------------------------------------------------------------------------
+// ДИНАМИЧЕСКИЙ МАНИФЕСТ ДЛЯ ИДЕАЛЬНОГО ОТОБРАЖЕНИЯ ЛОГОТИПА В КОШЕЛЬКЕ
 app.get('/tonconnect-manifest.json', (req, res) => {
     const host = req.get('host');
     const protocol = 'https'; 
@@ -144,9 +134,7 @@ function matchTransactionComment(tx, userId) {
     return comment.trim() === String(userId).trim();
 }
 
-// ---------------------------------------------------------------------------
 // MIDDLEWARE ДЛЯ АВТОРИЗАЦИИ ТЕЛЕГРАМ
-// ---------------------------------------------------------------------------
 app.use(async (req, res, next) => {
     const initData = req.body?.initData || req.headers['x-telegram-init-data'] || req.query.initData;
     if (!initData) {
@@ -193,6 +181,53 @@ app.use(async (req, res, next) => {
         return res.status(401).json({ error: 'Unauthorized' });
     }
     next();
+});
+
+// ЭНДПОИНТ ДЛЯ ОПЛАТЫ ИГРОВОЙ СТАВКИ В BEST ARENA С БАЛАНСА
+app.post('/api/place_bet', async (req, res) => {
+    if (!req.telegramUser || !req.telegramUser.id) {
+        return res.status(401).json({ error: 'Unauthorized' });
+    }
+    const userId = req.telegramUser.id;
+    const { amount } = req.body;
+    const betVal = parseFloat(amount);
+
+    if (isNaN(betVal) || betVal < 0.1) {
+        return res.status(400).json({ error: "Минимальная ставка — 0.1 GRAM" });
+    }
+
+    let client;
+    try {
+        client = await pool.connect();
+        await client.query('BEGIN');
+
+        const userRes = await client.query('SELECT balance FROM users WHERE id = $1 FOR UPDATE', [userId]);
+        const user = userRes.rows[0];
+
+        if (!user) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({ error: "Пользователь не найден" });
+        }
+
+        const balance = parseFloat(user.balance || 0);
+        if (balance < betVal) {
+            await client.query('ROLLBACK');
+            return res.status(400).json({ error: "Недостаточно баланса для ставки" });
+        }
+
+        const newBalance = balance - betVal;
+        await client.query('UPDATE users SET balance = $1 WHERE id = $2', [newBalance, userId]);
+        await client.query('INSERT INTO transactions (user_id, type, amount, details) VALUES ($1, $2, $3, $4)', 
+            [userId, 'bet_arena', betVal, `Ставка в игре Best Arena: -${betVal} GRAM`]);
+
+        await client.query('COMMIT');
+        res.json({ success: true, newBalance: newBalance });
+    } catch (err) {
+        if (client) await client.query('ROLLBACK');
+        res.status(500).json({ error: "Ошибка проведения транзакции на сервере" });
+    } finally {
+        if (client) client.release();
+    }
 });
 
 // Endpoint для безопасного получения Payload с сервера
