@@ -15,7 +15,7 @@
     --purple-gradient: linear-gradient(135deg, #22184c 0%, #0d091a 100%);
 }
 
-/* ФИКС: Полное удаление синего выделения (Tap Highlight) при нажатиях на кнопки на Android/iOS */
+/* ФИКС: Полное удаление синей подсветки нажатий на Android и iOS */
 * {
     -webkit-tap-highlight-color: transparent !important;
     -webkit-tap-highlight-color: rgba(0, 0, 0, 0) !important;
@@ -96,13 +96,13 @@ body {
     gap: 8px;
 }
 
-/* Новый круглый логотип в шапке вместо эмодзи */
+/* Ваш логотип в шапке с неоновым фиолетовым свечением */
 .logo-img-header {
-    width: 28px;
-    height: 28px;
+    width: 26px;
+    height: 26px;
     object-fit: contain;
     border-radius: 50%;
-    box-shadow: 0 0 8px var(--accent-purple-glow);
+    box-shadow: 0 0 10px var(--accent-purple-glow);
 }
 
 .logo-img-header-small {
@@ -1151,4 +1151,4 @@ body {
 .modal-btn-secondary {
     background: #241c44;
     color: #ffffff;
-   }
+                     }
