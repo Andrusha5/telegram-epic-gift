@@ -2,6 +2,7 @@ const express = require('express');
 const path = require('path');
 const crypto = require('crypto');
 const axios = require('axios');
+const cors = require('cors'); // Поддержка CORS для стабильной загрузки логотипа кошельками
 require('dotenv').config();
 
 process.on('unhandledRejection', (reason, promise) => {
@@ -28,48 +29,97 @@ const CHANNEL_USERNAME = process.env.CHANNEL_USERNAME || "";
 const ADMIN_TON_ADDRESS = process.env.ADMIN_TON_ADDRESS; 
 const TONCENTER_API_KEY = process.env.TONCENTER_API_KEY; 
 
+app.use(cors());
 app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
+
+// ---------------------------------------------------------------------------
+// ГАРАНТИРОВАННЫЙ БЕЗОПАСНЫЙ СЕРВЕРНЫЙ КОМПИЛЯТОР ТЕКСТОВЫХ КОММЕНТАРИЕВ BOC
+// Устраняет ошибку: "Payload is invalid" (Index 0 > 0 is out of bounds)
+// ---------------------------------------------------------------------------
+function serializeTextCommentBoc(text) {
+    const textBytes = Buffer.from(text, 'utf8');
+    const dataLen = 4 + textBytes.length; // 4 пустых байта префикса + байты строки
+
+    const d1 = 0; // Нет дочерних ячеек, не экзотическая
+    const d2 = dataLen * 2; // Выравнивание (byte-aligned)
+
+    const cellContentLen = 2 + dataLen; //Descriptors (2 байта) + payload (dataLen)
+
+    // Сборка 100% совместимого с TON Virtual Machine заголовка Bag of Cells без CRC
+    const header = Buffer.from([
+        0xb5, 0xee, 0x9c, 0x72, // BOC Magic
+        0x01,                   // has_idx=0, has_crc32c=0, size_bytes=1 (флаги без капризных CRC)
+        0x01,                   // off_bytes = 1
+        0x01,                   // cell_count = 1
+        0x01,                   // root_count = 1
+        0x00,                   // absent_count = 0
+        cellContentLen,         // tot_cells_size (1 byte)
+        0x00                    // root_list (root index 0)
+    ]);
+
+    const cellData = Buffer.alloc(2 + dataLen);
+    cellData[0] = d1;
+    cellData[1] = d2;
+    cellData.writeUInt32BE(0, 2); // 32-битный пустой заголовок (комментарий)
+    textBytes.copy(cellData, 6);
+
+    const finalBoc = Buffer.concat([header, cellData]);
+    return finalBoc.toString('base64');
+}
+
+// ---------------------------------------------------------------------------
+// ДИНАМИЧЕСКИЙ МАНИФЕСТ С АБСОЛЮТНЫМИ ССЫЛКАМИ ПОД ВАШ ЛОГОТИП
+// Размещен ВЫШЕ static middleware для избежания конфликтов и перезаписи
+// ---------------------------------------------------------------------------
+app.get('/tonconnect-manifest.json', (req, res) => {
+    const host = req.get('host');
+    const protocol = req.secure || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
+    const appUrl = process.env.WEB_APP_URL || `${protocol}://${host}`;
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Access-Control-Allow-Origin', '*'); // Доступность для всех кошельков
+    res.json({
+        "url": appUrl,
+        "name": "BestGifts",
+        "iconUrl": `${appUrl}/Images/Logo/logotip.png`, // Абсолютная ссылка решает проблему с логотипом
+        "termsOfUseUrl": appUrl,
+        "privacyPolicyUrl": appUrl
+    });
+});
+
+// КЛИЕНТСКИЙ АВАТАР-ПРОКСИ: Позволяет круглосуточно отображать фото профилей без обрыва сессий
+app.get('/api/avatar/:userId', async (req, res) => {
+    const userId = req.params.userId;
+    try {
+        const avatarUrl = await getUserAvatarUrl(userId);
+        if (avatarUrl) {
+            const response = await axios.get(avatarUrl, { responseType: 'stream' });
+            response.data.pipe(res);
+        } else {
+            res.redirect('https://img.icons8.com/color/96/user.png');
+        }
+    } catch (e) {
+        res.redirect('https://img.icons8.com/color/96/user.png');
+    }
+});
+
+// ---------------------------------------------------------------------------
+// ПОДКЛЮЧЕНИЕ СТАТИЧЕСКИХ РЕСУРСОВ С КЕШИРОВАНИЕМ ДЛЯ МОМЕНТАЛЬНОЙ ЗАГРУЗКИ
+// ---------------------------------------------------------------------------
+app.use(express.static(path.join(__dirname, 'public'), {
+    maxAge: '1y',
+    setHeaders: (res, path) => {
+        res.setHeader('Access-Control-Allow-Origin', '*'); // Разрешаем кошелькам кешировать логотип
+        if (path.endsWith('.png') || path.endsWith('.jpg') || path.endsWith('.jpeg') || path.endsWith('.gif') || path.endsWith('.webp')) {
+            res.setHeader('Cache-Control', 'public, max-age=31536000, immutable'); // Кеширование картинок на 1 год
+        }
+    }
+}));
 
 // Сопоставление комментариев транзакций TON
 function matchTransactionComment(tx, userId) {
     if (!tx.in_msg) return false;
     const comment = tx.in_msg.message || "";
     return comment.trim() === String(userId).trim();
-}
-
-// СТАБИЛЬНЫЙ ВЫСОКОТОЧНЫЙ СЕРВЕРНЫЙ КОМПИЛЯТОР BOC (Решает все вылеты в кошельках)
-function serializeTextCommentBoc(text) {
-    const textBytes = Buffer.from(text, 'utf8');
-    const dataLen = 4 + textBytes.length; // 4 нулевых байта + байты строки
-
-    // Дескрипторы ячейки (Refs=0, Exotic=0)
-    const d1 = 0; 
-    const d2 = dataLen * 2; // Битовая длина с байтовым выравниванием
-
-    const cellContentLen = 2 + dataLen;
-
-    // Спецификация TON Single-Cell BOC
-    const header = Buffer.from([
-        0xb5, 0xee, 0x9c, 0x72, // BOC Magic
-        0x01,                   // has_idx=0, has_crc32c=0, size_bytes=1
-        0x01,                   // index_size
-        0x01,                   // offset_size
-        0x01,                   // cell_count
-        0x01,                   // root_count
-        0x00,                   // absent_count
-        cellContentLen,         // Общая длина ячейки данных
-        0x00                    // Индекс корня (0)
-    ]);
-
-    const cellData = Buffer.alloc(2 + dataLen);
-    cellData[0] = d1;
-    cellData[1] = d2;
-    cellData.writeUInt32BE(0, 2); // 32-битный пустой заголовок (Указывает кошельку на текстовый комментарий)
-    textBytes.copy(cellData, 6);
-
-    const finalBoc = Buffer.concat([header, cellData]);
-    return finalBoc.toString('base64');
 }
 
 // ---------------------------------------------------------------------------
@@ -123,47 +173,20 @@ app.use(async (req, res, next) => {
     next();
 });
 
-// Роут генерации Payload (Вызывается из клиента)
+// Endpoint для безопасного получения Payload с сервера
 app.get('/api/generate_payload', (req, res) => {
     const text = req.query.text;
     if (!text) return res.status(400).json({ error: "Missing text parameter" });
-    const boc = serializeTextCommentBoc(String(text));
-    res.json({ payload: boc });
-});
-
-// КЛИЕНТСКИЙ АВАТАР-ПРОКСИ (Позволяет круглосуточно отображать фото профилей)
-app.get('/api/avatar/:userId', async (req, res) => {
-    const userId = req.params.userId;
     try {
-        const avatarUrl = await getUserAvatarUrl(userId);
-        if (avatarUrl) {
-            const response = await axios.get(avatarUrl, { responseType: 'stream' });
-            response.data.pipe(res);
-        } else {
-            res.redirect('https://img.icons8.com/color/96/user.png');
-        }
+        const boc = serializeTextCommentBoc(String(text));
+        res.json({ payload: boc });
     } catch (e) {
-        res.redirect('https://img.icons8.com/color/96/user.png');
+        res.status(500).json({ error: "BOC compilation error" });
     }
 });
 
 app.get('/api/deposit_address', (req, res) => {
     res.json({ address: ADMIN_TON_ADDRESS });
-});
-
-// КРАСИВЫЙ ДИНАМИЧЕСКИЙ МАНИФЕСТ С АБСОЛЮТНЫМИ ССЫЛКАМИ ПОД ВАШ ЛОГОТИП
-app.get('/tonconnect-manifest.json', (req, res) => {
-    const host = req.get('host');
-    const protocol = req.secure || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
-    const appUrl = process.env.WEB_APP_URL || `${protocol}://${host}`;
-    res.setHeader('Content-Type', 'application/json');
-    res.json({
-        "url": appUrl,
-        "name": "BestGifts",
-        "iconUrl": `${appUrl}/Images/Logo/logotip.png`, // Абсолютная ссылка решает проблему с логотипом
-        "termsOfUseUrl": appUrl,
-        "privacyPolicyUrl": appUrl
-    });
 });
 
 app.post('/api/verify-payment', async (req, res) => {
