@@ -15,6 +15,7 @@
     --purple-gradient: linear-gradient(135deg, #22184c 0%, #0d091a 100%);
 }
 
+/* Полное удаление синей рамки выделения (Tap Highlight) при тапах */
 * {
     -webkit-tap-highlight-color: transparent !important;
     -webkit-tap-highlight-color: rgba(0, 0, 0, 0) !important;
@@ -331,7 +332,7 @@ body {
     z-index: 2;
 }
 
-/* СТРОГО ЦЕНТРИРОВАННЫЙ ТЕКСТ */
+/* СТРОГО ЦЕНТРИРОВАННЫЙ ТЕКСТ ПО ЦЕНТРУ ПОЛЯ */
 .arena-waiting-text {
     position: absolute;
     top: 50%;
@@ -348,9 +349,10 @@ body {
     animation: pulseGlow 1.8s ease-in-out infinite alternate;
     text-align: center;
     white-space: nowrap;
+    pointer-events: none;
 }
 
-/* Круглый таймер */
+/* Неоновый таймер */
 .arena-timer-circle {
     position: absolute;
     top: 50%;
@@ -369,6 +371,7 @@ body {
     font-weight: 900;
     color: #ffffff;
     z-index: 6;
+    pointer-events: none;
 }
 
 .arena-avatars-overlay {
@@ -388,11 +391,11 @@ body {
     box-shadow: 0 2px 8px rgba(0,0,0,0.5);
     transform: translate(-50%, -50%);
     object-fit: cover;
-    transition: width 0.3s, height 0.3s;
+    transition: all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
 @keyframes pulseGlow {
-    0% { opacity: 0.3; }
+    0% { opacity: 0.35; }
     100% { opacity: 1; }
 }
 
@@ -411,18 +414,19 @@ body {
 
 /* Квадратный карандашик со скругленными углами */
 .bet-edit-btn {
-    width: 48px;
-    height: 48px;
-    border-radius: 12px;
-    background: rgba(255, 255, 255, 0.08);
-    border: 1.5px solid rgba(255, 255, 255, 0.15);
+    width: 58px;
+    height: 58px;
+    border-radius: 16px;
+    background: rgba(30, 24, 54, 0.6);
+    border: 1.5px solid var(--border-color);
     color: #ffffff;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
     transition: transform 0.1s, border-color 0.2s, background-color 0.2s;
+    box-sizing: border-box;
 }
 
 .bet-edit-btn:active {
@@ -434,23 +438,24 @@ body {
     background: rgba(141, 61, 245, 0.15);
 }
 
-/* Квадратные кнопки ставок */
+/* Квадратные аккуратные кнопки ставок */
 .bet-button {
-    width: 48px;
-    height: 48px;
-    border-radius: 12px;
-    background: rgba(255, 255, 255, 0.08);
-    border: 1.5px solid rgba(255, 255, 255, 0.15);
+    width: 58px;
+    height: 58px;
+    border-radius: 16px;
+    background: rgba(30, 24, 54, 0.6);
+    border: 1.5px solid var(--border-color);
     color: #ffffff;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 4px;
+    gap: 3px;
     cursor: pointer;
-    font-weight: 700;
-    font-size: 13px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-    transition: all 0.15s ease-in-out;
+    font-weight: 800;
+    font-size: 11px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
     position: relative;
     box-sizing: border-box;
 }
