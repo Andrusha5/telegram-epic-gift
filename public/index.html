@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>BestGifts</title>
-    <!-- Версионный маркер ?v=2.0.6 гарантирует моментальный сброс кэша в Telegram -->
-    <link rel="stylesheet" href="css/style.css?v=2.0.6">
+    <!-- Версионный маркер ?v=2.0.7 гарантирует моментальный сброс кэша в Telegram -->
+    <link rel="stylesheet" href="css/style.css?v=2.0.7">
 </head>
 <body>
 
@@ -13,6 +13,7 @@
     <header class="main-header">
         <div class="header-left">
             <div class="logo-area">
+                <!-- Увеличенный круглый логотип BestGifts -->
                 <img src="/Images/Logo/logotip.png" alt="BestGifts" class="logo-img-header" onerror="this.src='https://img.icons8.com/color/96/gift.png';">
                 <span class="logo-text">BESTGIFTS</span>
             </div>
@@ -29,6 +30,7 @@
 
     <!-- ================= 1. ГЛАВНЫЙ ЭКРАН (МЕНЮ) ================= -->
     <section id="home-section" class="app-section">
+        <!-- ПРИВЕТСТВЕННЫЙ БАННЕР -->
         <div class="welcome-banner">
             <h2>Добро пожаловать в BestGifts!</h2>
         </div>
@@ -49,6 +51,7 @@
 
         <h2 class="section-title">КЕЙСЫ</h2>
         
+        <!-- СЕТКА КЕЙСОВ -->
         <div class="cases-grid-layout" id="banners-container">
             <!-- Ежедневный бесплатный кейс -->
             <div class="case-card" id="daily-case-banner">
@@ -108,18 +111,22 @@
             <div style="width:46px;"></div>
         </div>
 
+        <!-- Рулетка прокрутки -->
         <div class="roulette-viewport">
             <div class="roulette-marker"></div>
             <div class="roulette-track" id="roulette-track"></div>
         </div>
 
+        <!-- Кнопка вращения -->
         <div class="spin-controls">
             <button class="spin-btn" id="spin-case-button">Запустить</button>
+            <!-- Таймер ежедневного кейса -->
             <div id="timer-container" class="timer-box hidden">
                 Возвращайтесь через: <span id="daily-case-timer">24ч 00м 00с</span>
             </div>
         </div>
 
+        <!-- Список наград -->
         <div id="rewards-section-container" class="rewards-section">
             <h3 id="rewards-grid-title" class="sub-title">🏆 Содержимое кейса</h3>
             <div class="rewards-grid" id="rewards-grid"></div>
@@ -149,17 +156,17 @@
                 <!-- Строго центрированная неоновая надпись -->
                 <div class="arena-waiting-text" id="arena-status-text">Ждем ставки...</div>
                 
-                <!-- Элемент круглого таймера по центру -->
+                <!-- Элемент круглого таймера по центру (изначально скрыт) -->
                 <div class="arena-timer-circle hidden" id="arena-countdown-timer">15</div>
 
                 <!-- Контейнер для аватарок поверх секторов -->
                 <div class="arena-avatars-overlay" id="arena-avatars-container"></div>
             </div>
 
-            <!-- БЛОК ПАНЕЛИ СТАВОК (КВАДРАТНЫЕ АККУРАТНЫЕ КНОПКИ В СТИЛЕ СКРИНШОТА) -->
+            <!-- БЛОК ПАНЕЛИ СТАВОК (КВАДРАТНЫЕ АККУРАТНЫЕ КНОПКИ С СКРУГЛЕННЫМИ УГЛАМИ) -->
             <div class="betting-row">
                 <button class="bet-edit-btn" id="bet-edit-trigger">
-                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
                         <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
                     </svg>
                 </button>
@@ -181,8 +188,10 @@
 
     <!-- ================= 4. ЭКРАН ИНВЕНТАРЯ ================= -->
     <section id="inventory-section" class="app-section hidden">
+        <!-- Сетка предметов -->
         <div class="inventory-grid" id="inventory-grid"></div>
 
+        <!-- БЛОК ДЕПОЗИТА ПОДАРКОВ (NFT) -->
         <div class="deposit-gift-box">
             <div class="deposit-header-row">
                 <span class="deposit-box-icon">📥</span>
@@ -279,25 +288,25 @@
         </nav>
     </div>
 
-    <!-- МОДАЛЬНОЕ ОКНО НАСТРОЙКИ СТАВОК (ДО 3 ЗНАКОВ ПОСЛЕ ЗАПЯТОЙ) -->
+    <!-- МОДАЛЬНОЕ ОКНО НАСТРОЙКИ СТАВОК (ОГРАНИЧЕНИЕ 3 ЦИФРЫ ПОСЛЕ ЗАПЯТОЙ) -->
     <div id="edit-bets-modal" class="modal-overlay hidden">
         <div class="modal-card">
             <button class="modal-close-x" id="edit-bets-close-btn">&times;</button>
             <div class="modal-icon">✏️</div>
             <h2 class="modal-title">Настройка кнопок</h2>
-            <p class="modal-message">Введите суммы для быстрых ставок (не менее 0.1, макс. 3 знака после запятой):</p>
+            <p class="modal-message">Задайте суммы для быстрых ставок (не менее 0.1, макс. 3 знака после запятой):</p>
             <div class="modal-input-row">
                 <div class="bet-input-wrapper">
                     <label>Кнопка 1</label>
-                    <input type="number" id="bet-input-1" class="modal-deposit-field" step="0.001" min="0.1" placeholder="1">
+                    <input type="number" id="bet-input-1" class="modal-deposit-field" step="0.001" min="0.1">
                 </div>
                 <div class="bet-input-wrapper">
                     <label>Кнопка 2</label>
-                    <input type="number" id="bet-input-2" class="modal-deposit-field" step="0.001" min="0.1" placeholder="2">
+                    <input type="number" id="bet-input-2" class="modal-deposit-field" step="0.001" min="0.1">
                 </div>
                 <div class="bet-input-wrapper">
                     <label>Кнопка 3</label>
-                    <input type="number" id="bet-input-3" class="modal-deposit-field" step="0.001" min="0.1" placeholder="3">
+                    <input type="number" id="bet-input-3" class="modal-deposit-field" step="0.001" min="0.1">
                 </div>
             </div>
             <div class="modal-actions" style="margin-top: 20px;">
@@ -335,8 +344,9 @@
         </div>
     </div>
 
+    <!-- Telegram SDK и TON Connect SDK подключены перед скриптом -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>
-    <script src="js/app.js?v=2.0.6" defer></script>
+    <script src="js/app.js?v=2.0.7" defer></script>
 </body>
-        </html>
+    </html>
