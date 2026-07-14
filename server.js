@@ -42,7 +42,7 @@ app.use((req, res, next) => {
     next();
 });
 
-// АВТОМАТИЧЕСКИЙ СБРОС КЭША TELEGRAM (Блокирует сохранение старых сессий кода)
+// АВТОМАТИЧЕСКИЙ СБРОС КЭША TELEGRAM
 app.use((req, res, next) => {
     const url = req.url;
     if (url.endsWith('.html') || url.endsWith('.js') || url.endsWith('.css') || url === '/' || url === '/index.html') {
@@ -84,7 +84,7 @@ function serializeTextCommentBoc(text) {
     return Buffer.concat([header, cellData]).toString('base64');
 }
 
-// ДИНАМИЧЕСКИЙ МАНИФЕСТ ДЛЯ ИДЕАЛЬНОГО ОТОБРАЖЕНИЯ ЛОГОТИПА В КОШЕЛЬКЕ
+// ДИНАМИЧЕСКИЙ МАНИФЕСТ
 app.get('/tonconnect-manifest.json', (req, res) => {
     const host = req.get('host');
     const protocol = 'https'; 
@@ -183,7 +183,7 @@ app.use(async (req, res, next) => {
     next();
 });
 
-// ЭНДПОИНТ ДЛЯ ОПЛАТЫ ИГРОВОЙ СТАВКИ В BEST ARENA С БАЛАНСА
+// ЭНДПОИНТ ДЛЯ ОПЛАТЫ СТАВКИ В BEST ARENA С БАЛАНСА
 app.post('/api/place_bet', async (req, res) => {
     if (!req.telegramUser || !req.telegramUser.id) {
         return res.status(401).json({ error: 'Unauthorized' });
