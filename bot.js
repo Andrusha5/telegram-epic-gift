@@ -4,11 +4,26 @@ const pool = db.pool || db;
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
 
-// Защита от запуска дублирующих процессов (синглтон-клиент)
+// Защита от дублирования процессов на сервере (синглтон)
 if (!global.botInstance) {
     global.botInstance = new TelegramBot(token, { polling: true });
 }
 const bot = global.botInstance;
+
+// --- ФУНКЦИЯ ПОЛУЧЕНИЯ СВЕЖЕЙ АВАТАРКИ ЧЕРЕЗ TELEGRAM API ---
+async function getUserAvatarUrl(userId) {
+    try {
+        const photos = await bot.getUserProfilePhotos(userId, { limit: 1 });
+        if (photos && photos.total_count > 0 && photos.photos[0].length > 0) {
+            const fileId = photos.photos[0][0].file_id; // Берем аватарку в стандартном качестве
+            const file = await bot.getFile(fileId);
+            return `https://api.telegram.org/file/bot${token}/${file.file_path}`;
+        }
+    } catch (err) {
+        console.error("Ошибка при получении фото профиля в боте:", err);
+    }
+    return null;
+}
 
 // --- ФУНКЦИЯ ПРОВЕРКИ ПОДПИСКИ ПОЛЬЗОВАТЕЛЯ НА КАНАЛ ---
 async function checkUserSubscription(userId) {
@@ -122,5 +137,6 @@ bot.on('callback_query', async (callbackQuery) => {
 
 module.exports = {
     bot,
-    checkUserSubscription
+    checkUserSubscription,
+    getUserAvatarUrl
 };
