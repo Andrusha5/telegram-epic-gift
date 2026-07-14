@@ -101,15 +101,15 @@ bot.on('callback_query', async (callbackQuery) => {
             ).catch(() => {});
 
             const userMsg = `📥 <b>Ваш депозит подтвержден!</b>\n\n` +
-                            `🎁 Подарок <b>${item.name}</b> успешно добавлен в ваш инвентарь.\n` +
-                            `🎒 Откройте «Инвентарь» в приложении, чтобы распорядиться им!`;
+                            `🎁 Подарок <b>${item.name}</b> добавлен в инвентарь.\n` +
+                            `🎒 Откройте «Инвентарь» в приложении!`;
             bot.sendMessage(targetUserId, userMsg, { parse_mode: 'HTML' }).catch(() => {});
 
         } else if (action === 'rej') {
             await client.query('COMMIT');
 
             await bot.editMessageText(
-                message.text + `\n\n🔴 <b>Статус:</b> ЗАЯВКА ОТКЛОНЕНА АДМИНИСТРАТОРОМ`,
+                message.text + `\n\n🔴 <b>Статус:</b> ЗАЯВКА ОТКЛОНЕНА`,
                 { chat_id: message.chat.id, message_id: message.message_id, parse_mode: 'HTML' }
             ).catch(() => {});
 
