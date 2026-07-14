@@ -288,7 +288,7 @@ body {
 }
 
 /* ==========================================================================
-   СТИЛИ НОВОГО ЭКРАНА ИГРЫ "BEST ARENA"
+   СТИЛИ НОВОГО ЭКРАНА ИГРЫ "BEST ARENA" С ДИНАМИЧЕСКИМ РАЗДЕЛЕНИЕМ ПОЛЯ
    ========================================================================== */
 .arena-game-container {
     width: 100%;
@@ -296,7 +296,7 @@ body {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    margin-top: 24px;
+    margin-top: 14px;
     box-sizing: border-box;
 }
 
@@ -304,15 +304,25 @@ body {
 .arena-big-box {
     width: 280px;
     height: 280px;
-    background: radial-gradient(circle, #1a163a 0%, #0d091e 100%);
-    border: 3px solid #3a355c;
-    border-radius: 36px;
+    background: #110e25;
+    border: 3px solid #2d2654;
+    border-radius: 32px;
     position: relative;
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.7), inset 0 0 20px rgba(141, 61, 245, 0.2);
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6);
     overflow: hidden;
+}
+
+/* Холст SVG для красивого закрашивания поля */
+.arena-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
 }
 
 /* Сетка внутри игрового поля */
@@ -323,62 +333,104 @@ body {
     width: 100%;
     height: 100%;
     background-image: 
-        linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
-    background-size: 40px 40px;
+        linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+    background-size: 35px 35px;
     background-position: center;
     pointer-events: none;
+    z-index: 2;
 }
 
 /* Мерцающая неоновая надпись */
 .arena-waiting-text {
-    font-size: 22px;
+    font-size: 20px;
     font-weight: 900;
     color: #ffffff;
     text-transform: uppercase;
     letter-spacing: 1.5px;
-    text-shadow: 0 0 10px rgba(255, 255, 255, 0.8), 0 0 20px rgba(255, 255, 255, 0.4);
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.8), 0 0 20px rgba(141, 61, 245, 0.4);
     z-index: 5;
     animation: pulseGlow 1.8s ease-in-out infinite alternate;
     text-align: center;
 }
 
-@keyframes pulseGlow {
-    0% {
-        opacity: 0.3;
-        transform: scale(0.96);
-        text-shadow: 0 0 5px rgba(255, 255, 255, 0.4);
-    }
-    100% {
-        opacity: 1;
-        transform: scale(1.04);
-        text-shadow: 0 0 20px rgba(255, 255, 255, 1), 0 0 30px rgba(141, 61, 245, 0.6);
-    }
+/* Круглый неоновый таймер по центру */
+.arena-timer-circle {
+    width: 78px;
+    height: 78px;
+    border-radius: 50%;
+    background: rgba(11, 9, 20, 0.9);
+    border: 3px solid var(--accent-purple);
+    box-shadow: 0 0 20px var(--accent-purple-glow);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 32px;
+    font-weight: 900;
+    color: #ffffff;
+    z-index: 6;
+    animation: timerPulse 1s ease-in-out infinite;
 }
 
-/* КНОПКИ СТАВОК (КРАСИВАЯ СЕТКА ИЗ 4 СФЕР) */
+/* Слой для аватарок игроков */
+.arena-avatars-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 4;
+    pointer-events: none;
+}
+
+/* Стили аватарок игроков на поле */
+.arena-player-avatar-node {
+    position: absolute;
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    border: 2px solid #ffffff;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+    transform: translate(-50%, -50%);
+}
+
+@keyframes timerPulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.08); box-shadow: 0 0 25px rgba(141, 61, 245, 0.6); }
+    100% { transform: scale(1); }
+}
+
+@keyframes pulseGlow {
+    0% { opacity: 0.3; transform: scale(0.96); }
+    100% { opacity: 1; transform: scale(1.04); }
+}
+
+/* ==========================================================================
+   КНОПКИ СТАВОК (АККУРАТНЫЕ И ЭЛЕГАНТНЫЕ - КАК НА СКРИНШОТЕ)
+   ========================================================================== */
 .betting-row {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 16px;
-    margin-top: 32px;
+    gap: 12px;
+    margin-top: 24px;
     width: 100%;
     box-sizing: border-box;
 }
 
+/* Круглая кнопка изменения ставки (карандашик) */
 .bet-edit-btn {
-    width: 58px;
-    height: 58px;
+    width: 46px;
+    height: 46px;
     border-radius: 50%;
-    background: #1d1b33;
-    border: 2px solid #3a355c;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1.5px solid rgba(255, 255, 255, 0.15);
     color: #ffffff;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
     transition: transform 0.1s, border-color 0.2s, background-color 0.2s;
 }
 
@@ -388,57 +440,56 @@ body {
 
 .bet-edit-btn:hover {
     border-color: var(--accent-purple);
+    background: rgba(141, 61, 245, 0.15);
 }
 
+/* Круглые аккуратные кнопки ставок */
 .bet-button {
-    width: 58px;
-    height: 58px;
+    width: 46px;
+    height: 46px;
     border-radius: 50%;
-    background: #1c143c;
-    border: 2.5px solid #452a8c;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1.5px solid rgba(255, 255, 255, 0.15);
     color: #ffffff;
     display: flex;
-    flex-direction: row;
     align-items: center;
     justify-content: center;
-    gap: 3px;
+    gap: 2px;
     cursor: pointer;
-    font-weight: 900;
-    font-size: 14px;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
-    transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    font-weight: 700;
+    font-size: 11px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    transition: all 0.15s ease-in-out;
     position: relative;
     box-sizing: border-box;
 }
 
-/* Активная кнопка: Достаточно средств на балансе */
+/* Активное и доступное состояние кнопки */
 .bet-button.active {
-    background: linear-gradient(135deg, #24144e 0%, #3e1b78 100%);
     border-color: var(--accent-purple);
-    box-shadow: 0 0 14px var(--accent-purple-glow), 0 4px 10px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 0 10px var(--accent-purple-glow);
 }
 
 .bet-button.active:active {
     transform: scale(0.92);
-    box-shadow: 0 0 6px var(--accent-purple-glow);
 }
 
-/* Выключенное состояние (Баланс ниже стоимости) */
+/* Отключенное состояние (баланса не хватает) */
 .bet-button.disabled {
-    background: #14131d !important;
-    border-color: #24222c !important;
-    color: #4a4857 !important;
+    background: rgba(255, 255, 255, 0.03) !important;
+    border-color: rgba(255, 255, 255, 0.05) !important;
+    color: rgba(255, 255, 255, 0.2) !important;
     box-shadow: none !important;
     cursor: not-allowed;
 }
 
 .bet-button.disabled .bet-coin-icon {
-    filter: grayscale(1) opacity(0.2);
+    filter: grayscale(1) opacity(0.15);
 }
 
 .bet-coin-icon {
-    width: 14px;
-    height: 14px;
+    width: 11px;
+    height: 11px;
     object-fit: contain;
 }
 
@@ -1438,4 +1489,4 @@ body {
 .modal-btn-secondary {
     background: #241c44;
     color: #ffffff;
-                                                                    }
+   }
