@@ -28,20 +28,17 @@ const CHANNEL_USERNAME = process.env.CHANNEL_USERNAME || "";
 const ADMIN_TON_ADDRESS = process.env.ADMIN_TON_ADDRESS; 
 const TONCENTER_API_KEY = process.env.TONCENTER_API_KEY; 
 
-// Резервируем память под JSON-парсер
 app.use(express.json());
 
 // ---------------------------------------------------------------------------
-// НАДЁЖНАЯ ВСТРОЕННАЯ (НАТИВНАЯ) НАСТРОЙКА CORS БЕЗ ВНЕШНИХ БИБЛИОТЕК
-// Решает проблему с развертыванием на Render и обеспечивает доступ кошелькам
+// НАСТРОЙКА КРОСС-ДОМЕННОГО ДОСТУПА (CORS) БЕЗ ВНЕШНИХ МОДУЛЕЙ
+// Предотвращает ошибки MODULE_NOT_FOUND на хостингах
 // ---------------------------------------------------------------------------
 app.use((req, res, next) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, PATCH, DELETE');
     res.setHeader('Access-Control-Allow-Headers', 'X-Requested-With, content-type, x-telegram-init-data');
     res.setHeader('Access-Control-Allow-Credentials', 'true');
-    
-    // Мгновенный ответ на preflight-запросы (OPTIONS)
     if (req.method === 'OPTIONS') {
         return res.sendStatus(200);
     }
@@ -86,7 +83,7 @@ function serializeTextCommentBoc(text) {
 
 // ---------------------------------------------------------------------------
 // ДИНАМИЧЕСКИЙ МАНИФЕСТ С АБСОЛЮТНЫМИ ССЫЛКАМИ ПОД ВАШ ЛОГОТИП
-// Перенесен в самый начало для безупречной обработки TON Connect кошельками
+// Перенесен в самое начало для безупречной обработки TON Connect кошельками
 // ---------------------------------------------------------------------------
 app.get('/tonconnect-manifest.json', (req, res) => {
     const host = req.get('host');
