@@ -44,7 +44,7 @@ function preloadImages(urls) {
     });
 }
 
-// Детерминированный генератор случайных чисел (Seeded PRNG) для синхронизации физики движения
+// Детерминированный seeded генератор для физики шарика
 function createPRNG(seedString) {
     let h = 1779033703 ^ seedString.length;
     for (let i = 0; i < seedString.length; i++) {
@@ -64,12 +64,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     let isNewbieCaseMode = false; 
     const GRAMCOIN_ICON_URL = "/Images/Items/gram_popolnenie.png"; 
 
-    let customBets = [1, 2, 3];
+    // Настраиваемые ставки по умолчанию (не менее 0.1 GRAM!)
+    let customBets = [0.1, 1.0, 5.0];
     let arenaPlayers = []; 
     let arenaPollInterval = null;
     let isBallAnimating = false;
     let currentRoundSignature = null;
-    let arenaStatusStr = "waiting"; // "waiting", "countdown", "finished"
+    let arenaStatusStr = "waiting";
+
+    // Хранение плавных координат парящего юзернейма
+    let lerpedTextX = 160;
+    let lerpedTextY = 160;
 
     const safeSetText = (el, val) => { if (el) el.innerText = val; };
     const initialName = tg.initDataUnsafe?.user?.username || tg.initDataUnsafe?.user?.first_name || "Пользователь";
@@ -391,42 +396,95 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // -----------------------------------------------------------------------
-    // ДИНАМИЧЕСКИЙ SVG ДВИЖОК И МУЛЬТИПЛЕЕРНАЯ СИНХРОНИЗАЦИЯ BEST ARENA
+    // ГЕОМЕТРИЧЕСКИЙ ДВИЖОК SVG И МУЛЬТИПЛЕЕРНАЯ СИНХРОНИЗАЦИЯ BEST ARENA
     // -----------------------------------------------------------------------
+    
+    // Алгоритм защиты долей ставок: минимальная доля каждого участника — 4% (0.04)
+    function calculateSharesProtection(players) {
+        const N = players.length;
+        if (N === 0) return [];
+        let bets = players.map(p => parseFloat(p.bet || 0));
+        const total = bets.reduce((a, b) => a + b, 0);
+        if (total === 0) return bets.map(() => 1 / N);
+
+        let rawShares = bets.map(b => b / total);
+        const minShare = 0.04; // Гарантированные 4% для каждого мелкого игрока
+
+        let adjusted = [...rawShares];
+        let iterations = 0;
+        while (iterations < 10) {
+            let underMinCount = 0;
+            let underMinSum = 0;
+            let overMinSum = 0;
+
+            for (let i = 0; i < N; i++) {
+                if (adjusted[i] < minShare) {
+                    underMinCount++;
+                    underMinSum += minShare;
+                } else {
+                    overMinSum += adjusted[i];
+                }
+            }
+
+            if (underMinCount === 0) break;
+            if (underMinSum >= 1.0) {
+                return adjusted.map(() => 1 / N);
+            }
+
+            const scale = (1.0 - underMinSum) / overMinSum;
+            for (let i = 0; i < N; i++) {
+                if (adjusted[i] < minShare) {
+                    adjusted[i] = minShare;
+                } else {
+                    adjusted[i] = adjusted[i] * scale;
+                }
+            }
+            iterations++;
+        }
+        return adjusted;
+    }
+
+    // Поиск точного геометрического центра масс (Centroid) для любого полигона
+    function getPolygonCentroid(pts) {
+        let first = pts[0];
+        let last = pts[pts.length - 1];
+        let closeCycle = false;
+        if (first.x !== last.x || first.y !== last.y) {
+            pts.push({ x: first.x, y: first.y });
+            closeCycle = true;
+        }
+        let area = 0, cx = 0, cy = 0;
+        for (let i = 0; i < pts.length - 1; i++) {
+            let p1 = pts[i];
+            let p2 = pts[i+1];
+            let factor = (p1.x * p2.y - p2.x * p1.y);
+            area += factor;
+            cx += (p1.x + p2.x) * factor;
+            cy += (p1.y + p2.y) * factor;
+        }
+        area = area / 2;
+        if (closeCycle) pts.pop();
+        if (Math.abs(area) < 0.01) {
+            let sx = 0, sy = 0;
+            pts.forEach(p => { sx += p.x; sy += p.y; });
+            return { x: sx / pts.length, y: sy / pts.length };
+        }
+        cx = cx / (6 * area);
+        cy = cy / (6 * area);
+        return { x: cx, y: cy };
+    }
+
     const gameTrigger = document.getElementById('game-arena-trigger');
     if (gameTrigger) {
-        gameTrigger.addEventListener('click', () => {
-            navigateTo('arena');
-        });
+        gameTrigger.addEventListener('click', () => { navigateTo('arena'); });
     }
 
     const backFromArena = document.getElementById('back-to-home-from-arena');
     if (backFromArena) {
-        backFromArena.addEventListener('click', () => {
-            navigateTo('home');
-        });
+        backFromArena.addEventListener('click', () => { navigateTo('home'); });
     }
 
-    // Поиск точки пересечения луча из центра (160,160) с границами поля 320x320
-    function getSquareIntersection(angle) {
-        const cx = 160, cy = 160;
-        const dx = Math.cos(angle);
-        const dy = Math.sin(angle);
-        let tMax = Infinity;
-
-        if (dx > 0) tMax = Math.min(tMax, (320 - cx) / dx);
-        else if (dx < 0) tMax = Math.min(tMax, (0 - cx) / dx);
-
-        if (dy > 0) tMax = Math.min(tMax, (320 - cy) / dy);
-        else if (dy < 0) tMax = Math.min(tMax, (0 - cy) / dy);
-
-        return {
-            x: cx + dx * tMax,
-            y: cy + dy * tMax
-        };
-    }
-
-    // ИСПРАВЛЕНО: Математически идеальное ДИАГОНАЛЬНОЕ и РАДИАЛЬНОЕ деление поля
+    // Рендеринг секторов полей: Диагонали (2 игрока) или Радиальные лучи (3+ игрока)
     function drawArenaSegments() {
         const svg = document.getElementById('arena-svg-canvas');
         const avatarsContainer = document.getElementById('arena-avatars-container');
@@ -443,10 +501,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         const W = 320; 
         const H = 320;
 
-        const totalBetSum = arenaPlayers.reduce((sum, p) => sum + parseFloat(p.bet), 0);
+        const shares = calculateSharesProtection(arenaPlayers);
 
         if (N === 1) {
-            // 1 игрок - все поле закрашено его цветом
             const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
             rect.setAttribute("x", "0");
             rect.setAttribute("y", "0");
@@ -455,65 +512,88 @@ document.addEventListener('DOMContentLoaded', async () => {
             rect.setAttribute("fill", arenaPlayers[0].color);
             svg.appendChild(rect);
 
-            createAvatarElement(160, 160, arenaPlayers[0].avatar, 64);
+            createAvatarElement(160, 160, arenaPlayers[0].avatar, 56);
         } else if (N === 2) {
-            // ИСПРАВЛЕНО: Точное ДИАГОНАЛЬНОЕ деление поля для двух игроков!
-            const r = arenaPlayers[0].bet / totalBetSum;
+            // Математически безупречное диагональное деление
+            const r = shares[0];
 
             if (r <= 0.5) {
-                // Игрок 1 получает треугольник в левом верхнем углу (диагональное деление)
                 const s = Math.sqrt(2 * r);
                 const sizeX = (W * s).toFixed(1);
                 const sizeY = (H * s).toFixed(1);
 
-                // Задний фон - Игрок 2 (заполняет всё остальное)
+                // Фон - Игрок 2
                 const bg = document.createElementNS("http://www.w3.org/2000/svg", "rect");
                 bg.setAttribute("width", "100%");
                 bg.setAttribute("height", "100%");
                 bg.setAttribute("fill", arenaPlayers[1].color);
                 svg.appendChild(bg);
 
-                // Треугольник - Игрок 1
+                // Верхний левый треугольник - Игрок 1
                 const poly = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
-                poly.setAttribute("points", `0,0 ${sizeX},0 0,${sizeY}`);
+                const p1Pts = [{x:0, y:0}, {x:parseFloat(sizeX), y:0}, {x:0, y:parseFloat(sizeY)}];
+                poly.setAttribute("points", p1Pts.map(p => `${p.x},${p.y}`).join(' '));
                 poly.setAttribute("fill", arenaPlayers[0].color);
                 svg.appendChild(poly);
 
-                // Отрисовка аватарок на центрах масс
-                createAvatarElement(parseFloat(sizeX) / 3, parseFloat(sizeY) / 3, arenaPlayers[0].avatar, 44);
-                createAvatarElement(W - 60, H - 60, arenaPlayers[1].avatar, 48);
+                // Центроиды для идеального центрирования аватарок
+                const c1 = getPolygonCentroid(p1Pts);
+                const p2Pts = [
+                    {x:parseFloat(sizeX), y:0}, 
+                    {x:320, y:0}, 
+                    {x:320, y:320}, 
+                    {x:0, y:320}, 
+                    {x:0, y:parseFloat(sizeY)}
+                ];
+                const c2 = getPolygonCentroid(p2Pts);
+
+                createAvatarElement(c1.x, c1.y, arenaPlayers[0].avatar, 24 + r * 30);
+                createAvatarElement(c2.x, c2.y, arenaPlayers[1].avatar, 24 + (1-r) * 30);
             } else {
-                // Игрок 2 получает треугольник в правом нижнем углу
                 const s = Math.sqrt(2 * (1 - r));
                 const sizeX = (W * s).toFixed(1);
                 const sizeY = (H * s).toFixed(1);
 
-                // Задний фон - Игрок 1
+                // Фон - Игрок 1
                 const bg = document.createElementNS("http://www.w3.org/2000/svg", "rect");
                 bg.setAttribute("width", "100%");
                 bg.setAttribute("height", "100%");
                 bg.setAttribute("fill", arenaPlayers[0].color);
                 svg.appendChild(bg);
 
-                // Треугольник - Игрок 2
+                // Нижний правый треугольник - Игрок 2
                 const poly = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
-                poly.setAttribute("points", `320,320 ${(320 - sizeX)},320 320,${(320 - sizeY)}`);
+                const p2Pts = [
+                    {x:320, y:320}, 
+                    {x:320 - parseFloat(sizeX), y:320}, 
+                    {x:320, y:320 - parseFloat(sizeY)}
+                ];
+                poly.setAttribute("points", p2Pts.map(p => `${p.x},${p.y}`).join(' '));
                 poly.setAttribute("fill", arenaPlayers[1].color);
                 svg.appendChild(poly);
 
-                createAvatarElement(60, 60, arenaPlayers[0].avatar, 48);
-                createAvatarElement(W - parseFloat(sizeX) / 3, H - parseFloat(sizeY) / 3, arenaPlayers[1].avatar, 44);
+                const p1Pts = [
+                    {x:0, y:0}, 
+                    {x:320, y:0}, 
+                    {x:320, y:320 - parseFloat(sizeY)}, 
+                    {x:320 - parseFloat(sizeX), y:320}, 
+                    {x:0, y:320}
+                ];
+                const c1 = getPolygonCentroid(p1Pts);
+                const c2 = getPolygonCentroid(p2Pts);
+
+                createAvatarElement(c1.x, c1.y, arenaPlayers[0].avatar, 24 + r * 30);
+                createAvatarElement(c2.x, c2.y, arenaPlayers[1].avatar, 24 + (1-r) * 30);
             }
         } else {
-            // 3+ игроков - разделение радиальными треугольными секторами из центра
+            // Радиальное деление лучами из центра для 3+ игроков
             let currentAngle = 0;
-            arenaPlayers.forEach((player) => {
-                const share = player.bet / totalBetSum;
+            for (let i = 0; i < arenaPlayers.length; i++) {
+                const player = arenaPlayers[i];
+                const share = shares[i];
                 const nextAngle = currentAngle + 2 * Math.PI * share;
 
-                const pts = [];
-                pts.push({ x: 160, y: 160 }); // Центр
-
+                const pts = [{ x: 160, y: 160 }];
                 const step = 0.05;
                 for (let a = currentAngle; a < nextAngle; a += step) {
                     pts.push(getSquareIntersection(a));
@@ -521,21 +601,16 @@ document.addEventListener('DOMContentLoaded', async () => {
                 pts.push(getSquareIntersection(nextAngle));
 
                 const poly = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
-                const pointsStr = pts.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
-                poly.setAttribute("points", pointsStr);
+                poly.setAttribute("points", pts.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' '));
                 poly.setAttribute("fill", player.color);
                 svg.appendChild(poly);
 
-                // Вычисление центральной оси сектора для размещения аватарок
-                const midAngle = currentAngle + (nextAngle - currentAngle) / 2;
-                const edgePoint = getSquareIntersection(midAngle);
-                const avatarX = 160 + (edgePoint.x - 160) * 0.55;
-                const avatarY = 160 + (edgePoint.y - 160) * 0.55;
-
-                createAvatarElement(avatarX, avatarY, player.avatar, 38);
+                // Позиционируем аватарку строго по центру тяжести сектора
+                const c = getPolygonCentroid(pts);
+                createAvatarElement(c.x, c.y, player.avatar, 24 + share * 24);
 
                 currentAngle = nextAngle;
-            });
+            }
         }
     }
 
@@ -553,25 +628,23 @@ document.addEventListener('DOMContentLoaded', async () => {
         container.appendChild(img);
     }
 
-    // Определение того, на чьей территории находится шарик в реальном времени
+    // Координатная проверка принадлежности шара к сектору игрока в реальном времени
     function getPlayerAtCoords(x, y) {
         const N = arenaPlayers.length;
         if (N === 0) return null;
         if (N === 1) return arenaPlayers[0];
 
-        const totalBetSum = arenaPlayers.reduce((sum, p) => sum + parseFloat(p.bet), 0);
+        const shares = calculateSharesProtection(arenaPlayers);
 
         if (N === 2) {
-            const r = arenaPlayers[0].bet / totalBetSum;
+            const r = shares[0];
             if (r <= 0.5) {
                 const s = Math.sqrt(2 * r);
                 const boundarySize = 320 * s;
-                // Уравнение линии диагонали: x/boundarySize + y/boundarySize = 1 -> y = boundarySize - x
                 return (x + y <= boundarySize) ? arenaPlayers[0] : arenaPlayers[1];
             } else {
                 const s = Math.sqrt(2 * (1 - r));
                 const boundarySize = 320 * s;
-                // Линия отсекает нижний правый угол
                 return ((320 - x) + (320 - y) <= boundarySize) ? arenaPlayers[1] : arenaPlayers[0];
             }
         } else {
@@ -581,7 +654,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             let currentAngle = 0;
             for (let i = 0; i < arenaPlayers.length; i++) {
                 const player = arenaPlayers[i];
-                const share = player.bet / totalBetSum;
+                const share = shares[i];
                 const nextAngle = currentAngle + 2 * Math.PI * share;
 
                 if (angle >= currentAngle && angle <= nextAngle) {
@@ -630,7 +703,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     function renderBetButtons() {
         const balance = parseFloat(currentUser.balance || 0);
-        // Если шарик уже летит или игра закончена, кнопки блокируются!
         const blockBets = isBallAnimating || (arenaStatusStr === 'finished');
 
         for (let i = 0; i < 3; i++) {
@@ -651,19 +723,18 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    // ИСПРАВЛЕНО: Двумерный расчет траектории полета шарика с быстрым вылетом и красивым замедлением
+    // ИСПРАВЛЕНО: Траектория полета в 3 раза дольше с резким стартом и плавным торможением
     function simulateBallPathDeterministic(targetX, targetY, seedSignature, boardWidth = 320, boardHeight = 320, ballRadius = 8) {
-        const friction = 0.955; // Мягкое гашение скорости для плавного скольжения к цели
+        const friction = 0.988; // ИСПРАВЛЕНО: Минимальная потеря энергии за такт. Полет длится в 3 раза дольше!
         const rng = createPRNG(seedSignature);
 
-        // Поиск детерминированной траектории, оканчивающейся точно в секторе
         for (let trial = 0; trial < 3000; trial++) {
             const startX = boardWidth / 2;
             const startY = boardHeight / 2;
 
-            // ИСПРАВЛЕНО: Очень высокая стартовая скорость для резкого ускорения в начале
+            // ИСПРАВЛЕНО: Очень высокая стартовая скорость для резкого рывка на старте
             const angle = rng() * Math.PI * 2;
-            const speed = 35 + rng() * 12; 
+            const speed = 48 + rng() * 16; 
 
             let vx = Math.cos(angle) * speed;
             let vy = Math.sin(angle) * speed;
@@ -674,7 +745,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             let currentX = startX;
             let currentY = startY;
 
-            while (Math.abs(currentVx) > 0.05 || Math.abs(currentVy) > 0.05) {
+            while (Math.abs(currentVx) > 0.04 || Math.abs(currentVy) > 0.04) {
                 currentX += currentVx;
                 currentY += currentVy;
 
@@ -722,14 +793,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         ballCanvas.innerHTML = ''; 
 
-        // Идеально белый шарик без обводок
         const ballElement = document.createElementNS("http://www.w3.org/2000/svg", "circle");
         ballElement.setAttribute("id", "physics-ball");
         ballElement.setAttribute("r", "8");
         ballElement.setAttribute("fill", "#ffffff");
         ballCanvas.appendChild(ballElement);
 
-        // Парящий юзернейм над шариком (z-index 10)
         const textElement = document.createElementNS("http://www.w3.org/2000/svg", "text");
         textElement.setAttribute("id", "physics-ball-text");
         textElement.setAttribute("fill", "#ffffff");
@@ -743,9 +812,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         const H = 320;
 
         let simulation = simulateBallPathDeterministic(targetX, targetY, seedSignature, W, H, 8);
+        
+        // Переменные для сглаживания движения текста
+        lerpedTextX = W / 2;
+        lerpedTextY = H / 2;
+
         if (!simulation) {
             let frame = 0;
-            const totalFrames = 100;
+            const totalFrames = 300; // В 3 раза дольше при отсутствии просчитанной траектории
             const step = () => {
                 if (frame >= totalFrames) {
                     isBallAnimating = false;
@@ -761,13 +835,17 @@ document.addEventListener('DOMContentLoaded', async () => {
                 ballElement.setAttribute("cx", currentX.toFixed(1));
                 ballElement.setAttribute("cy", currentY.toFixed(1));
 
-                // Умный перенос юзернейма вверх/вниз у краев стены
-                const textX = Math.max(45, Math.min(275, currentX));
+                // ИСПРАВЛЕНО: Умный горизонтальный барьер у стен (с зазором 50 пикселей) и вертикальный перенос
+                const textTargetX = Math.max(50, Math.min(270, currentX));
                 const isNearTopWall = currentY < 35;
-                const textY = isNearTopWall ? (currentY + 24) : (currentY - 14);
+                const textTargetY = isNearTopWall ? (currentY + 24) : (currentY - 14);
 
-                textElement.setAttribute("x", textX.toFixed(1));
-                textElement.setAttribute("y", textY.toFixed(1));
+                // Плавное следование за шариком (Lerp)
+                lerpedTextX = lerpedTextX * 0.82 + textTargetX * 0.18;
+                lerpedTextY = lerpedTextY * 0.82 + textTargetY * 0.18;
+
+                textElement.setAttribute("x", lerpedTextX.toFixed(1));
+                textElement.setAttribute("y", lerpedTextY.toFixed(1));
 
                 const activePlayer = getPlayerAtCoords(currentX, currentY);
                 textElement.textContent = activePlayer ? activePlayer.username : "";
@@ -794,13 +872,16 @@ document.addEventListener('DOMContentLoaded', async () => {
             ballElement.setAttribute("cx", pos.x.toFixed(1));
             ballElement.setAttribute("cy", pos.y.toFixed(1));
 
-            // Автоматический перенос юзернейма под шарик, когда он близко к потолку
-            const textX = Math.max(45, Math.min(275, pos.x));
+            // ИСПРАВЛЕНО: Плавный перенос ника вверх-вниз + центровка по X вдоль стен
+            const textTargetX = Math.max(50, Math.min(270, pos.x));
             const isNearTopWall = pos.y < 35;
-            const textY = isNearTopWall ? (pos.y + 24) : (pos.y - 14);
+            const textTargetY = isNearTopWall ? (pos.y + 24) : (pos.y - 14);
 
-            textElement.setAttribute("x", textX.toFixed(1));
-            textElement.setAttribute("y", textY.toFixed(1));
+            lerpedTextX = lerpedTextX * 0.85 + textTargetX * 0.15;
+            lerpedTextY = lerpedTextY * 0.85 + textTargetY * 0.15;
+
+            textElement.setAttribute("x", lerpedTextX.toFixed(1));
+            textElement.setAttribute("y", lerpedTextY.toFixed(1));
 
             const activePlayer = getPlayerAtCoords(pos.x, pos.y);
             textElement.textContent = activePlayer ? activePlayer.username : "";
@@ -927,7 +1008,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (btn.classList.contains('disabled')) return;
 
         const betValue = parseFloat(btn.getAttribute('data-bet'));
-        if (isNaN(betValue) || betValue < 0.001) return;
+        if (isNaN(betValue) || betValue < 0.1) return; // Минимальная планка - 0.1 тон!
 
         btn.classList.add('disabled');
         btn.disabled = true;
@@ -984,11 +1065,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (editBetsClose) editBetsClose.addEventListener('click', closeEditBetsModal);
     if (cancelBetsBtn) cancelBetsBtn.addEventListener('click', closeEditBetsModal);
 
-    // Полное решение проблемы с вводом дробных на мобильных: авто-замена запятых на точки в реальном времени
+    // Замена запятых на точки в реальном времени при вводе
     const enforceThreeDecimals = (e) => {
         let val = e.target.value;
-        val = val.replace(/,/g, '.'); // Замена запятых на точки на лету
-        val = val.replace(/[^0-9.]/g, ''); // Удаление всех символов кроме цифр и точек
+        val = val.replace(/,/g, '.'); 
+        val = val.replace(/[^0-9.]/g, ''); 
         
         const dots = val.split('.');
         if (dots.length > 2) {
@@ -1017,8 +1098,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             b2 = parseFloat(b2.toFixed(3));
             b3 = parseFloat(b3.toFixed(3));
 
-            if (isNaN(b1) || b1 < 0.001 || isNaN(b2) || b2 < 0.001 || isNaN(b3) || b3 < 0.001) {
-                showNotification("Ставка не может быть меньше 0.001 GRAM!", "⚠️");
+            // ИСПРАВЛЕНО: Минимальная ставка изменена на 0.1 тон!
+            if (isNaN(b1) || b1 < 0.1 || isNaN(b2) || b2 < 0.1 || isNaN(b3) || b3 < 0.1) {
+                showNotification("Ставка не может быть меньше 0.1 GRAM!", "⚠️");
                 return;
             }
 
@@ -1039,7 +1121,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    // ----------------- ПУЛЫ НАГРАД -----------------
+    // Награды
     const GIFT_POOL = [
         { id: 1, name: "Статуя птицы серая", icon: "/Images/Items/rare_bird.jpg", price: "20 GRAM", rawPrice: 20.0, isGold: true, type: "gift" },
         { id: 2, name: "Тыква", icon: "/Images/Items/pumpkin.jpg", price: "8 GRAM", rawPrice: 8.0, isGold: true, type: "gift" },
