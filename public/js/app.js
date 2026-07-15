@@ -99,7 +99,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         largeBalanceDisplay: document.getElementById('large-balance-value'), 
         rewardsGrid: document.getElementById('rewards-grid'),
         inventoryGrid: document.getElementById('inventory-grid'),
-        // ИСПРАВЛЕНО: Находим навигационную панель по правильному селектору класса
         bottomNavigation: document.querySelector('.floating-nav-container'),
         navTabs: document.querySelectorAll('.nav-tab'),
         dailyCaseBanner: document.getElementById('daily-case-banner'),
@@ -120,18 +119,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         adminTgChatTrigger: document.getElementById('admin-tg-chat-trigger')
     };
 
-    // ИСПРАВЛЕНО: Глубокая валидация загрузки кнопок. Полностью исключает NaN, null и битые массивы
+    // Загрузка кастомных ставок с проверкой на повреждение данных
     function loadSavedBets() {
         try {
             const saved = localStorage.getItem(`custom_bets_${userId}`);
             if (saved) {
                 const parsed = JSON.parse(saved);
                 if (Array.isArray(parsed) && parsed.length === 3) {
-                    const validated = parsed.map(v => {
+                    customBets = parsed.map(v => {
                         const num = parseFloat(v);
                         return (isNaN(num) || num < 0.1) ? 0.1 : num;
                     });
-                    customBets = validated;
                     return;
                 }
             }
@@ -406,7 +404,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // ГЕОМЕТРИЧЕСКИЙ ДВИЖОК SVG И МУЛЬТИПЛЕЕРНАЯ СИНХРОНИЗАЦИЯ BEST ARENA
     // -----------------------------------------------------------------------
     
-    // ИСПРАВЛЕНО: Минимальная гарантированная доля поля уменьшена в 3 раза до 1.3% (0.013)
+    // Минимальная гарантированная доля поля в 3 раза меньше (1.3%)
     function calculateSharesProtection(players) {
         const N = players.length;
         if (N === 0) return [];
@@ -733,7 +731,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    // ИСПРАВЛЕНО: Трение изменено на 0.981. Шарик летает быстро и останавливается плавно, но на 1.5–2 секунды быстрее
+    // Трение 0.981 — шарик останавливается на 1.5–2 секунды быстрее
     function simulateBallPathDeterministic(targetX, targetY, seedSignature, boardWidth = 320, boardHeight = 320, ballRadius = 8) {
         const friction = 0.981; 
         const rng = createPRNG(seedSignature);
@@ -790,7 +788,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         return null; 
     }
 
-    // Анимация шарика: юзернейм следует жестко за шариком и не исчезает в конце раунда
+    // Анимация шарика: юзернейм жестко следует за шариком без сглаживания и отставаний
     function animateBouncingBall(targetX, targetY, seedSignature, onComplete) {
         if (isBallAnimating) return;
         isBallAnimating = true;
@@ -828,7 +826,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             const step = () => {
                 if (frame >= totalFrames) {
                     isBallAnimating = false;
-                    // ИСПРАВЛЕНО: Не удаляем шарик и имя по окончании полета! Они остаются на экране!
                     onComplete();
                     return;
                 }
@@ -840,7 +837,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 ballElement.setAttribute("cx", currentX.toFixed(1));
                 ballElement.setAttribute("cy", currentY.toFixed(1));
 
-                // ИСПРАВЛЕНО: Юзернейм движется жестко как единое целое без Lerp-отставаний
                 const textX = Math.max(50, Math.min(270, currentX));
                 const isNearTopWall = currentY < 35;
                 const textY = isNearTopWall ? (currentY + 24) : (currentY - 14);
@@ -864,7 +860,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         const renderFrame = () => {
             if (frameIndex >= path.length) {
                 isBallAnimating = false;
-                // ИСПРАВЛЕНО: Не удаляем элементы! Они остаются до следующего раунда!
                 onComplete();
                 return;
             }
@@ -873,7 +868,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             ballElement.setAttribute("cx", pos.x.toFixed(1));
             ballElement.setAttribute("cy", pos.y.toFixed(1));
 
-            // ИСПРАВЛЕНО: Жесткая мгновенная привязка имени к шарику (без Lerp)
+            // Жесткая привязка юзернейма к шарику (без Lerp-сглаживания)
             const textX = Math.max(50, Math.min(270, pos.x));
             const isNearTopWall = pos.y < 35;
             const textY = isNearTopWall ? (pos.y + 24) : (pos.y - 14);
@@ -933,11 +928,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                 } else if (state.status === 'finished') {
                     const signature = state.winnerId + "_" + state.totalPool + "_" + state.winnerX + "_" + state.winnerY;
                     
-                    // ИСПРАВЛЕНО: Предотвращает циклические запуски анимации у зашедших игроков
+                    // Асинхронное предотвращение повторного запуска анимации шарика
                     const age = (state.serverTime && state.resolvedAt) ? (state.serverTime - state.resolvedAt) : 99999;
 
                     if (age > 9500) {
-                        // Если победа была рассчитана более 9.5 секунд назад, пропускаем воспроизведение
                         currentRoundSignature = signature;
                         if (statusText && !isBallAnimating) {
                             statusText.classList.remove('hidden');
@@ -993,7 +987,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    // ИСПРАВЛЕНО: Метод очистки холста вызывается только здесь при старте нового раунда
     function resetArenaGame() {
         stopArenaPolling();
         const statusText = document.getElementById('arena-status-text');
@@ -1128,6 +1121,22 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (elements.adminTgChatTrigger) {
         elements.adminTgChatTrigger.addEventListener('click', () => {
             tg.openTelegramLink("https://t.me/Sintopa");
+        });
+    }
+
+    // ИСПРАВЛЕНО: Принудительная привязка клика по баннеру Арены для открытия игры
+    const arenaTrigger = document.getElementById('game-arena-trigger');
+    if (arenaTrigger) {
+        arenaTrigger.addEventListener('click', () => {
+            navigateTo('arena');
+        });
+    }
+
+    // ИСПРАВЛЕНО: Принудительная привязка клика для кнопки возврата из Арены
+    const backFromArena = document.getElementById('back-to-home-from-arena');
+    if (backFromArena) {
+        backFromArena.addEventListener('click', () => {
+            navigateTo('home');
         });
     }
 
