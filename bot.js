@@ -9,7 +9,7 @@ if (!global.botInstance) {
 }
 const bot = global.botInstance;
 
-// ИСПРАВЛЕНО: Бесшовный останов Polling-процесса при перезапуске на Render (Устраняет ошибку 409 Conflict)
+// ИСПРАВЛЕНО: Бесшумный останов Polling-процесса при перезапуске на Render (Устраняет ошибку 409 Conflict)
 const shutdownGracefully = async (signal) => {
     console.log(`[Graceful Shutdown] Получен сигнал ${signal}. Отключение Telegram Polling...`);
     if (bot.isPolling()) {
@@ -26,6 +26,14 @@ const shutdownGracefully = async (signal) => {
 // Привязываем обработчики сигналов деплоя Render
 process.once('SIGTERM', () => shutdownGracefully('SIGTERM'));
 process.once('SIGINT', () => shutdownGracefully('SIGINT'));
+
+// ИСПРАВЛЕНО: Глушим цикличные ошибки ETELEGRAM 409, чтобы не засорять логи на Render
+bot.on('polling_error', (error) => {
+    if (error.code === 'ETELEGAM' || (error.message && error.message.includes('409 Conflict'))) {
+        return; // Игнорируем дублирующие сессии при перезагрузке контейнеров
+    }
+    console.error('[Bot Polling Error]', error);
+});
 
 // Надежное получение аватара пользователя
 async function getUserAvatarUrl(userId) {
