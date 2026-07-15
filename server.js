@@ -21,7 +21,7 @@ const getUserAvatarUrl = botModule.getUserAvatarUrl || (async () => null);
 const pool = db.pool || db;
 const query = (text, params) => pool.query(text, params);
 
-// ИСПРАВЛЕНО: Сначала объявляем PORT, затем создаем Express-приложение
+// ИСПРАВЛЕНО: Объявление PORT строго до вызова инициализации Express
 const PORT = process.env.PORT || 3000;
 const app = express();
 const CHANNEL_USERNAME = process.env.CHANNEL_USERNAME || "";
@@ -67,6 +67,7 @@ let arenaGameState = {
     winnerId: null,
     winnerName: null,
     winnerX: null,
+    winnerY: null,
     totalPool: null
 };
 
@@ -100,7 +101,7 @@ setInterval(async () => {
     }
 }, 1000);
 
-// Расчет победителя
+// ИСПРАВЛЕНО: Генерация двухмерных координат (X, Y) глубоко внутри сектора победителя
 async function resolveArenaWinner() {
     let client;
     try {
@@ -144,29 +145,63 @@ async function resolveArenaWinner() {
 
         await client.query('COMMIT');
 
-        // Определение точки на поле 320px
-        let currentX = 0;
-        let targetX = 160; 
-        const boardWidth = 320;
+        // ИСПРАВЛЕНО: Алгоритм генерации координат строго внутри диагональных/радиальных полей
+        let targetX = 160;
+        let targetY = 160;
+        const N = bets.length;
 
-        for (const b of bets) {
-            const percentage = parseFloat(b.amount) / totalPool;
-            const segmentWidth = boardWidth * percentage;
+        if (N === 2) {
+            const r = parseFloat(bets[0].amount) / totalPool;
+            const isPlayer1Winner = (winnerId === bets[0].user_id);
 
-            if (b.user_id === winnerId) {
-                const margin = Math.min(15, segmentWidth * 0.15); 
-                const minT = currentX + margin;
-                const maxT = currentX + segmentWidth - margin;
-                targetX = minT + Math.random() * (maxT - minT);
-                break;
+            if (r <= 0.5) {
+                if (isPlayer1Winner) {
+                    // Игрок 1 - Треугольник в левом верхнем углу
+                    const s = Math.sqrt(2 * r) * 0.75; // сжатие на 25% для гарантированного захода внутрь
+                    targetX = 320 * s * Math.random();
+                    targetY = 320 * s * Math.random();
+                } else {
+                    // Игрок 2 - Все остальное поле (целимся в правый нижний сектор)
+                    targetX = 220 + Math.random() * 60;
+                    targetY = 220 + Math.random() * 60;
+                }
+            } else {
+                if (!isPlayer1Winner) {
+                    // Игрок 2 - Треугольник в правом нижнем углу
+                    const s = Math.sqrt(2 * (1 - r)) * 0.75;
+                    targetX = 320 - (320 * s * Math.random());
+                    targetY = 320 - (320 * s * Math.random());
+                } else {
+                    // Игрок 1 - Все остальное
+                    targetX = 40 + Math.random() * 60;
+                    targetY = 40 + Math.random() * 60;
+                }
             }
-            currentX += segmentWidth;
+        } else {
+            // Для 3+ игроков - радиальные лучи
+            let currentAngle = 0;
+            for (let i = 0; i < bets.length; i++) {
+                const b = bets[i];
+                const share = parseFloat(b.amount) / totalPool;
+                const nextAngle = currentAngle + 2 * Math.PI * share;
+
+                if (b.user_id === winnerId) {
+                    // Шарик должен плавно залететь в середину веера
+                    const midAngle = currentAngle + (nextAngle - currentAngle) * (0.35 + Math.random() * 0.3);
+                    const dist = 50 + Math.random() * 70; // дистанция от 50 до 120px от центра
+                    targetX = 160 + Math.cos(midAngle) * dist;
+                    targetY = 160 + Math.sin(midAngle) * dist;
+                    break;
+                }
+                currentAngle = nextAngle;
+            }
         }
 
         arenaGameState.winnerId = winnerId;
         const winnerName = winnerRow.username || winnerRow.first_name || "Игрок";
         arenaGameState.winnerName = winnerName;
         arenaGameState.winnerX = targetX;
+        arenaGameState.winnerY = targetY;
         arenaGameState.totalPool = totalPool;
 
         // 12 секунд на завершение анимации у клиентов и сброс стола
@@ -177,6 +212,7 @@ async function resolveArenaWinner() {
                 arenaGameState.winnerId = null;
                 arenaGameState.winnerName = null;
                 arenaGameState.winnerX = null;
+                arenaGameState.winnerY = null;
                 arenaGameState.totalPool = null;
                 arenaGameState.timeLeft = 15;
             } catch (err) {
@@ -350,8 +386,9 @@ app.post('/api/place_bet', async (req, res) => {
         return res.status(400).json({ error: "Минимальная ставка — 0.001 GRAM" });
     }
 
+    // ИСПРАВЛЕНО: Строгая проверка на стороне сервера — если статус "finished" (шарик запущен), ставка отклоняется!
     if (arenaGameState.status === 'finished') {
-        return res.status(400).json({ error: "Игра уже запущена! Ожидайте следующий раунд." });
+        return res.status(400).json({ error: "Раунд уже запущен! Дождитесь следующей игры." });
     }
     
     betVal = parseFloat(betVal.toFixed(3));
@@ -454,7 +491,8 @@ app.get('/api/arena/state', async (req, res) => {
             totalPool: totalPool,
             winnerId: arenaGameState.winnerId,
             winnerName: arenaGameState.winnerName,
-            winnerX: arenaGameState.winnerX
+            winnerX: arenaGameState.winnerX,
+            winnerY: arenaGameState.winnerY
         });
     } catch (err) {
         res.status(500).json({ error: "Внутренняя ошибка сервера" });
@@ -667,5 +705,5 @@ app.post('/api/deposit_gift_request', async (req, res) => {
 
 app.get('/api/daily_case_info', (req, res) => { res.json({ channel_username: CHANNEL_USERNAME }); });
 
-// Запуск сервера Express
+// Запуск веб-сервера
 app.listen(PORT, () => console.log("🚀 Server running on port " + PORT));
