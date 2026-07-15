@@ -21,8 +21,9 @@ const getUserAvatarUrl = botModule.getUserAvatarUrl || (async () => null);
 const pool = db.pool || db;
 const query = (text, params) => pool.query(text, params);
 
-const app = Math.abs(PORT) ? express() : express();
+// ИСПРАВЛЕНО: Сначала объявляем PORT, затем создаем Express-приложение
 const PORT = process.env.PORT || 3000;
+const app = express();
 const CHANNEL_USERNAME = process.env.CHANNEL_USERNAME || "";
 
 const ADMIN_TON_ADDRESS = process.env.ADMIN_TON_ADDRESS; 
@@ -349,7 +350,6 @@ app.post('/api/place_bet', async (req, res) => {
         return res.status(400).json({ error: "Минимальная ставка — 0.001 GRAM" });
     }
 
-    // Если шарик запущен или раунд завершается, ставки ставить запрещено
     if (arenaGameState.status === 'finished') {
         return res.status(400).json({ error: "Игра уже запущена! Ожидайте следующий раунд." });
     }
@@ -666,4 +666,6 @@ app.post('/api/deposit_gift_request', async (req, res) => {
 });
 
 app.get('/api/daily_case_info', (req, res) => { res.json({ channel_username: CHANNEL_USERNAME }); });
+
+// Запуск сервера Express
 app.listen(PORT, () => console.log("🚀 Server running on port " + PORT));
