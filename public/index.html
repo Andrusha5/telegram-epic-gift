@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>BestGifts</title>
-    <!-- Версионный маркер ?v=2.0.8 гарантирует моментальный сброс кэша в Telegram -->
-    <link rel="stylesheet" href="css/style.css?v=2.0.8">
+    <!-- Версионный маркер ?v=2.0.9 гарантирует моментальный сброс кэша в Telegram -->
+    <link rel="stylesheet" href="css/style.css?v=2.0.9">
 </head>
 <body>
 
@@ -135,19 +135,11 @@
         </div>
 
         <div class="arena-game-container">
-            <!-- УВЕЛИЧЕННОЕ ИГРОВОЕ ПОЛЕ ДО 320x320px -->
             <div class="arena-big-box" id="arena-box-container">
-                <!-- SVG-холст для динамической отрисовки сегментов и катящегося шара -->
                 <svg id="arena-svg-canvas" class="arena-canvas"></svg>
-                
                 <div class="arena-grid-overlay"></div>
-                
-                <!-- Строго центрированный неоновый текст ожидания -->
                 <div class="arena-waiting-text" id="arena-status-text">Ждем ставки...</div>
-                
-                <!-- Строго центрированный неоновый таймер БЕЗ ЧЕРНОГО КРУГА -->
                 <div class="arena-timer-circle hidden" id="arena-countdown-timer">15</div>
-
                 <div class="arena-avatars-overlay" id="arena-avatars-container"></div>
             </div>
 
@@ -170,6 +162,14 @@
                     <span class="bet-val">3</span>
                     <img src="/Images/Items/gram_popolnenie.png" class="bet-coin-icon" alt="GRAM">
                 </button>
+            </div>
+
+            <!-- ИНТЕРАКТИВНЫЙ СПИСОК УЧАСТНИКОВ -->
+            <div class="arena-players-list-box">
+                <h3 class="players-list-title">👥 Список участников</h3>
+                <div id="arena-players-list" class="players-list-container">
+                    <div class="empty-list-placeholder">Ставок еще нет. Станьте первым!</div>
+                </div>
             </div>
         </div>
     </section>
@@ -332,6 +332,6 @@
 
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>
-    <script src="js/app.js?v=2.0.8" defer></script>
+    <script src="js/app.js?v=2.0.9" defer></script>
 </body>
-                                                                                                                                                                        </html>
+                    </html>
