@@ -72,6 +72,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     let currentRoundSignature = null;
     let arenaStatusStr = "waiting";
 
+    // ПЕРЕМЕННЫЕ ДЛЯ КЭШИРОВАНИЯ ДЕТАЛЕЙ ТРАНЗАКЦИЙ (РЕШЕНИЕ ПРОБЛЕМЫ iOS)
+    let preloadedAdminAddress = null;
+    let preloadedPayloadBase64 = null;
+
     const safeSetText = (el, val) => { if (el) el.innerText = val; };
     const initialName = tg.initDataUnsafe?.user?.username || tg.initDataUnsafe?.user?.first_name || "Пользователь";
     safeSetText(document.getElementById('user-username'), formatUsername(initialName));
@@ -302,8 +306,26 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     } catch (err) {}
 
+    // ФОНОВЫЙ ПРЕДЗАПРОС АДРЕСА И PAYLOAD ДЛЯ ПРЕДОТВРАЩЕНИЯ БЛОКИРОВКИ НА iOS
+    async function preloadPaymentParams() {
+        try {
+            const resAddr = await fetch(`${API_BASE_URL}/api/deposit_address`);
+            const dataAddr = await resAddr.json();
+            preloadedAdminAddress = dataAddr.address;
+
+            const resPayload = await fetch(`${API_BASE_URL}/api/generate_payload?text=${userId}`);
+            const dataPayload = await resPayload.json();
+            preloadedPayloadBase64 = dataPayload.payload;
+        } catch (e) {
+            console.error("Прелоад платежных данных не удался:", e);
+        }
+    }
+
     if (elements.depositBalanceBtn) {
         elements.depositBalanceBtn.addEventListener('click', () => {
+            // Запускаем предзагрузку адреса и пейлоада сразу при открытии окна
+            preloadPaymentParams();
+            
             if (elements.depositAmountModal) {
                 elements.depositAmountModal.classList.remove('hidden');
                 if (elements.modalDepositInput) {
@@ -333,36 +355,33 @@ document.addEventListener('DOMContentLoaded', async () => {
                 return;
             }
 
+            // ИСПРАВЛЕНО ДЛЯ iOS: Если данные не успели загрузиться в прелоаде, догружаем их мгновенно
+            if (!preloadedAdminAddress || !preloadedPayloadBase64) {
+                await preloadPaymentParams();
+            }
+
+            if (!preloadedAdminAddress) {
+                showNotification("Ошибка сервера при получении адреса.", "⚠️");
+                return;
+            }
+
             closeDepositModal();
 
             try {
-                const res = await fetch(`${API_BASE_URL}/api/deposit_address`);
-                const data = await res.json();
-                const adminAddress = data.address;
-
-                if (!adminAddress) {
-                    showNotification("Ошибка: адрес не настроен.", "⚠️");
-                    return;
-                }
-
-                const payloadRes = await fetch(`${API_BASE_URL}/api/generate_payload?text=${userId}`);
-                const payloadData = await payloadRes.json();
-                const payloadBase64 = payloadData.payload;
-
                 const nanoAmount = Math.floor(amount * 1000000000).toString();
 
                 const transaction = {
                     validUntil: Math.floor(Date.now() / 1000) + 360,
                     messages: [
                         {
-                            address: adminAddress,
+                            address: preloadedAdminAddress,
                             amount: nanoAmount,
-                            payload: payloadBase64 
+                            payload: preloadedPayloadBase64 
                         }
                     ]
                 };
 
-                showNotification("Подтвердите транзакцию...", "⏳");
+                showNotification("Подтвердите транзакцию в кошельке...", "⏳");
                 const result = await tonConnectUI.sendTransaction(transaction);
 
                 if (result) {
@@ -413,7 +432,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (total === 0) return bets.map(() => 1 / N);
 
         let rawShares = bets.map(b => b / total);
-        const minShare = 0.013; // Ровно 1.3% гарантированного поля для мелкой ставки
+        const minShare = 0.013; // 1.3% гарантированного веса на бэкенде и фронтенде
 
         let adjusted = [...rawShares];
         let iterations = 0;
@@ -820,6 +839,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         let simulation = simulateBallPathDeterministic(targetX, targetY, seedSignature, W, H, 8);
         
+        let lastMatchedPlayer = null; // Защитный буфер имени для iOS
+
         if (!simulation) {
             let frame = 0;
             const totalFrames = 180; 
@@ -844,8 +865,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                 textElement.setAttribute("x", textX.toFixed(1));
                 textElement.setAttribute("y", textY.toFixed(1));
 
-                const activePlayer = getPlayerAtCoords(currentX, currentY);
-                textElement.textContent = activePlayer ? activePlayer.username : "";
+                const activePlayer = getPlayerAtCoords(currentX, currentY) || lastMatchedPlayer || arenaPlayers[0];
+                if (activePlayer) {
+                    lastMatchedPlayer = activePlayer;
+                    textElement.textContent = activePlayer.username;
+                }
 
                 frame++;
                 requestAnimationFrame(step);
@@ -868,7 +892,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             ballElement.setAttribute("cx", pos.x.toFixed(1));
             ballElement.setAttribute("cy", pos.y.toFixed(1));
 
-            // Жесткая привязка юзернейма к шарику (без Lerp-сглаживания)
+            // ИСПРАВЛЕНО: Полная асинхронная жесткая привязка координат текста к координатам шара
             const textX = Math.max(50, Math.min(270, pos.x));
             const isNearTopWall = pos.y < 35;
             const textY = isNearTopWall ? (pos.y + 24) : (pos.y - 14);
@@ -876,8 +900,12 @@ document.addEventListener('DOMContentLoaded', async () => {
             textElement.setAttribute("x", textX.toFixed(1));
             textElement.setAttribute("y", textY.toFixed(1));
 
-            const activePlayer = getPlayerAtCoords(pos.x, pos.y);
-            textElement.textContent = activePlayer ? activePlayer.username : "";
+            // ИСПРАВЛЕНО: Защита имени от стирания при соприкосновении со стеной в SVG
+            const activePlayer = getPlayerAtCoords(pos.x, pos.y) || lastMatchedPlayer || arenaPlayers[0];
+            if (activePlayer) {
+                lastMatchedPlayer = activePlayer;
+                textElement.textContent = activePlayer.username;
+            }
 
             frameIndex++;
             requestAnimationFrame(renderFrame);
@@ -928,7 +956,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 } else if (state.status === 'finished') {
                     const signature = state.winnerId + "_" + state.totalPool + "_" + state.winnerX + "_" + state.winnerY;
                     
-                    // Асинхронное предотвращение повторного запуска анимации шарика
                     const age = (state.serverTime && state.resolvedAt) ? (state.serverTime - state.resolvedAt) : 99999;
 
                     if (age > 9500) {
@@ -1124,7 +1151,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    // ИСПРАВЛЕНО: Принудительная привязка клика по баннеру Арены для открытия игры
+    // Принудительная привязка клика по баннеру Арены для открытия игры
     const arenaTrigger = document.getElementById('game-arena-trigger');
     if (arenaTrigger) {
         arenaTrigger.addEventListener('click', () => {
@@ -1132,7 +1159,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    // ИСПРАВЛЕНО: Принудительная привязка клика для кнопки возврата из Арены
+    // Принудительная привязка клика для кнопки возврата из Арены
     const backFromArena = document.getElementById('back-to-home-from-arena');
     if (backFromArena) {
         backFromArena.addEventListener('click', () => {
@@ -1451,7 +1478,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (items.length === 0) {
                 elements.inventoryGrid.innerHTML = `
                     <div class="empty-inventory">
-                        🎒 Ваш инвентарь пуст.<br>Открывайте кейсы!
+                        🎒 Ваш инвентать пуст.<br>Открывайте кейсы!
                     </div>`;
                 return;
             }
@@ -1673,11 +1700,25 @@ document.addEventListener('DOMContentLoaded', async () => {
                         if (data.error && data.error.includes('подписчиком канала')) {
                             const infoRes = await fetch(`${API_BASE_URL}/api/daily_case_info`, { headers: { 'X-Telegram-Init-Data': tg.initData || "" } });
                             const infoData = await infoRes.json();
+                            
+                            // ИСПРАВЛЕНО: Нативный переход в канал через tg.openTelegramLink для iOS
                             showCustomModal({
                                 icon: '📢',
                                 title: 'Нужна подписка',
-                                message: 'Пожалуйста, подпишитесь на канал!',
-                                buttons: [{ text: 'Подписаться', primary: true, onClick: () => { tg.openLink(`https://t.me/${infoData.channel_username}`); elements.spinBtn.disabled = false; } }],
+                                message: 'Пожалуйста, подпишитесь на наш канал, чтобы открыть этот кейс!',
+                                buttons: [{ 
+                                    text: 'Подписаться', 
+                                    primary: true, 
+                                    onClick: () => { 
+                                        const channelLink = `https://t.me/${infoData.channel_username.replace('@', '')}`;
+                                        if (tg.openTelegramLink) {
+                                            tg.openTelegramLink(channelLink);
+                                        } else {
+                                            window.open(channelLink, '_blank');
+                                        }
+                                        elements.spinBtn.disabled = false; 
+                                    } 
+                                }],
                                 onClose: () => { elements.spinBtn.disabled = false; }
                             });
                         } else {
@@ -1695,6 +1736,22 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (document.getElementById('balance-pill')) {
         document.getElementById('balance-pill').addEventListener('click', () => {
             navigateTo('balance');
+        });
+    }
+
+    // Привязка клика по баннеру Арены для открытия игры
+    const arenaTrigger = document.getElementById('game-arena-trigger');
+    if (arenaTrigger) {
+        arenaTrigger.addEventListener('click', () => {
+            navigateTo('arena');
+        });
+    }
+
+    // Привязка клика для кнопки возврата из Арены
+    const backFromArena = document.getElementById('back-to-home-from-arena');
+    if (backFromArena) {
+        backFromArena.addEventListener('click', () => {
+            navigateTo('home');
         });
     }
 
