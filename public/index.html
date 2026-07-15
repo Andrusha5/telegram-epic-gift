@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>BestGifts</title>
-    <!-- Версионный маркер ?v=2.0.9 гарантирует моментальный сброс кэша в Telegram -->
-    <link rel="stylesheet" href="css/style.css?v=2.0.9">
+    <!-- Версионный маркер ?v=2.1.0 гарантирует моментальный сброс кэша в Telegram -->
+    <link rel="stylesheet" href="css/style.css?v=2.1.0">
 </head>
 <body>
 
@@ -136,11 +136,23 @@
 
         <div class="arena-game-container">
             <div class="arena-big-box" id="arena-box-container">
+                <!-- SVG-холст для динамической отрисовки сегментов (Слой 1) -->
                 <svg id="arena-svg-canvas" class="arena-canvas"></svg>
+                
+                <!-- Декоративная сетка (Слой 2) -->
                 <div class="arena-grid-overlay"></div>
+                
+                <!-- Строго центрированный неоновый текст ожидания -->
                 <div class="arena-waiting-text" id="arena-status-text">Ждем ставки...</div>
+                
+                <!-- Строго центрированный неоновый таймер БЕЗ ЧЕРНОГО КРУГА -->
                 <div class="arena-timer-circle hidden" id="arena-countdown-timer">15</div>
+
+                <!-- Контейнер аватарок игроков (Слой 4) -->
                 <div class="arena-avatars-overlay" id="arena-avatars-container"></div>
+
+                <!-- Верхний холст для шарика и текста над ним (Слой 10 - fly over everything!) -->
+                <svg id="arena-ball-svg" class="arena-ball-canvas"></svg>
             </div>
 
             <!-- КВАДРАТНЫЕ КНОПКИ СТАВОК СО СКРУГЛЕННЫМИ УГЛАМИ -->
@@ -332,6 +344,6 @@
 
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>
-    <script src="js/app.js?v=2.0.9" defer></script>
+    <script src="js/app.js?v=2.1.0" defer></script>
 </body>
                     </html>
