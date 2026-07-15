@@ -21,7 +21,7 @@ const getUserAvatarUrl = botModule.getUserAvatarUrl || (async () => null);
 const pool = db.pool || db;
 const query = (text, params) => pool.query(text, params);
 
-// ИСПРАВЛЕНО: Объявление PORT строго до вызова инициализации Express
+// ИСПРАВЛЕНО: Полностью предотвращен риск ReferenceError в контейнерах Render
 const PORT = process.env.PORT || 3000;
 const app = express();
 const CHANNEL_USERNAME = process.env.CHANNEL_USERNAME || "";
@@ -101,7 +101,52 @@ setInterval(async () => {
     }
 }, 1000);
 
-// ИСПРАВЛЕНО: Генерация двухмерных координат (X, Y) глубоко внутри сектора победителя
+// Алгоритм защиты долей ставок на бэкенде (полная синхронизация с фронтендом)
+function calculateSharesProtectionBackend(bets) {
+    const N = bets.length;
+    if (N === 0) return [];
+    let amounts = bets.map(b => parseFloat(b.amount || 0));
+    const total = amounts.reduce((a, b) => a + b, 0);
+    if (total === 0) return amounts.map(() => 1 / N);
+
+    let rawShares = amounts.map(b => b / total);
+    const minShare = 0.04; 
+
+    let adjusted = [...rawShares];
+    let iterations = 0;
+    while (iterations < 10) {
+        let underMinCount = 0;
+        let underMinSum = 0;
+        let overMinSum = 0;
+
+        for (let i = 0; i < N; i++) {
+            if (adjusted[i] < minShare) {
+                underMinCount++;
+                underMinSum += minShare;
+            } else {
+                overMinSum += adjusted[i];
+            }
+        }
+
+        if (underMinCount === 0) break;
+        if (underMinSum >= 1.0) {
+            return adjusted.map(() => 1 / N);
+        }
+
+        const scale = (1.0 - underMinSum) / overMinSum;
+        for (let i = 0; i < N; i++) {
+            if (adjusted[i] < minShare) {
+                adjusted[i] = minShare;
+            } else {
+                adjusted[i] = adjusted[i] * scale;
+            }
+        }
+        iterations++;
+    }
+    return adjusted;
+}
+
+// Расчет победителя с защитой координат внутри защищенных полей
 async function resolveArenaWinner() {
     let client;
     try {
@@ -145,36 +190,38 @@ async function resolveArenaWinner() {
 
         await client.query('COMMIT');
 
-        // ИСПРАВЛЕНО: Алгоритм генерации координат строго внутри диагональных/радиальных полей
+        // Расчет финальных координат остановки шара с учетом защитных долей
         let targetX = 160;
         let targetY = 160;
         const N = bets.length;
 
+        const shares = calculateSharesProtectionBackend(bets);
+
         if (N === 2) {
-            const r = parseFloat(bets[0].amount) / totalPool;
+            const r = shares[0]; // Защищенная доля первого игрока
             const isPlayer1Winner = (winnerId === bets[0].user_id);
 
             if (r <= 0.5) {
                 if (isPlayer1Winner) {
-                    // Игрок 1 - Треугольник в левом верхнем углу
-                    const s = Math.sqrt(2 * r) * 0.75; // сжатие на 25% для гарантированного захода внутрь
+                    // Шарик останавливается внутри левого верхнего треугольника Игрока 1
+                    const s = Math.sqrt(2 * r) * 0.70; // Коэффициент сжатия 0.70 для безопасности
                     targetX = 320 * s * Math.random();
                     targetY = 320 * s * Math.random();
                 } else {
-                    // Игрок 2 - Все остальное поле (целимся в правый нижний сектор)
-                    targetX = 220 + Math.random() * 60;
-                    targetY = 220 + Math.random() * 60;
+                    // Игрок 2 (целимся в правый нижний сектор)
+                    targetX = 220 + Math.random() * 50;
+                    targetY = 220 + Math.random() * 50;
                 }
             } else {
                 if (!isPlayer1Winner) {
-                    // Игрок 2 - Треугольник в правом нижнем углу
-                    const s = Math.sqrt(2 * (1 - r)) * 0.75;
+                    // Шарик гарантированно летит в правый нижний треугольник Игрока 2
+                    const s = Math.sqrt(2 * (1 - r)) * 0.70;
                     targetX = 320 - (320 * s * Math.random());
                     targetY = 320 - (320 * s * Math.random());
                 } else {
-                    // Игрок 1 - Все остальное
-                    targetX = 40 + Math.random() * 60;
-                    targetY = 40 + Math.random() * 60;
+                    // Игрок 1
+                    targetX = 50 + Math.random() * 50;
+                    targetY = 50 + Math.random() * 50;
                 }
             }
         } else {
@@ -182,13 +229,12 @@ async function resolveArenaWinner() {
             let currentAngle = 0;
             for (let i = 0; i < bets.length; i++) {
                 const b = bets[i];
-                const share = parseFloat(b.amount) / totalPool;
+                const share = shares[i];
                 const nextAngle = currentAngle + 2 * Math.PI * share;
 
                 if (b.user_id === winnerId) {
-                    // Шарик должен плавно залететь в середину веера
                     const midAngle = currentAngle + (nextAngle - currentAngle) * (0.35 + Math.random() * 0.3);
-                    const dist = 50 + Math.random() * 70; // дистанция от 50 до 120px от центра
+                    const dist = 50 + Math.random() * 70; 
                     targetX = 160 + Math.cos(midAngle) * dist;
                     targetY = 160 + Math.sin(midAngle) * dist;
                     break;
@@ -197,6 +243,7 @@ async function resolveArenaWinner() {
             }
         }
 
+        // Фиксация победных координат
         arenaGameState.winnerId = winnerId;
         const winnerName = winnerRow.username || winnerRow.first_name || "Игрок";
         arenaGameState.winnerName = winnerName;
@@ -204,7 +251,7 @@ async function resolveArenaWinner() {
         arenaGameState.winnerY = targetY;
         arenaGameState.totalPool = totalPool;
 
-        // 12 секунд на завершение анимации у клиентов и сброс стола
+        // Сброс арены через 12 секунд
         setTimeout(async () => {
             try {
                 await query('TRUNCATE arena_active_bets');
@@ -373,7 +420,7 @@ app.use(async (req, res, next) => {
     next();
 });
 
-// Добавление и увеличение ставки (Ограничение одинаковых цветов)
+// Установка ставки (ограничение минимальной суммы в 0.1 тон)
 app.post('/api/place_bet', async (req, res) => {
     if (!req.telegramUser || !req.telegramUser.id) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -382,11 +429,11 @@ app.post('/api/place_bet', async (req, res) => {
     const { amount } = req.body;
     let betVal = parseFloat(amount);
 
-    if (isNaN(betVal) || betVal < 0.001) {
-        return res.status(400).json({ error: "Минимальная ставка — 0.001 GRAM" });
+    // ИСПРАВЛЕНО: Минимальная ставка на бэкенде теперь строго 0.1 TON (GRAM)!
+    if (isNaN(betVal) || betVal < 0.1) {
+        return res.status(400).json({ error: "Минимальная ставка — 0.1 GRAM" });
     }
 
-    // ИСПРАВЛЕНО: Строгая проверка на стороне сервера — если статус "finished" (шарик запущен), ставка отклоняется!
     if (arenaGameState.status === 'finished') {
         return res.status(400).json({ error: "Раунд уже запущен! Дождитесь следующей игры." });
     }
@@ -423,21 +470,12 @@ app.post('/api/place_bet', async (req, res) => {
             const newAmount = parseFloat(activeBetRes.rows[0].amount) + betVal;
             await client.query('UPDATE arena_active_bets SET amount = $1, updated_at = NOW() WHERE user_id = $2', [newAmount, userId]);
         } else {
-            // Генерация строго уникальных контрастных цветов
             const usedColorsRes = await client.query('SELECT color FROM arena_active_bets');
             const usedColors = usedColorsRes.rows.map(row => row.color.toLowerCase());
 
             const poolOfColors = [
-                '#ff0055', // Ruby Red
-                '#00ffcc', // Vibrant Cyan
-                '#ffcc00', // Neon Yellow
-                '#00ff00', // Green Neon
-                '#ff00ff', // Fuchsia
-                '#0066ff', // Electric Blue
-                '#ff6600', // Safety Orange
-                '#9900ff', // Violet Purple
-                '#00ffff', // Aqua
-                '#ff3300'  // Red-Orange
+                '#ff0055', '#00ffcc', '#ffcc00', '#00ff00', '#ff00ff',
+                '#0066ff', '#ff6600', '#9900ff', '#00ffff', '#ff3300'
             ];
 
             let assignedColor = null;
@@ -705,5 +743,4 @@ app.post('/api/deposit_gift_request', async (req, res) => {
 
 app.get('/api/daily_case_info', (req, res) => { res.json({ channel_username: CHANNEL_USERNAME }); });
 
-// Запуск веб-сервера
 app.listen(PORT, () => console.log("🚀 Server running on port " + PORT));
