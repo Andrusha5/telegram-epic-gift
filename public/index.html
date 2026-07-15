@@ -4,12 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>BestGifts</title>
-    <!-- Версионный маркер ?v=2.1.1 гарантирует моментальный сброс кэша в Telegram -->
-    <link rel="stylesheet" href="css/style.css?v=2.1.1">
+    <!-- Версионный маркер ?v=2.1.2 гарантирует сброс кэша в Telegram -->
+    <link rel="stylesheet" href="css/style.css?v=2.1.2">
 </head>
 <body>
 
-    <!-- ВЕРХНЯЯ ПАНЕЛЬ (ХЕДЕР) -->
+    <!-- ВЕРХНЯЯ ПАНЕЛЬ -->
     <header class="main-header">
         <div class="header-left">
             <div class="logo-area">
@@ -136,24 +136,24 @@
 
         <div class="arena-game-container">
             <div class="arena-big-box" id="arena-box-container">
-                <!-- Слой 1: Динамические сектора (Диагонали/Треугольники) -->
+                <!-- SVG-холст для динамической отрисовки секторов (Диагональные / Треугольные) -->
                 <svg id="arena-svg-canvas" class="arena-canvas"></svg>
                 
-                <!-- Слой 2: Тонкая сетка -->
+                <!-- Сетка (Слой 2) -->
                 <div class="arena-grid-overlay"></div>
                 
-                <!-- Слой 3: Тексты и таймеры -->
+                <!-- Статусы и таймеры -->
                 <div class="arena-waiting-text" id="arena-status-text">Ждем ставки...</div>
                 <div class="arena-timer-circle hidden" id="arena-countdown-timer">15</div>
 
-                <!-- Слой 4: Аватарки участников внутри секторов -->
+                <!-- Контейнер аватарок игроков -->
                 <div class="arena-avatars-overlay" id="arena-avatars-container"></div>
 
-                <!-- Слой 10: Шарик и летающий ник (Поверх аватарок!) -->
+                <!-- Верхний холст для шарика и парящего никнейма (Z-index: 10 - Поверх всего!) -->
                 <svg id="arena-ball-svg" class="arena-ball-canvas"></svg>
             </div>
 
-            <!-- КНОПКИ СТАВОК -->
+            <!-- ПАНЕЛЬ УПРАВЛЕНИЯ СТАВКАМИ -->
             <div class="betting-row">
                 <button class="bet-edit-btn" id="bet-edit-trigger">
                     <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
@@ -174,7 +174,7 @@
                 </button>
             </div>
 
-            <!-- СПИСОК УЧАСТНИКОВ -->
+            <!-- ИНТЕРАКТИВНЫЙ СПИСОК УЧАСТНИКОВ -->
             <div class="arena-players-list-box">
                 <h3 class="players-list-title">👥 Список участников</h3>
                 <div id="arena-players-list" class="players-list-container">
@@ -246,7 +246,7 @@
         </div>
     </section>
 
-    <!-- ================= НАВИГАЦИЯ ================= -->
+    <!-- ================= МЕНЮ НАВИГАЦИИ ================= -->
     <div class="floating-nav-container">
         <nav class="bottom-nav">
             <button class="nav-tab" data-target="inventory">
@@ -284,7 +284,7 @@
         </nav>
     </div>
 
-    <!-- МОДАЛЬНОЕ ОКНО НАСТРОЙКИ СТАВОК (Заменено на ТЕКСТОВЫЙ ввод для дробных) -->
+    <!-- МОДАЛЬНОЕ ОКНО НАСТРОЙКИ СТАВОК (Поля заменены на TEXT с inputmode для дробных!) -->
     <div id="edit-bets-modal" class="modal-overlay hidden">
         <div class="modal-card">
             <button class="modal-close-x" id="edit-bets-close-btn">&times;</button>
@@ -342,6 +342,6 @@
 
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>
-    <script src="js/app.js?v=2.1.1" defer></script>
+    <script src="js/app.js?v=2.1.2" defer></script>
 </body>
-                </html>
+                                                                                                                                                                                                                    </html>
