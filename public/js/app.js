@@ -99,7 +99,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         largeBalanceDisplay: document.getElementById('large-balance-value'), 
         rewardsGrid: document.getElementById('rewards-grid'),
         inventoryGrid: document.getElementById('inventory-grid'),
-        bottomNavigation: document.getElementById('bottom-navigation'),
+        // ИСПРАВЛЕНО: Находим навигационную панель по правильному селектору класса
+        bottomNavigation: document.querySelector('.floating-nav-container'),
         navTabs: document.querySelectorAll('.nav-tab'),
         dailyCaseBanner: document.getElementById('daily-case-banner'),
         newbieCaseBanner: document.getElementById('newbie-case-banner'),
@@ -119,13 +120,23 @@ document.addEventListener('DOMContentLoaded', async () => {
         adminTgChatTrigger: document.getElementById('admin-tg-chat-trigger')
     };
 
+    // ИСПРАВЛЕНО: Глубокая валидация загрузки кнопок. Полностью исключает NaN, null и битые массивы
     function loadSavedBets() {
         try {
             const saved = localStorage.getItem(`custom_bets_${userId}`);
             if (saved) {
-                customBets = JSON.parse(saved);
+                const parsed = JSON.parse(saved);
+                if (Array.isArray(parsed) && parsed.length === 3) {
+                    const validated = parsed.map(v => {
+                        const num = parseFloat(v);
+                        return (isNaN(num) || num < 0.1) ? 0.1 : num;
+                    });
+                    customBets = validated;
+                    return;
+                }
             }
         } catch (e) {}
+        customBets = [0.1, 1.0, 5.0];
     }
 
     function loadCachedUserData() {
@@ -404,7 +415,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (total === 0) return bets.map(() => 1 / N);
 
         let rawShares = bets.map(b => b / total);
-        const minShare = 0.013; // Гарантированные 1.3% для миноритарных игроков
+        const minShare = 0.013; // Ровно 1.3% гарантированного поля для мелкой ставки
 
         let adjusted = [...rawShares];
         let iterations = 0;
@@ -708,7 +719,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (!btn) continue;
             
             const betVal = parseFloat(customBets[i]);
-            btn.querySelector('.bet-val').innerText = betVal.toString();
+            const betValSpan = btn.querySelector('.bet-val');
+            if (betValSpan) betValSpan.innerText = betVal.toString();
             btn.setAttribute('data-bet', betVal);
 
             if (balance >= betVal && !blockBets) {
@@ -921,8 +933,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 } else if (state.status === 'finished') {
                     const signature = state.winnerId + "_" + state.totalPool + "_" + state.winnerX + "_" + state.winnerY;
                     
-                    // ИСПРАВЛЕНО: Серверная проверка "возраста" победного состояния. Предотвращает циклические запуски шара.
-                    const age = state.serverTime - state.resolvedAt;
+                    // ИСПРАВЛЕНО: Предотвращает циклические запуски анимации у зашедших игроков
+                    const age = (state.serverTime && state.resolvedAt) ? (state.serverTime - state.resolvedAt) : 99999;
 
                     if (age > 9500) {
                         // Если победа была рассчитана более 9.5 секунд назад, пропускаем воспроизведение
@@ -1007,7 +1019,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (btn.classList.contains('disabled')) return;
 
         const betValue = parseFloat(btn.getAttribute('data-bet'));
-        if (isNaN(betValue) || betValue < 0.1) return; // ИСПРАВЛЕНО: Жесткий лимит ставки от 0.1 тон на фронтенде!
+        if (isNaN(betValue) || betValue < 0.1) return; 
 
         btn.classList.add('disabled');
         btn.disabled = true;
@@ -1097,7 +1109,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             b2 = parseFloat(b2.toFixed(3));
             b3 = parseFloat(b3.toFixed(3));
 
-            // ИСПРАВЛЕНО: Минимальная ставка изменена на 0.1 TON!
             if (isNaN(b1) || b1 < 0.1 || isNaN(b2) || b2 < 0.1 || isNaN(b3) || b3 < 0.1) {
                 showNotification("Ставка не может быть меньше 0.1 GRAM!", "⚠️");
                 return;
@@ -1281,6 +1292,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             const itemId = select.value;
             const allPools = [...GIFT_POOL, ...NEWBIE_GIFT_POOL];
             const selectedGift = allPools.find(g => g.id == itemId);
+
+            if (!selectedGift) return;
 
             showCustomModal({
                 icon: `<img src="${selectedGift.icon}" style="width:70px;height:70px;object-fit:contain;" onerror="this.src='https://img.icons8.com/color/96/gift.png'">`,
