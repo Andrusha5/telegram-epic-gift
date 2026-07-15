@@ -99,7 +99,7 @@ setInterval(async () => {
     }
 }, 1000);
 
-// Определение победителя (Уведомления в Телеграм-бот полностью вырезаны)
+// Расчет победителя и отправка точных детерминированных координат на увеличенном поле
 async function resolveArenaWinner() {
     let client;
     try {
@@ -121,6 +121,7 @@ async function resolveArenaWinner() {
         const bets = betsRes.rows;
         const totalPool = bets.reduce((sum, b) => sum + parseFloat(b.amount), 0);
 
+        // Взвешенный рандом
         let rand = Math.random() * totalPool;
         let winnerRow = null;
         for (const b of bets) {
@@ -142,7 +143,7 @@ async function resolveArenaWinner() {
 
         await client.query('COMMIT');
 
-        // Расчет X-координаты попадания шарика на увеличенном поле 320px
+        // Определение точки на поле 320px
         let currentX = 0;
         let targetX = 160; 
         const boardWidth = 320;
@@ -335,7 +336,7 @@ app.use(async (req, res, next) => {
     next();
 });
 
-// Сделать и увеличить ставку
+// Добавление и увеличение ставки (Ограничение одинаковых цветов)
 app.post('/api/place_bet', async (req, res) => {
     if (!req.telegramUser || !req.telegramUser.id) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -344,8 +345,8 @@ app.post('/api/place_bet', async (req, res) => {
     const { amount } = req.body;
     let betVal = parseFloat(amount);
 
-    if (isNaN(betVal) || betVal < 0.1) {
-        return res.status(400).json({ error: "Минимальная ставка — 0.1 GRAM" });
+    if (isNaN(betVal) || betVal < 0.001) {
+        return res.status(400).json({ error: "Минимальная ставка — 0.001 GRAM" });
     }
     
     betVal = parseFloat(betVal.toFixed(3));
@@ -380,8 +381,34 @@ app.post('/api/place_bet', async (req, res) => {
             const newAmount = parseFloat(activeBetRes.rows[0].amount) + betVal;
             await client.query('UPDATE arena_active_bets SET amount = $1, updated_at = NOW() WHERE user_id = $2', [newAmount, userId]);
         } else {
-            const colors = ['#d500f9', '#00e5ff', '#ffd600', '#00e676', '#ff1744', '#ff9100', '#2979ff'];
-            const assignedColor = colors[Math.floor(Math.random() * colors.length)];
+            // Генерация строго уникальных цветов без повторок
+            const usedColorsRes = await client.query('SELECT color FROM arena_active_bets');
+            const usedColors = usedColorsRes.rows.map(row => row.color.toLowerCase());
+
+            const poolOfColors = [
+                '#ff0055', // Ruby Red
+                '#00ffcc', // Vibrant Cyan
+                '#ffcc00', // Neon Yellow
+                '#00ff00', // Green Neon
+                '#ff00ff', // Fuchsia
+                '#0066ff', // Electric Blue
+                '#ff6600', // Safety Orange
+                '#9900ff', // Violet Purple
+                '#00ffff', // Aqua
+                '#ff3300'  // Red-Orange
+            ];
+
+            let assignedColor = null;
+            for (const col of poolOfColors) {
+                if (!usedColors.includes(col.toLowerCase())) {
+                    assignedColor = col;
+                    break;
+                }
+            }
+            if (!assignedColor) {
+                assignedColor = poolOfColors[Math.floor(Math.random() * poolOfColors.length)];
+            }
+
             await client.query('INSERT INTO arena_active_bets (user_id, amount, color) VALUES ($1, $2, $3)', [userId, betVal, assignedColor]);
         }
 
@@ -395,7 +422,7 @@ app.post('/api/place_bet', async (req, res) => {
     }
 });
 
-// Получить состояние Арены
+// Получение состояния Арены
 app.get('/api/arena/state', async (req, res) => {
     try {
         const betsRes = await query(`
