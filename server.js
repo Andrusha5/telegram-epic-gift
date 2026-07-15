@@ -21,7 +21,7 @@ const getUserAvatarUrl = botModule.getUserAvatarUrl || (async () => null);
 const pool = db.pool || db;
 const query = (text, params) => pool.query(text, params);
 
-const app = express();
+const app = Math.abs(PORT) ? express() : express();
 const PORT = process.env.PORT || 3000;
 const CHANNEL_USERNAME = process.env.CHANNEL_USERNAME || "";
 
@@ -99,7 +99,7 @@ setInterval(async () => {
     }
 }, 1000);
 
-// Расчет победителя и отправка точных детерминированных координат на увеличенном поле
+// Расчет победителя
 async function resolveArenaWinner() {
     let client;
     try {
@@ -348,6 +348,11 @@ app.post('/api/place_bet', async (req, res) => {
     if (isNaN(betVal) || betVal < 0.001) {
         return res.status(400).json({ error: "Минимальная ставка — 0.001 GRAM" });
     }
+
+    // Если шарик запущен или раунд завершается, ставки ставить запрещено
+    if (arenaGameState.status === 'finished') {
+        return res.status(400).json({ error: "Игра уже запущена! Ожидайте следующий раунд." });
+    }
     
     betVal = parseFloat(betVal.toFixed(3));
 
@@ -381,7 +386,7 @@ app.post('/api/place_bet', async (req, res) => {
             const newAmount = parseFloat(activeBetRes.rows[0].amount) + betVal;
             await client.query('UPDATE arena_active_bets SET amount = $1, updated_at = NOW() WHERE user_id = $2', [newAmount, userId]);
         } else {
-            // Генерация строго уникальных цветов без повторок
+            // Генерация строго уникальных контрастных цветов
             const usedColorsRes = await client.query('SELECT color FROM arena_active_bets');
             const usedColors = usedColorsRes.rows.map(row => row.color.toLowerCase());
 
