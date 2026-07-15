@@ -9,6 +9,24 @@ if (!global.botInstance) {
 }
 const bot = global.botInstance;
 
+// ИСПРАВЛЕНО: Бесшовный останов Polling-процесса при перезапуске на Render (Устраняет ошибку 409 Conflict)
+const shutdownGracefully = async (signal) => {
+    console.log(`[Graceful Shutdown] Получен сигнал ${signal}. Отключение Telegram Polling...`);
+    if (bot.isPolling()) {
+        try {
+            await bot.stopPolling();
+            console.log('[Graceful Shutdown] Telegram Polling успешно остановлен. Конфликт 409 исключен.');
+        } catch (err) {
+            console.error('[Graceful Shutdown] Ошибка при остановке Polling:', err);
+        }
+    }
+    process.exit(0);
+};
+
+// Привязываем обработчики сигналов деплоя Render
+process.once('SIGTERM', () => shutdownGracefully('SIGTERM'));
+process.once('SIGINT', () => shutdownGracefully('SIGINT'));
+
 // Надежное получение аватара пользователя
 async function getUserAvatarUrl(userId) {
     try {
