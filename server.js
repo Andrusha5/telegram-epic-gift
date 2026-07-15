@@ -30,7 +30,6 @@ const TONCENTER_API_KEY = process.env.TONCENTER_API_KEY;
 
 app.use(express.json());
 
-// Инициализация структуры базы данных
 async function initDb() {
     try {
         await query(`
@@ -100,7 +99,7 @@ setInterval(async () => {
     }
 }, 1000);
 
-// Определение победителя и расчет финального положения шарика
+// Определение победителя (Уведомления в Телеграм-бот полностью вырезаны)
 async function resolveArenaWinner() {
     let client;
     try {
@@ -122,7 +121,6 @@ async function resolveArenaWinner() {
         const bets = betsRes.rows;
         const totalPool = bets.reduce((sum, b) => sum + parseFloat(b.amount), 0);
 
-        // Взвешенный рандом для определения победителя
         let rand = Math.random() * totalPool;
         let winnerRow = null;
         for (const b of bets) {
@@ -144,7 +142,7 @@ async function resolveArenaWinner() {
 
         await client.query('COMMIT');
 
-        // Расчет X-координаты попадания шарика (пространство 320px)
+        // Расчет X-координаты попадания шарика на увеличенном поле 320px
         let currentX = 0;
         let targetX = 160; 
         const boardWidth = 320;
@@ -169,20 +167,7 @@ async function resolveArenaWinner() {
         arenaGameState.winnerX = targetX;
         arenaGameState.totalPool = totalPool;
 
-        if (bot) {
-            const winMsg = `🏆 <b>Игра Best Arena завершена!</b>\n\n` +
-                           `👑 Победитель: <a href="tg://user?id=${winnerId}">${winnerName}</a>\n` +
-                           `💰 Банк: <b>${totalPool.toFixed(3)} GRAM</b> зачислен на баланс!`;
-            
-            bot.sendMessage(winnerId, `🎉 <b>Поздравляем с победой в Best Arena!</b>\n\nВы выиграли весь банк: <b>${totalPool.toFixed(3)} GRAM</b>!`, { parse_mode: 'HTML' }).catch(() => {});
-            
-            const adminId = process.env.ADMIN_TELEGRAM_ID;
-            if (adminId) {
-                bot.sendMessage(adminId, winMsg, { parse_mode: 'HTML' }).catch(() => {});
-            }
-        }
-
-        // 12 секунд на завершение анимации у клиентов и показ результатов
+        // 12 секунд на завершение анимации у клиентов и сброс стола
         setTimeout(async () => {
             try {
                 await query('TRUNCATE arena_active_bets');
@@ -350,7 +335,7 @@ app.use(async (req, res, next) => {
     next();
 });
 
-// Добавление и увеличение ставки
+// Сделать и увеличить ставку
 app.post('/api/place_bet', async (req, res) => {
     if (!req.telegramUser || !req.telegramUser.id) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -363,7 +348,6 @@ app.post('/api/place_bet', async (req, res) => {
         return res.status(400).json({ error: "Минимальная ставка — 0.1 GRAM" });
     }
     
-    // Округление до 3 знаков
     betVal = parseFloat(betVal.toFixed(3));
 
     let client;
@@ -411,7 +395,7 @@ app.post('/api/place_bet', async (req, res) => {
     }
 });
 
-// Получение состояния Арены
+// Получить состояние Арены
 app.get('/api/arena/state', async (req, res) => {
     try {
         const betsRes = await query(`
@@ -517,7 +501,7 @@ app.post('/api/open_daily_case', async (req, res) => {
         const adminId = process.env.ADMIN_TELEGRAM_ID;
         if (adminId && bot && wonItem.type !== 'balance') {
             const fullName = [user.first_name, user.last_name].filter(Boolean).join(' ') || 'Пользователь';
-            const adminMsg = `🎉 <b>Выигрыш в Ежедневном кейсе!</b>\n\n🎁 <b>Подарок:</b> ${wonItem.name} (ID: ${wonItem.item_id}, Цена: ${wonItem.value} GRAM)\n👤 <b>Пользователь:</b> <a href="tg://user?id=${userId}">${fullName}</a>`;
+            const adminMsg = `🎉 <b>Выигран подарок в Ежедневном кейсе!</b>\n\n🎁 <b>Подарок:</b> ${wonItem.name} (ID: ${wonItem.item_id}, Цена: ${wonItem.value} GRAM)\n👤 <b>Пользователь:</b> <a href="tg://user?id=${userId}">${fullName}</a>`;
             bot.sendMessage(adminId, adminMsg, { parse_mode: 'HTML' }).catch(console.error);
         }
         res.json({ success: true, wonItem: { id: wonItem.item_id, name: wonItem.name, price: wonItem.value + " GRAM", type: wonItem.type }, newBalance: newBalance });
@@ -561,7 +545,7 @@ app.post('/api/open_newbie_case', async (req, res) => {
         const adminId = process.env.ADMIN_TELEGRAM_ID;
         if (adminId && bot && wonItem.type !== 'balance') {
             const fullName = [user.first_name, user.last_name].filter(Boolean).join(' ') || 'Пользователь';
-            const adminMsg = `🎉 <b>Выигрыш в Кейсе Новичка!</b>\n\n🎁 <b>Подарок:</b> ${wonItem.name} (ID: ${wonItem.item_id}, Цена: ${wonItem.value} GRAM)\n👤 <b>Пользователь:</b> <a href="tg://user?id=${userId}">${fullName}</a>`;
+            const adminMsg = `🎉 <b>Выигран подарок в Кейсе Новичка!</b>\n\n🎁 <b>Подарок:</b> ${wonItem.name} (ID: ${wonItem.item_id}, Цена: ${wonItem.value} GRAM)\n👤 <b>Пользователь:</b> <a href="tg://user?id=${userId}">${fullName}</a>`;
             bot.sendMessage(adminId, adminMsg, { parse_mode: 'HTML' }).catch(console.error);
         }
         res.json({ success: true, wonItem: { id: wonItem.item_id, name: wonItem.name, price: wonItem.value + " GRAM", type: wonItem.type }, newBalance: newBalance });
@@ -578,7 +562,7 @@ app.post('/api/sell_gift', async (req, res) => {
         await client.query('BEGIN');
         const inventoryRes = await client.query('SELECT quantity FROM user_inventory WHERE user_id = $1 AND item_id = $2 FOR UPDATE', [userId, itemId]);
         const item = inventoryRes.rows[0];
-        if (!item || item.quantity < 1) { await client.query('ROLLBACK'); return res.status(400).json({ error: 'Предмет не найден.' }); }
+        if (!item || item.quantity < 1) { await client.query('ROLLBACK'); return res.status(400).json({ error: 'У вас нет этого предмета.' }); }
         await client.query('UPDATE user_inventory SET quantity = quantity - 1 WHERE user_id = $1 AND item_id = $2', [userId, itemId]);
         const userRes = await client.query('SELECT username, first_name, last_name, balance FROM users WHERE id = $1 FOR UPDATE', [userId]);
         const user = userRes.rows[0];
