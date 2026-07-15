@@ -26,7 +26,7 @@ button, a, .nav-tab, .case-card, .back-btn-square, select, input, .balance-pill 
     -webkit-tap-highlight-color: transparent !important;
     -webkit-tap-highlight-color: rgba(0, 0, 0, 0) !important;
     outline: none !important;
-    touch-action: manipulation; /* Предотвращает двойной тап зум на iOS */
+    touch-action: manipulation;
 }
 
 input, select, textarea {
@@ -39,7 +39,6 @@ body {
     color: #ffffff;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     margin: 0;
-    /* Учет безопасных зон внизу страницы на iPhone */
     padding: 114px 16px calc(125px + env(safe-area-inset-bottom)) 16px;
     box-sizing: border-box;
     overflow-x: hidden;
@@ -390,7 +389,6 @@ body {
     transition: left 0.4s ease, top 0.4s ease, width 0.4s ease, height 0.4s ease;
 }
 
-/* ВЕРХНИЙ СЛОЙ ШАРИКА ДЛЯ ПОЛЕТА НАД АВАТАРКАМИ */
 .arena-ball-canvas {
     position: absolute;
     top: 0;
@@ -492,7 +490,6 @@ body {
     object-fit: contain;
 }
 
-/* РАСКЛАДКА ПОЛЕЙ ДЛЯ РЕДАКТИРОВАНИЯ СТАВОК В МОДАЛКЕ */
 .modal-input-row {
     display: flex;
     gap: 8px;
@@ -557,7 +554,7 @@ body {
     max-height: 190px;
     overflow-y: auto;
     padding-right: 4px;
-    -webkit-overflow-scrolling: touch; /* Плавный скролл на iOS */
+    -webkit-overflow-scrolling: touch;
 }
 
 .player-list-row {
@@ -1239,7 +1236,7 @@ body {
 .wallet-actions-container {
     display: flex;
     flex-direction: column;
-    gap: 16px; /* Оптимальный отступ на iOS */
+    gap: 16px;
     width: 100%;
     margin-bottom: 30px;
     box-sizing: border-box;
@@ -1270,7 +1267,6 @@ body {
     font-weight: normal;
 }
 
-/* ИСПРАВЛЕННЫЙ iPHONE-SAFE ДИЗАЙН КНОПОК КОШЕЛЬКА */
 .connect-wallet-btn, .deposit-balance-btn {
     -webkit-appearance: none;
     -moz-appearance: none;
@@ -1280,7 +1276,7 @@ body {
     border: none;
     outline: none;
     border-radius: 16px;
-    padding: 18px 12px; /* Увеличенная область клика для пальцев на iOS */
+    padding: 18px 12px;
     font-size: 15px;
     font-weight: 800;
     cursor: pointer;
@@ -1326,7 +1322,7 @@ body {
 
 /* ==========================================================================
    ЭКРАН РЕЙТИНГА
-   ========================================================================= */
+   ========================================================================== */
 .rating-header {
     text-align: center;
     margin-bottom: 24px;
@@ -1364,7 +1360,7 @@ body {
    ========================================================================== */
 .floating-nav-container {
     position: fixed;
-    bottom: calc(16px + env(safe-area-inset-bottom)); /* Безопасная зона на iPhone */
+    bottom: calc(16px + env(safe-area-inset-bottom));
     left: 16px;   
     right: 16px;  
     z-index: 2000;
@@ -1592,4 +1588,4 @@ body {
 .modal-btn-secondary {
     background: #241c44;
     color: #ffffff;
-       }
+   }
