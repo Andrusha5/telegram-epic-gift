@@ -21,7 +21,6 @@ const getUserAvatarUrl = botModule.getUserAvatarUrl || (async () => null);
 const pool = db.pool || db;
 const query = (text, params) => pool.query(text, params);
 
-// ИСПРАВЛЕНО: Полностью предотвращен риск ReferenceError в контейнерах Render
 const PORT = process.env.PORT || 3000;
 const app = express();
 const CHANNEL_USERNAME = process.env.CHANNEL_USERNAME || "";
@@ -68,7 +67,8 @@ let arenaGameState = {
     winnerName: null,
     winnerX: null,
     winnerY: null,
-    totalPool: null
+    totalPool: null,
+    resolvedAt: 0 // Системный timestamp завершения раунда
 };
 
 // Фоновый таймер арены
@@ -101,7 +101,7 @@ setInterval(async () => {
     }
 }, 1000);
 
-// Алгоритм защиты долей ставок на бэкенде (полная синхронизация с фронтендом)
+// ИСПРАВЛЕНО: Минимальная гарантированная доля полей уменьшена в 3 раза до 1.3% (0.013)
 function calculateSharesProtectionBackend(bets) {
     const N = bets.length;
     if (N === 0) return [];
@@ -110,7 +110,7 @@ function calculateSharesProtectionBackend(bets) {
     if (total === 0) return amounts.map(() => 1 / N);
 
     let rawShares = amounts.map(b => b / total);
-    const minShare = 0.04; 
+    const minShare = 0.013; // 1.3% гарантированного веса на бэкенде
 
     let adjusted = [...rawShares];
     let iterations = 0;
@@ -146,7 +146,7 @@ function calculateSharesProtectionBackend(bets) {
     return adjusted;
 }
 
-// Расчет победителя с защитой координат внутри защищенных полей
+// Расчет победителя
 async function resolveArenaWinner() {
     let client;
     try {
@@ -182,7 +182,7 @@ async function resolveArenaWinner() {
 
         const winnerId = winnerRow.user_id;
 
-        // Начисление банка победителю
+        // Начисление выигрыша
         await client.query('UPDATE users SET balance = balance + $1 WHERE id = $2', [totalPool, winnerId]);
         await client.query('INSERT INTO transactions (user_id, type, amount, details) VALUES ($1, $2, $3, $4)', [
             winnerId, 'arena_win', totalPool, `Выигрыш в игре Best Arena: +${totalPool} GRAM`
@@ -190,7 +190,7 @@ async function resolveArenaWinner() {
 
         await client.query('COMMIT');
 
-        // Расчет финальных координат остановки шара с учетом защитных долей
+        // Расчет координат приземления шарика с учетом защищенных 1.3% долей полей
         let targetX = 160;
         let targetY = 160;
         const N = bets.length;
@@ -198,34 +198,29 @@ async function resolveArenaWinner() {
         const shares = calculateSharesProtectionBackend(bets);
 
         if (N === 2) {
-            const r = shares[0]; // Защищенная доля первого игрока
+            const r = shares[0]; 
             const isPlayer1Winner = (winnerId === bets[0].user_id);
 
             if (r <= 0.5) {
                 if (isPlayer1Winner) {
-                    // Шарик останавливается внутри левого верхнего треугольника Игрока 1
-                    const s = Math.sqrt(2 * r) * 0.70; // Коэффициент сжатия 0.70 для безопасности
+                    const s = Math.sqrt(2 * r) * 0.70; 
                     targetX = 320 * s * Math.random();
                     targetY = 320 * s * Math.random();
                 } else {
-                    // Игрок 2 (целимся в правый нижний сектор)
                     targetX = 220 + Math.random() * 50;
                     targetY = 220 + Math.random() * 50;
                 }
             } else {
                 if (!isPlayer1Winner) {
-                    // Шарик гарантированно летит в правый нижний треугольник Игрока 2
                     const s = Math.sqrt(2 * (1 - r)) * 0.70;
                     targetX = 320 - (320 * s * Math.random());
                     targetY = 320 - (320 * s * Math.random());
                 } else {
-                    // Игрок 1
                     targetX = 50 + Math.random() * 50;
                     targetY = 50 + Math.random() * 50;
                 }
             }
         } else {
-            // Для 3+ игроков - радиальные лучи
             let currentAngle = 0;
             for (let i = 0; i < bets.length; i++) {
                 const b = bets[i];
@@ -243,15 +238,16 @@ async function resolveArenaWinner() {
             }
         }
 
-        // Фиксация победных координат
+        // Фиксация победного состояния и системного времени
         arenaGameState.winnerId = winnerId;
         const winnerName = winnerRow.username || winnerRow.first_name || "Игрок";
         arenaGameState.winnerName = winnerName;
         arenaGameState.winnerX = targetX;
         arenaGameState.winnerY = targetY;
         arenaGameState.totalPool = totalPool;
+        arenaGameState.resolvedAt = Date.now(); // ИСПРАВЛЕНО: Время резолва в миллисекундах
 
-        // Сброс арены через 12 секунд
+        // Сброс стола через 12 секунд
         setTimeout(async () => {
             try {
                 await query('TRUNCATE arena_active_bets');
@@ -262,6 +258,7 @@ async function resolveArenaWinner() {
                 arenaGameState.winnerY = null;
                 arenaGameState.totalPool = null;
                 arenaGameState.timeLeft = 15;
+                arenaGameState.resolvedAt = 0;
             } catch (err) {
                 console.error("Ошибка при сбросе раунда арены:", err);
             }
@@ -429,7 +426,6 @@ app.post('/api/place_bet', async (req, res) => {
     const { amount } = req.body;
     let betVal = parseFloat(amount);
 
-    // ИСПРАВЛЕНО: Минимальная ставка на бэкенде теперь строго 0.1 TON (GRAM)!
     if (isNaN(betVal) || betVal < 0.1) {
         return res.status(400).json({ error: "Минимальная ставка — 0.1 GRAM" });
     }
@@ -522,6 +518,7 @@ app.get('/api/arena/state', async (req, res) => {
         
         const totalPool = bets.reduce((sum, b) => sum + b.amount, 0);
         
+        // ИСПРАВЛЕНО: Добавлены поля resolvedAt и serverTime для полной асинхронизации клиентов
         res.json({
             status: arenaGameState.status,
             timeLeft: arenaGameState.timeLeft,
@@ -530,7 +527,9 @@ app.get('/api/arena/state', async (req, res) => {
             winnerId: arenaGameState.winnerId,
             winnerName: arenaGameState.winnerName,
             winnerX: arenaGameState.winnerX,
-            winnerY: arenaGameState.winnerY
+            winnerY: arenaGameState.winnerY,
+            resolvedAt: arenaGameState.resolvedAt,
+            serverTime: Date.now()
         });
     } catch (err) {
         res.status(500).json({ error: "Внутренняя ошибка сервера" });
