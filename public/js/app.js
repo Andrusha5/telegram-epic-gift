@@ -44,7 +44,6 @@ function preloadImages(urls) {
     });
 }
 
-// Детерминированный seeded генератор для физики шарика
 function createPRNG(seedString) {
     let h = 1779033703 ^ seedString.length;
     for (let i = 0; i < seedString.length; i++) {
@@ -58,9 +57,9 @@ function createPRNG(seedString) {
     }
 }
 
-// УНИВЕРСАЛЬНЫЙ КЛИЕНТСКИЙ FETCH С ТАЙМАУТОМ (ЗАЩИТА ОТ ЗАВИСАНИЯ И ВЕЧНОЙ ЗАГРУЗКИ)
+// УНИВЕРСАЛЬНЫЙ КЛИЕНТСКИЙ FETCH С ТАЙМАУТОМ (8 секунд для стабильности на 3G/LTE)
 async function fetchWithTimeout(resource, options = {}) {
-    const { timeout = 3000 } = options; // Быстрый таймаут 3 секунды
+    const { timeout = 8000 } = options; 
     const controller = new AbortController();
     const id = setTimeout(() => controller.abort(), timeout);
     try {
@@ -77,28 +76,24 @@ async function fetchWithTimeout(resource, options = {}) {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
-    // Вся инициализация завернута в глобальный блок безопасности
     try {
         const API_BASE_URL = window.location.origin;
         let currentUser = {};
         let isNewbieCaseMode = false; 
         const GRAMCOIN_ICON_URL = "/Images/Items/gram_popolnenie.png"; 
 
-        // Настраиваемые ставки по умолчанию
         let customBets = [0.1, 1.0, 5.0];
         let arenaPlayers = []; 
-        let arenaPollInterval = null;
+        let isPollingActive = false; // Маркер последовательного поллинга
         let isBallAnimating = false;
         let currentRoundSignature = null;
         let arenaStatusStr = "waiting";
 
-        // КЭШ ИНФОРМАЦИИ ДЛЯ СТАБИЛЬНЫХ ТРАНЗАКЦИЙ НА IPHONE
         let preloadedAdminAddress = null;
         let preloadedPayloadBase64 = null;
 
         const safeSetText = (el, val) => { if (el) el.innerText = val; };
 
-        // ИСПРАВЛЕНО: Мгновенное (0мс) отображение имени до отправки запросов в сеть
         const initialName = tg.initDataUnsafe?.user?.username || tg.initDataUnsafe?.user?.first_name || "Пользователь";
         safeSetText(document.getElementById('user-username'), formatUsername(initialName));
 
@@ -145,21 +140,44 @@ document.addEventListener('DOMContentLoaded', async () => {
             adminTgChatTrigger: document.getElementById('admin-tg-chat-trigger')
         };
 
-        // Запуск фоновой подгрузки платежных параметров для iPhone сразу при старте
+        // УМНЫЙ FALLBACK ПЛАТЕЖНЫХ ЭНДПОИНТОВ (АВТОМАТИЧЕСКИЙ ПОДБОР ПУТИ НА ЛЮБОМ СЕРВЕРЕ)
         async function preloadPaymentParams() {
-            try {
-                const resAddr = await fetchWithTimeout(`${API_BASE_URL}/api/deposit_address`, { timeout: 2500 });
-                const dataAddr = await resAddr.json();
-                preloadedAdminAddress = dataAddr.address;
+            // Подбор адреса
+            const addrEndpoints = [
+                `${API_BASE_URL}/api/deposit_address`,
+                `${API_BASE_URL}/api/deposit-address`,
+                `${API_BASE_URL}/api/address`
+            ];
+            for (const url of addrEndpoints) {
+                try {
+                    const res = await fetchWithTimeout(url, { timeout: 4000 });
+                    if (res.ok) {
+                        const data = await res.json();
+                        preloadedAdminAddress = data.address || data.deposit_address || data.wallet;
+                        if (preloadedAdminAddress) break;
+                    }
+                } catch (e) {}
+            }
 
-                const resPayload = await fetchWithTimeout(`${API_BASE_URL}/api/generate_payload?text=${userId}`, { timeout: 2500 });
-                const dataPayload = await resPayload.json();
-                preloadedPayloadBase64 = dataPayload.payload;
-            } catch (e) {}
+            // Подбор пейлоада
+            const payloadEndpoints = [
+                `${API_BASE_URL}/api/generate_payload?text=${userId}`,
+                `${API_BASE_URL}/api/generate-payload?text=${userId}`,
+                `${API_BASE_URL}/api/payload?text=${userId}`
+            ];
+            for (const url of payloadEndpoints) {
+                try {
+                    const res = await fetchWithTimeout(url, { timeout: 4000 });
+                    if (res.ok) {
+                        const data = await res.json();
+                        preloadedPayloadBase64 = data.payload || data.payload_base64;
+                        if (preloadedPayloadBase64) break;
+                    }
+                } catch (e) {}
+            }
         }
         preloadPaymentParams();
 
-        // Загрузка кэша и сохраненных настроек
         function loadSavedBets() {
             try {
                 const saved = localStorage.getItem(`custom_bets_${userId}`);
@@ -269,7 +287,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             overlay.classList.remove('hidden');
         }
 
-        // Инициализация TON Connect
+        // Подключение кошелька TON Connect
         let tonConnectUI = null;
         try {
             const manifestUrl = `${API_BASE_URL}/tonconnect-manifest.json`;
@@ -346,7 +364,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         if (elements.depositBalanceBtn) {
             elements.depositBalanceBtn.addEventListener('click', () => {
-                preloadPaymentParams(); // Мгновенный вызов для исключения задержек на iOS
+                preloadPaymentParams();
                 if (elements.depositAmountModal) {
                     elements.depositAmountModal.classList.remove('hidden');
                     if (elements.modalDepositInput) {
@@ -377,11 +395,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
 
                 if (!preloadedAdminAddress || !preloadedPayloadBase64) {
+                    showNotification("Загружаем реквизиты, подождите 2 секунды...", "⏳");
                     await preloadPaymentParams();
                 }
 
                 if (!preloadedAdminAddress) {
-                    showNotification("Ошибка сервера при получении адреса.", "⚠️");
+                    showNotification("Не удалось получить адрес пополнения. Попробуйте еще раз.", "⚠️");
                     return;
                 }
 
@@ -415,23 +434,32 @@ document.addEventListener('DOMContentLoaded', async () => {
                                 return;
                             }
 
-                            try {
-                                const verifyRes = await fetchWithTimeout(`${API_BASE_URL}/api/verify-payment`, {
-                                    method: 'POST',
-                                    headers: { 
-                                        'Content-Type': 'application/json',
-                                        'X-Telegram-Init-Data': tg.initData || ""
-                                    },
-                                    body: JSON.stringify({ amount: amount, userId: userId }),
-                                    timeout: 2500
-                                });
-                                const verifyData = await verifyRes.json();
-                                if (verifyRes.ok && verifyData.success) {
-                                    clearInterval(checkInterval);
-                                    showNotification(`Баланс пополнен на +${amount.toFixed(2)} GRAM!`, "💎");
-                                    fetchUserData();
-                                }
-                            } catch (e) {}
+                            const verifyUrls = [
+                                `${API_BASE_URL}/api/verify-payment`,
+                                `${API_BASE_URL}/api/verify_payment`
+                            ];
+                            for (const url of verifyUrls) {
+                                try {
+                                    const verifyRes = await fetchWithTimeout(url, {
+                                        method: 'POST',
+                                        headers: { 
+                                            'Content-Type': 'application/json',
+                                            'X-Telegram-Init-Data': tg.initData || ""
+                                        },
+                                        body: JSON.stringify({ amount: amount, userId: userId }),
+                                        timeout: 4000
+                                    });
+                                    if (verifyRes.ok) {
+                                        const verifyData = await verifyRes.json();
+                                        if (verifyData.success) {
+                                            clearInterval(checkInterval);
+                                            showNotification(`Баланс пополнен на +${amount.toFixed(2)} GRAM!`, "💎");
+                                            fetchUserData();
+                                            return;
+                                        }
+                                    }
+                                } catch (e) {}
+                            }
                         }, 3000);
                     }
                 } catch (err) {
@@ -447,7 +475,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         function calculateSharesProtection(players) {
             const N = players.length;
             if (N === 0) return [];
-            let bets = players.map(p => parseFloat(p.bet || 0));
+            let bets = players.map(p => {
+                const val = parseFloat(p.bet);
+                return isNaN(val) ? 0 : val;
+            });
             const total = bets.reduce((a, b) => a + b, 0);
             if (total === 0) return bets.map(() => 1 / N);
 
@@ -536,124 +567,126 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         function drawArenaSegments() {
-            const svg = document.getElementById('arena-svg-canvas');
-            const avatarsContainer = document.getElementById('arena-avatars-container');
-            if (!svg || !avatarsContainer) return;
+            try {
+                const svg = document.getElementById('arena-svg-canvas');
+                const avatarsContainer = document.getElementById('arena-avatars-container');
+                if (!svg || !avatarsContainer) return;
 
-            if (isBallAnimating) return;
+                if (isBallAnimating) return;
 
-            svg.innerHTML = '';
-            avatarsContainer.innerHTML = '';
+                svg.innerHTML = '';
+                avatarsContainer.innerHTML = '';
 
-            const N = arenaPlayers.length;
-            if (N === 0) return;
+                const N = arenaPlayers.length;
+                if (N === 0) return;
 
-            const W = 320; 
-            const H = 320;
+                const W = 320; 
+                const H = 320;
 
-            const shares = calculateSharesProtection(arenaPlayers);
+                const shares = calculateSharesProtection(arenaPlayers);
 
-            if (N === 1) {
-                const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-                rect.setAttribute("x", "0");
-                rect.setAttribute("y", "0");
-                rect.setAttribute("width", "100%");
-                rect.setAttribute("height", "100%");
-                rect.setAttribute("fill", arenaPlayers[0].color);
-                svg.appendChild(rect);
+                if (N === 1) {
+                    const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+                    rect.setAttribute("x", "0");
+                    rect.setAttribute("y", "0");
+                    rect.setAttribute("width", "100%");
+                    rect.setAttribute("height", "100%");
+                    rect.setAttribute("fill", arenaPlayers[0].color);
+                    svg.appendChild(rect);
 
-                createAvatarElement(160, 160, arenaPlayers[0].avatar, 56);
-            } else if (N === 2) {
-                const r = shares[0];
+                    createAvatarElement(160, 160, arenaPlayers[0].avatar, 56);
+                } else if (N === 2) {
+                    const r = shares[0];
 
-                if (r <= 0.5) {
-                    const s = Math.sqrt(2 * r);
-                    const sizeX = (W * s).toFixed(1);
-                    const sizeY = (H * s).toFixed(1);
+                    if (r <= 0.5) {
+                        const s = Math.sqrt(2 * r);
+                        const sizeX = (W * s).toFixed(1);
+                        const sizeY = (H * s).toFixed(1);
 
-                    const bg = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-                    bg.setAttribute("width", "100%");
-                    bg.setAttribute("height", "100%");
-                    bg.setAttribute("fill", arenaPlayers[1].color);
-                    svg.appendChild(bg);
+                        const bg = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+                        bg.setAttribute("width", "100%");
+                        bg.setAttribute("height", "100%");
+                        bg.setAttribute("fill", arenaPlayers[1].color);
+                        svg.appendChild(bg);
 
-                    const poly = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
-                    const p1Pts = [{x:0, y:0}, {x:parseFloat(sizeX), y:0}, {x:0, y:parseFloat(sizeY)}];
-                    poly.setAttribute("points", p1Pts.map(p => `${p.x},${p.y}`).join(' '));
-                    poly.setAttribute("fill", arenaPlayers[0].color);
-                    svg.appendChild(poly);
+                        const poly = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
+                        const p1Pts = [{x:0, y:0}, {x:parseFloat(sizeX), y:0}, {x:0, y:parseFloat(sizeY)}];
+                        poly.setAttribute("points", p1Pts.map(p => `${p.x},${p.y}`).join(' '));
+                        poly.setAttribute("fill", arenaPlayers[0].color);
+                        svg.appendChild(poly);
 
-                    const c1 = getPolygonCentroid(p1Pts);
-                    const p2Pts = [
-                        {x:parseFloat(sizeX), y:0}, 
-                        {x:320, y:0}, 
-                        {x:320, y:320}, 
-                        {x:0, y:320}, 
-                        {x:0, y:parseFloat(sizeY)}
-                    ];
-                    const c2 = getPolygonCentroid(p2Pts);
+                        const c1 = getPolygonCentroid(p1Pts);
+                        const p2Pts = [
+                            {x:parseFloat(sizeX), y:0}, 
+                            {x:320, y:0}, 
+                            {x:320, y:320}, 
+                            {x:0, y:320}, 
+                            {x:0, y:parseFloat(sizeY)}
+                        ];
+                        const c2 = getPolygonCentroid(p2Pts);
 
-                    createAvatarElement(c1.x, c1.y, arenaPlayers[0].avatar, 24 + r * 30);
-                    createAvatarElement(c2.x, c2.y, arenaPlayers[1].avatar, 24 + (1-r) * 30);
-                } else {
-                    const s = Math.sqrt(2 * (1 - r));
-                    const sizeX = (W * s).toFixed(1);
-                    const sizeY = (H * s).toFixed(1);
+                        createAvatarElement(c1.x, c1.y, arenaPlayers[0].avatar, 24 + r * 30);
+                        createAvatarElement(c2.x, c2.y, arenaPlayers[1].avatar, 24 + (1-r) * 30);
+                    } else {
+                        const s = Math.sqrt(2 * (1 - r));
+                        const sizeX = (W * s).toFixed(1);
+                        const sizeY = (H * s).toFixed(1);
 
-                    const bg = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-                    bg.setAttribute("width", "100%");
-                    bg.setAttribute("height", "100%");
-                    bg.setAttribute("fill", arenaPlayers[0].color);
-                    svg.appendChild(bg);
+                        const bg = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+                        bg.setAttribute("width", "100%");
+                        bg.setAttribute("height", "100%");
+                        bg.setAttribute("fill", arenaPlayers[0].color);
+                        svg.appendChild(bg);
 
-                    const poly = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
-                    const p2Pts = [
-                        {x:320, y:320}, 
-                        {x:320 - parseFloat(sizeX), y:320}, 
-                        {x:320, y:320 - parseFloat(sizeY)}
-                    ];
-                    poly.setAttribute("points", p2Pts.map(p => `${p.x},${p.y}`).join(' '));
-                    poly.setAttribute("fill", arenaPlayers[1].color);
-                    svg.appendChild(poly);
+                        const poly = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
+                        const p2Pts = [
+                            {x:320, y:320}, 
+                            {x:320 - parseFloat(sizeX), y:320}, 
+                            {x:320, y:320 - parseFloat(sizeY)}
+                        ];
+                        poly.setAttribute("points", p2Pts.map(p => `${p.x},${p.y}`).join(' '));
+                        poly.setAttribute("fill", arenaPlayers[1].color);
+                        svg.appendChild(poly);
 
-                    const p1Pts = [
-                        {x:0, y:0}, 
-                        {x:320, y:0}, 
-                        {x:320, y:320 - parseFloat(sizeY)}, 
-                        {x:320 - parseFloat(sizeX), y:320}, 
-                        {x:0, y:320}
-                    ];
-                    const c1 = getPolygonCentroid(p1Pts);
-                    const c2 = getPolygonCentroid(p2Pts);
+                        const p1Pts = [
+                            {x:0, y:0}, 
+                            {x:320, y:0}, 
+                            {x:320, y:320 - parseFloat(sizeY)}, 
+                            {x:320 - parseFloat(sizeX), y:320}, 
+                            {x:0, y:320}
+                        ];
+                        const c1 = getPolygonCentroid(p1Pts);
+                        const c2 = getPolygonCentroid(p2Pts);
 
-                    createAvatarElement(c1.x, c1.y, arenaPlayers[0].avatar, 24 + r * 30);
-                    createAvatarElement(c2.x, c2.y, arenaPlayers[1].avatar, 24 + (1-r) * 30);
-                }
-            } else {
-                let currentAngle = 0;
-                for (let i = 0; i < arenaPlayers.length; i++) {
-                    const player = arenaPlayers[i];
-                    const share = shares[i];
-                    const nextAngle = currentAngle + 2 * Math.PI * share;
-
-                    const pts = [{ x: 160, y: 160 }];
-                    const step = 0.05;
-                    for (let a = currentAngle; a < nextAngle; a += step) {
-                        pts.push(getSquareIntersection(a));
+                        createAvatarElement(c1.x, c1.y, arenaPlayers[0].avatar, 24 + r * 30);
+                        createAvatarElement(c2.x, c2.y, arenaPlayers[1].avatar, 24 + (1-r) * 30);
                     }
-                    pts.push(getSquareIntersection(nextAngle));
+                } else {
+                    let currentAngle = 0;
+                    for (let i = 0; i < arenaPlayers.length; i++) {
+                        const player = arenaPlayers[i];
+                        const share = shares[i];
+                        const nextAngle = currentAngle + 2 * Math.PI * share;
 
-                    const poly = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
-                    poly.setAttribute("points", pts.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' '));
-                    poly.setAttribute("fill", player.color);
-                    svg.appendChild(poly);
+                        const pts = [{ x: 160, y: 160 }];
+                        const step = 0.05;
+                        for (let a = currentAngle; a < nextAngle; a += step) {
+                            pts.push(getSquareIntersection(a));
+                        }
+                        pts.push(getSquareIntersection(nextAngle));
 
-                    const c = getPolygonCentroid(pts);
-                    createAvatarElement(c.x, c.y, player.avatar, 24 + share * 24);
+                        const poly = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
+                        poly.setAttribute("points", pts.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' '));
+                        poly.setAttribute("fill", player.color);
+                        svg.appendChild(poly);
 
-                    currentAngle = nextAngle;
+                        const c = getPolygonCentroid(pts);
+                        createAvatarElement(c.x, c.y, player.avatar, 24 + share * 24);
+
+                        currentAngle = nextAngle;
+                    }
                 }
-            }
+            } catch(e) {}
         }
 
         function getPlayerAtCoords(x, y) {
@@ -693,38 +726,59 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         }
 
+        function createAvatarElement(x, y, src, size) {
+            const container = document.getElementById('arena-avatars-container');
+            if (!container) return;
+            const img = document.createElement('img');
+            img.className = 'arena-player-avatar-node';
+            img.src = src;
+            img.style.left = `${x}px`;
+            img.style.top = `${y}px`;
+            img.style.width = `${size}px`;
+            img.style.height = `${size}px`;
+            img.onerror = () => { img.src = "https://img.icons8.com/color/96/user.png"; };
+            container.appendChild(img);
+        }
+
         function updatePlayersListUI() {
-            const listContainer = document.getElementById('arena-players-list');
-            if (!listContainer) return;
+            try {
+                const listContainer = document.getElementById('arena-players-list');
+                if (!listContainer) return;
 
-            if (arenaPlayers.length === 0) {
-                listContainer.innerHTML = `<div class="empty-list-placeholder">Ставок еще нет. Станьте первым!</div>`;
-                return;
-            }
+                if (arenaPlayers.length === 0) {
+                    listContainer.innerHTML = `<div class="empty-list-placeholder">Ставок еще нет. Станьте первым!</div>`;
+                    return;
+                }
 
-            const totalBetSum = arenaPlayers.reduce((sum, p) => sum + parseFloat(p.bet), 0);
+                let totalBetSum = 0;
+                arenaPlayers.forEach(p => {
+                    const val = parseFloat(p.bet);
+                    if (!isNaN(val)) totalBetSum += val;
+                });
 
-            listContainer.innerHTML = '';
-            arenaPlayers.forEach(p => {
-                const chance = totalBetSum > 0 ? ((p.bet / totalBetSum) * 100).toFixed(2) : (100 / arenaPlayers.length).toFixed(2);
-                const row = document.createElement('div');
-                row.className = 'player-list-row';
-                row.style.borderLeft = `4px solid ${p.color}`;
-                row.innerHTML = `
-                    <div class="player-row-left">
-                        <img class="player-row-avatar" src="${p.avatar}" onerror="this.src='https://img.icons8.com/color/96/user.png';">
-                        <div class="player-info-column">
-                            <span class="player-row-name">${p.username}</span>
-                            <span class="player-row-chance">${chance}% шанс</span>
+                listContainer.innerHTML = '';
+                arenaPlayers.forEach(p => {
+                    const pBet = parseFloat(p.bet) || 0;
+                    const chance = totalBetSum > 0 ? ((pBet / totalBetSum) * 100).toFixed(2) : (100 / arenaPlayers.length).toFixed(2);
+                    const row = document.createElement('div');
+                    row.className = 'player-list-row';
+                    row.style.borderLeft = `4px solid ${p.color || '#8d3df5'}`;
+                    row.innerHTML = `
+                        <div class="player-row-left">
+                            <img class="player-row-avatar" src="${p.avatar}" onerror="this.src='https://img.icons8.com/color/96/user.png';">
+                            <div class="player-info-column">
+                                <span class="player-row-name">${p.username || 'Игрок'}</span>
+                                <span class="player-row-chance">${chance}% шанс</span>
+                            </div>
                         </div>
-                    </div>
-                    <div class="player-row-right">
-                        <span class="player-row-bet-value">${p.bet.toFixed(3)}</span>
-                        <img class="player-row-coin" src="${GRAMCOIN_ICON_URL}" alt="GRAM">
-                    </div>
-                `;
-                listContainer.appendChild(row);
-            });
+                        <div class="player-row-right">
+                            <span class="player-row-bet-value">${pBet.toFixed(3)}</span>
+                            <img class="player-row-coin" src="${GRAMCOIN_ICON_URL}" alt="GRAM">
+                        </div>
+                    `;
+                    listContainer.appendChild(row);
+                });
+            } catch (e) {}
         }
 
         function renderBetButtons() {
@@ -806,7 +860,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             return null; 
         }
 
-        // АНИМАЦИЯ ШАРИКА: Адаптирована под 60/120 FPS и полностью защищена от фризов
         function animateBouncingBall(targetX, targetY, seedSignature, onComplete) {
             if (isBallAnimating) return;
             isBallAnimating = true;
@@ -910,32 +963,33 @@ document.addEventListener('DOMContentLoaded', async () => {
             requestAnimationFrame(renderFrame);
         }
 
-        function startArenaPolling() {
-            if (arenaPollInterval) return;
+        // БЕЗОПАСНЫЙ И ВЫСОКОСКОРОСТНОЙ ПОЛЛИНГ ИГРЫ ARENA (БЕЗ НАЛОЖЕНИЙ)
+        async function pollArenaLoop() {
+            if (!isPollingActive) return;
 
-            const poll = async () => {
-                const arenaSection = document.getElementById('arena-section');
-                if (!arenaSection || arenaSection.classList.contains('hidden')) {
-                    stopArenaPolling();
-                    return;
-                }
+            const arenaSection = document.getElementById('arena-section');
+            if (!arenaSection || arenaSection.classList.contains('hidden')) {
+                stopArenaPolling();
+                return;
+            }
 
-                try {
-                    const res = await fetchWithTimeout(`${API_BASE_URL}/api/arena/state`, {
-                        headers: { 'X-Telegram-Init-Data': tg.initData || "" },
-                        timeout: 2500
-                    });
-                    if (!res.ok) return;
+            try {
+                const res = await fetchWithTimeout(`${API_BASE_URL}/api/arena/state`, {
+                    headers: { 'X-Telegram-Init-Data': tg.initData || "" },
+                    timeout: 4000
+                });
+                if (res.ok) {
                     const state = await res.json();
+                    arenaStatusStr = state.status || state.state || "waiting";
 
-                    arenaStatusStr = state.status;
-
-                    arenaPlayers = state.bets.map(bet => ({
-                        id: bet.userId,
-                        username: bet.username,
-                        avatar: bet.avatar || "https://img.icons8.com/color/96/user.png",
-                        bet: parseFloat(bet.amount),
-                        color: bet.color
+                    // Поддержка любых названий переменных в JSON структуры сервера
+                    const rawBets = state.bets || state.players || state.activeBets || [];
+                    arenaPlayers = rawBets.map(bet => ({
+                        id: bet.userId || bet.user_id || bet.id || "",
+                        username: bet.username || bet.user_name || bet.name || "Игрок",
+                        avatar: bet.avatar || bet.avatar_url || "https://img.icons8.com/color/96/user.png",
+                        bet: parseFloat(bet.amount || bet.bet || 0),
+                        color: bet.color || "#8d3df5"
                     }));
 
                     drawArenaSegments();
@@ -944,14 +998,22 @@ document.addEventListener('DOMContentLoaded', async () => {
                     const statusText = document.getElementById('arena-status-text');
                     const countdownTimer = document.getElementById('arena-countdown-timer');
 
-                    if (state.status === 'countdown') {
+                    const stateTimeLeft = state.timeLeft !== undefined ? state.timeLeft : (state.time_left !== undefined ? state.time_left : (state.timer !== undefined ? state.timer : ""));
+
+                    if (arenaStatusStr === 'countdown') {
                         if (statusText) statusText.classList.add('hidden');
                         if (countdownTimer) {
                             countdownTimer.classList.remove('hidden');
-                            countdownTimer.innerText = state.timeLeft;
+                            countdownTimer.innerText = stateTimeLeft;
                         }
-                    } else if (state.status === 'finished') {
-                        const signature = state.winnerId + "_" + state.totalPool + "_" + state.winnerX + "_" + state.winnerY;
+                    } else if (arenaStatusStr === 'finished') {
+                        const winId = state.winnerId || state.winner_id || "";
+                        const winX = state.winnerX || state.winner_x || 0;
+                        const winY = state.winnerY || state.winner_y || 0;
+                        const winName = state.winnerName || state.winner_name || "Победитель";
+                        const tPool = state.totalPool || state.total_pool || state.pool || 0;
+
+                        const signature = winId + "_" + tPool + "_" + winX + "_" + winY;
                         const age = (state.serverTime && state.resolvedAt) ? (state.serverTime - state.resolvedAt) : 99999;
 
                         if (age > 9500) {
@@ -961,33 +1023,33 @@ document.addEventListener('DOMContentLoaded', async () => {
                                 statusText.innerText = "Ждем ставки...";
                             }
                             if (countdownTimer) countdownTimer.classList.add('hidden');
-                        } else if (currentRoundSignature !== signature && state.winnerX && state.winnerY) {
+                        } else if (currentRoundSignature !== signature && winX && winY) {
                             currentRoundSignature = signature;
                             
                             if (statusText) statusText.classList.add('hidden');
                             if (countdownTimer) countdownTimer.classList.add('hidden');
 
-                            animateBouncingBall(state.winnerX, state.winnerY, signature, () => {
-                                const isWeWinner = (String(state.winnerId) === String(userId));
-                                
+                            animateBouncingBall(winX, winY, signature, () => {
+                                const isWeWinner = (String(winId) === String(userId));
                                 if (isWeWinner) {
                                     showCustomModal({
                                         icon: '🏆',
                                         title: 'Победа!',
-                                        message: `🎉 Поздравляем! Белый шарик остановился на вашем секторе! Вы получили весь банк: +${parseFloat(state.totalPool).toFixed(3)} GRAM!`,
+                                        message: `🎉 Поздравляем! Белый шарик остановился на вашем секторе! Вы получили весь банк: +${parseFloat(tPool).toFixed(3)} GRAM!`,
                                         buttons: [{ text: 'Забрать!', primary: true }]
                                     });
-                                    showNotification(`Зачислено: +${parseFloat(state.totalPool).toFixed(3)} GRAM!`, "💎");
+                                    showNotification(`Зачислено: +${parseFloat(tPool).toFixed(3)} GRAM!`, "💎");
                                 } else {
-                                    showNotification(`Игрок ${state.winnerName} выиграл ${parseFloat(state.totalPool).toFixed(3)} GRAM!`, "🏆");
+                                    showNotification(`Игрок ${winName} выиграл ${parseFloat(tPool).toFixed(3)} GRAM!`, "🏆");
                                 }
                                 fetchUserData();
                             });
                         }
                     } else {
+                        // Режим 'waiting', 'active' или любой другой запуск
                         if (statusText && !isBallAnimating) {
                             statusText.classList.remove('hidden');
-                            statusText.innerText = "Ждем ставки...";
+                            statusText.innerText = (arenaStatusStr === 'active' || arenaStatusStr === 'running') ? "Игра идет..." : "Ждем ставки...";
                         }
                         if (countdownTimer) {
                             countdownTimer.classList.add('hidden');
@@ -995,19 +1057,23 @@ document.addEventListener('DOMContentLoaded', async () => {
                     }
 
                     renderBetButtons();
+                }
+            } catch (err) {}
 
-                } catch (err) {}
-            };
+            // Перезапуск следующей итерации ПОСЛЕ завершения текущей (защита от лагов сети)
+            if (isPollingActive) {
+                setTimeout(pollArenaLoop, 1500);
+            }
+        }
 
-            poll();
-            arenaPollInterval = setInterval(poll, 1000);
+        function startArenaPolling() {
+            if (isPollingActive) return;
+            isPollingActive = true;
+            pollArenaLoop();
         }
 
         function stopArenaPolling() {
-            if (arenaPollInterval) {
-                clearInterval(arenaPollInterval);
-                arenaPollInterval = null;
-            }
+            isPollingActive = false;
         }
 
         function resetArenaGame() {
@@ -1048,7 +1114,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         'X-Telegram-Init-Data': tg.initData || ""
                     },
                     body: JSON.stringify({ amount: betValue }),
-                    timeout: 3000
+                    timeout: 4000
                 });
                 const data = await res.json();
                 
@@ -1167,7 +1233,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
         }
 
-        // Награды
+        // Награда
         const GIFT_POOL = [
             { id: 1, name: "Статуя птицы серая", icon: "/Images/Items/rare_bird.jpg", price: "20 GRAM", rawPrice: 20.0, isGold: true, type: "gift" },
             { id: 2, name: "Тыква", icon: "/Images/Items/pumpkin.jpg", price: "8 GRAM", rawPrice: 8.0, isGold: true, type: "gift" },
@@ -1386,7 +1452,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             try {
                 const res = await fetchWithTimeout(`${API_BASE_URL}/api/user`, { 
                     headers: { 'X-Telegram-Init-Data': tg.initData || "" },
-                    timeout: 3000 
+                    timeout: 4000 
                 });
                 if (!res.ok) throw new Error();
                 currentUser = await res.json();
