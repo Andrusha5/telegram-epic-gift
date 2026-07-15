@@ -464,7 +464,25 @@ document.addEventListener('DOMContentLoaded', async () => {
         container.appendChild(img);
     }
 
-    // Динамический рендеринг списка участников снизу
+    // Детектор нахождения шарика на полях участников в реальном времени
+    function getPlayerAtX(x) {
+        if (arenaPlayers.length === 0) return null;
+        const W = 320;
+        const totalBetSum = arenaPlayers.reduce((sum, p) => sum + parseFloat(p.bet), 0);
+        let currentX = 0;
+
+        for (const player of arenaPlayers) {
+            const percentage = totalBetSum > 0 ? (parseFloat(player.bet) / totalBetSum) : (1 / arenaPlayers.length);
+            const segmentWidth = W * percentage;
+            if (x >= currentX && x <= currentX + segmentWidth) {
+                return player;
+            }
+            currentX += segmentWidth;
+        }
+        return arenaPlayers[arenaPlayers.length - 1]; 
+    }
+
+    // Рендеринг списка участников снизу с шансом выигрыша (до сотых, например 1.45%)
     function updatePlayersListUI() {
         const listContainer = document.getElementById('arena-players-list');
         if (!listContainer) return;
@@ -474,15 +492,21 @@ document.addEventListener('DOMContentLoaded', async () => {
             return;
         }
 
+        const totalBetSum = arenaPlayers.reduce((sum, p) => sum + parseFloat(p.bet), 0);
+
         listContainer.innerHTML = '';
         arenaPlayers.forEach(p => {
+            const chance = totalBetSum > 0 ? ((p.bet / totalBetSum) * 100).toFixed(2) : (100 / arenaPlayers.length).toFixed(2);
             const row = document.createElement('div');
             row.className = 'player-list-row';
             row.style.borderLeft = `4px solid ${p.color}`;
             row.innerHTML = `
                 <div class="player-row-left">
                     <img class="player-row-avatar" src="${p.avatar}" onerror="this.src='https://img.icons8.com/color/96/user.png';">
-                    <span class="player-row-name">${p.username}</span>
+                    <div class="player-info-column">
+                        <span class="player-row-name">${p.username}</span>
+                        <span class="player-row-chance">${chance}% шанс</span>
+                    </div>
                 </div>
                 <div class="player-row-right">
                     <span class="player-row-bet-value">${p.bet.toFixed(3)}</span>
@@ -522,9 +546,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             const startX = boardWidth / 2;
             const startY = boardHeight / 2;
 
-            // Движения запускаются на высокой скорости (быстрый старт)
+            // Запуск на высокой стартовой скорости (быстрый старт)
             const angle = rng() * Math.PI * 2;
-            const speed = 19 + rng() * 5; 
+            const speed = 20 + rng() * 6; 
 
             let vx = Math.cos(angle) * speed;
             let vy = Math.sin(angle) * speed;
@@ -561,7 +585,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 path.push({ x: currentX, y: currentY });
             }
 
-            // Проверяем, остановился ли шарик на нужном секторе
             if (Math.abs(currentX - targetX) < 10) {
                 return { path };
             }
@@ -569,22 +592,32 @@ document.addEventListener('DOMContentLoaded', async () => {
         return null;
     }
 
+    // Бесшовный полет над аватарками с динамическим изменением юзернеймов на холсте z-index: 10
     function animateBouncingBall(targetX, seedSignature, onComplete) {
         if (isBallAnimating) return;
         isBallAnimating = true;
 
-        const canvas = document.getElementById('arena-svg-canvas');
-        if (!canvas) return;
+        const ballCanvas = document.getElementById('arena-ball-svg');
+        if (!ballCanvas) return;
 
-        let ballElement = document.getElementById('physics-ball');
-        if (ballElement) ballElement.remove();
+        ballCanvas.innerHTML = ''; 
 
-        // Полностью белый шарик без обводок и рамок
-        ballElement = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+        // Чисто белый шарик без обводок
+        const ballElement = document.createElementNS("http://www.w3.org/2000/svg", "circle");
         ballElement.setAttribute("id", "physics-ball");
         ballElement.setAttribute("r", "8");
         ballElement.setAttribute("fill", "#ffffff");
-        canvas.appendChild(ballElement);
+        ballCanvas.appendChild(ballElement);
+
+        // Парящий юзернейм над шариком
+        const textElement = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        textElement.setAttribute("id", "physics-ball-text");
+        textElement.setAttribute("fill", "#ffffff");
+        textElement.setAttribute("font-size", "12");
+        textElement.setAttribute("font-weight", "900");
+        textElement.setAttribute("text-anchor", "middle");
+        textElement.setAttribute("filter", "drop-shadow(0px 2px 3px rgba(0,0,0,0.9))");
+        ballCanvas.appendChild(textElement);
 
         const W = 320;
         const H = 320;
@@ -596,6 +629,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const step = () => {
                 if (frame >= totalFrames) {
                     isBallAnimating = false;
+                    ballCanvas.innerHTML = '';
                     onComplete();
                     return;
                 }
@@ -605,6 +639,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const currentY = (H / 2);
                 ballElement.setAttribute("cx", currentX.toFixed(1));
                 ballElement.setAttribute("cy", currentY.toFixed(1));
+
+                textElement.setAttribute("x", currentX.toFixed(1));
+                textElement.setAttribute("y", (currentY - 16).toFixed(1));
+                const activePlayer = getPlayerAtX(currentX);
+                textElement.textContent = activePlayer ? activePlayer.username : "";
+
                 frame++;
                 requestAnimationFrame(step);
             };
@@ -618,6 +658,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const renderFrame = () => {
             if (frameIndex >= path.length) {
                 isBallAnimating = false;
+                ballCanvas.innerHTML = ''; 
                 onComplete();
                 return;
             }
@@ -625,6 +666,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             const pos = path[frameIndex];
             ballElement.setAttribute("cx", pos.x.toFixed(1));
             ballElement.setAttribute("cy", pos.y.toFixed(1));
+
+            textElement.setAttribute("x", pos.x.toFixed(1));
+            textElement.setAttribute("y", (pos.y - 16).toFixed(1));
+            const activePlayer = getPlayerAtX(pos.x);
+            textElement.textContent = activePlayer ? activePlayer.username : "";
 
             frameIndex++;
             requestAnimationFrame(renderFrame);
@@ -675,10 +721,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     if (currentRoundSignature !== signature && state.winnerX) {
                         currentRoundSignature = signature;
                         
-                        if (statusText) {
-                            statusText.classList.remove('hidden');
-                            statusText.innerText = "Шарик запущен...";
-                        }
+                        if (statusText) statusText.classList.add('hidden'); // Полное скрытие надписей при полете
                         if (countdownTimer) countdownTimer.classList.add('hidden');
 
                         animateBouncingBall(state.winnerX, signature, () => {
@@ -730,6 +773,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const countdownTimer = document.getElementById('arena-countdown-timer');
         const svg = document.getElementById('arena-svg-canvas');
         const avatarsContainer = document.getElementById('arena-avatars-container');
+        const ballSvg = document.getElementById('arena-ball-svg');
 
         if (statusText) {
             statusText.classList.remove('hidden');
@@ -738,6 +782,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (countdownTimer) countdownTimer.classList.add('hidden');
         if (svg) svg.innerHTML = '';
         if (avatarsContainer) avatarsContainer.innerHTML = '';
+        if (ballSvg) ballSvg.innerHTML = '';
 
         renderBetButtons();
     }
@@ -747,7 +792,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (btn.classList.contains('disabled')) return;
 
         const betValue = parseFloat(btn.getAttribute('data-bet'));
-        if (isNaN(betValue) || betValue < 0.1) return;
+        if (isNaN(betValue) || betValue < 0.001) return;
 
         btn.classList.add('disabled');
         btn.disabled = true;
@@ -834,8 +879,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             b2 = parseFloat(b2.toFixed(3));
             b3 = parseFloat(b3.toFixed(3));
 
-            if (isNaN(b1) || b1 < 0.1 || isNaN(b2) || b2 < 0.1 || isNaN(b3) || b3 < 0.1) {
-                showNotification("Ставка не может быть меньше 0.1 GRAM!", "⚠️");
+            if (isNaN(b1) || b1 < 0.001 || isNaN(b2) || b2 < 0.001 || isNaN(b3) || b3 < 0.001) {
+                showNotification("Ставка не может быть меньше 0.001 GRAM!", "⚠️");
                 return;
             }
 
