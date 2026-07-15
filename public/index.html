@@ -2,10 +2,10 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>BestGifts</title>
-    <!-- Версия v=2.3.0 сбрасывает весь кэш в Telegram -->
-    <link rel="stylesheet" href="css/style.css?v=2.3.0">
+    <!-- Версия v=2.4.0 сбрасывает весь кэш в Telegram -->
+    <link rel="stylesheet" href="css/style.css?v=2.4.0">
 </head>
 <body>
 
@@ -136,8 +136,8 @@
 
         <div class="arena-game-container">
             <div class="arena-big-box" id="arena-box-container">
-                <!-- SVG-холст полей секторов -->
-                <svg id="arena-svg-canvas" class="arena-canvas"></svg>
+                <!-- SVG-холст полей секторов с фиксацией viewBox для iOS -->
+                <svg id="arena-svg-canvas" class="arena-canvas" viewBox="0 0 320 320" width="320" height="320"></svg>
                 
                 <!-- Инженерная защитная сетка -->
                 <div class="arena-grid-overlay"></div>
@@ -146,11 +146,11 @@
                 <div class="arena-waiting-text" id="arena-status-text">Ждем ставки...</div>
                 <div class="arena-timer-circle hidden" id="arena-countdown-timer">15</div>
 
-                <!-- Контейнер аватарок (центрированных по геометрическим весам) -->
+                <!-- Контейнер аватарок -->
                 <div class="arena-avatars-overlay" id="arena-avatars-container"></div>
 
-                <!-- Верхний холст для отрисовки летающего шарика и его юзернейма -->
-                <svg id="arena-ball-svg" class="arena-ball-canvas"></svg>
+                <!-- Верхний холст для отрисовки шарика и текста с фиксацией viewBox для iOS -->
+                <svg id="arena-ball-svg" class="arena-ball-canvas" viewBox="0 0 320 320" width="320" height="320"></svg>
             </div>
 
             <!-- ПАНЕЛЬ БЫСТРЫХ СТАВОК -->
@@ -284,7 +284,7 @@
         </nav>
     </div>
 
-    <!-- МОДАЛЬНОЕ ОКНО НАСТРОЙКИ СТАВОК (Поля заменены на TEXT с inputmode для дробных!) -->
+    <!-- МОДАЛЬНЫЕ ОКНА -->
     <div id="edit-bets-modal" class="modal-overlay hidden">
         <div class="modal-card">
             <button class="modal-close-x" id="edit-bets-close-btn">&times;</button>
@@ -342,6 +342,6 @@
 
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>
-    <script src="js/app.js?v=2.3.0" defer></script>
+    <script src="js/app.js?v=2.4.0" defer></script>
 </body>
-                                                                                                                                                                        </html>
+    </html>
