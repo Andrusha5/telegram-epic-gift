@@ -407,7 +407,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    // Вспомогательная функция для получения пересечения луча из центра (160,160) с границей квадрата 320x320
+    // Поиск точки пересечения луча из центра (160,160) с границами поля 320x320
     function getSquareIntersection(angle) {
         const cx = 160, cy = 160;
         const dx = Math.cos(angle);
@@ -426,7 +426,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         };
     }
 
-    // Отрисовка секторов: Диагонали (2 игрока) или Треугольные лучи (3+ игрока)
+    // ИСПРАВЛЕНО: Математически идеальное ДИАГОНАЛЬНОЕ и РАДИАЛЬНОЕ деление поля
     function drawArenaSegments() {
         const svg = document.getElementById('arena-svg-canvas');
         const avatarsContainer = document.getElementById('arena-avatars-container');
@@ -457,24 +457,53 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             createAvatarElement(160, 160, arenaPlayers[0].avatar, 64);
         } else if (N === 2) {
-            // 2 игрока - поле делится красивой диагональю в зависимости от суммы ставок
+            // ИСПРАВЛЕНО: Точное ДИАГОНАЛЬНОЕ деление поля для двух игроков!
             const r = arenaPlayers[0].bet / totalBetSum;
-            const Y1 = H * r;
 
-            // Диагональная граница от (0, 320 - Y1) до (320, Y1)
-            const poly1 = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
-            poly1.setAttribute("points", `0,0 320,0 320,${Y1.toFixed(1)} 0,${(320 - Y1).toFixed(1)}`);
-            poly1.setAttribute("fill", arenaPlayers[0].color);
-            svg.appendChild(poly1);
+            if (r <= 0.5) {
+                // Игрок 1 получает треугольник в левом верхнем углу (диагональное деление)
+                const s = Math.sqrt(2 * r);
+                const sizeX = (W * s).toFixed(1);
+                const sizeY = (H * s).toFixed(1);
 
-            const poly2 = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
-            poly2.setAttribute("points", `0,${(320 - Y1).toFixed(1)} 320,${Y1.toFixed(1)} 320,320 0,320`);
-            poly2.setAttribute("fill", arenaPlayers[1].color);
-            svg.appendChild(poly2);
+                // Задний фон - Игрок 2 (заполняет всё остальное)
+                const bg = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+                bg.setAttribute("width", "100%");
+                bg.setAttribute("height", "100%");
+                bg.setAttribute("fill", arenaPlayers[1].color);
+                svg.appendChild(bg);
 
-            // Центры масс для аватарок двух полей
-            createAvatarElement(160, Y1 / 2, arenaPlayers[0].avatar, 48);
-            createAvatarElement(160, 320 - (320 - Y1) / 2, arenaPlayers[1].avatar, 48);
+                // Треугольник - Игрок 1
+                const poly = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
+                poly.setAttribute("points", `0,0 ${sizeX},0 0,${sizeY}`);
+                poly.setAttribute("fill", arenaPlayers[0].color);
+                svg.appendChild(poly);
+
+                // Отрисовка аватарок на центрах масс
+                createAvatarElement(parseFloat(sizeX) / 3, parseFloat(sizeY) / 3, arenaPlayers[0].avatar, 44);
+                createAvatarElement(W - 60, H - 60, arenaPlayers[1].avatar, 48);
+            } else {
+                // Игрок 2 получает треугольник в правом нижнем углу
+                const s = Math.sqrt(2 * (1 - r));
+                const sizeX = (W * s).toFixed(1);
+                const sizeY = (H * s).toFixed(1);
+
+                // Задний фон - Игрок 1
+                const bg = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+                bg.setAttribute("width", "100%");
+                bg.setAttribute("height", "100%");
+                bg.setAttribute("fill", arenaPlayers[0].color);
+                svg.appendChild(bg);
+
+                // Треугольник - Игрок 2
+                const poly = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
+                poly.setAttribute("points", `320,320 ${(320 - sizeX)},320 320,${(320 - sizeY)}`);
+                poly.setAttribute("fill", arenaPlayers[1].color);
+                svg.appendChild(poly);
+
+                createAvatarElement(60, 60, arenaPlayers[0].avatar, 48);
+                createAvatarElement(W - parseFloat(sizeX) / 3, H - parseFloat(sizeY) / 3, arenaPlayers[1].avatar, 44);
+            }
         } else {
             // 3+ игроков - разделение радиальными треугольными секторами из центра
             let currentAngle = 0;
@@ -482,9 +511,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const share = player.bet / totalBetSum;
                 const nextAngle = currentAngle + 2 * Math.PI * share;
 
-                // Создаем полигон радиального сектора
                 const pts = [];
-                pts.push({ x: 160, y: 160 }); // Начало в центре
+                pts.push({ x: 160, y: 160 }); // Центр
 
                 const step = 0.05;
                 for (let a = currentAngle; a < nextAngle; a += step) {
@@ -498,7 +526,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 poly.setAttribute("fill", player.color);
                 svg.appendChild(poly);
 
-                // Аватарка рендерится посередине дуги сектора
+                // Вычисление центральной оси сектора для размещения аватарок
                 const midAngle = currentAngle + (nextAngle - currentAngle) / 2;
                 const edgePoint = getSquareIntersection(midAngle);
                 const avatarX = 160 + (edgePoint.x - 160) * 0.55;
@@ -535,9 +563,17 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         if (N === 2) {
             const r = arenaPlayers[0].bet / totalBetSum;
-            const Y1 = 320 * r;
-            const Yline = (320 - Y1) + ((2 * Y1 - 320) / 320) * x;
-            return (y < Yline) ? arenaPlayers[0] : arenaPlayers[1];
+            if (r <= 0.5) {
+                const s = Math.sqrt(2 * r);
+                const boundarySize = 320 * s;
+                // Уравнение линии диагонали: x/boundarySize + y/boundarySize = 1 -> y = boundarySize - x
+                return (x + y <= boundarySize) ? arenaPlayers[0] : arenaPlayers[1];
+            } else {
+                const s = Math.sqrt(2 * (1 - r));
+                const boundarySize = 320 * s;
+                // Линия отсекает нижний правый угол
+                return ((320 - x) + (320 - y) <= boundarySize) ? arenaPlayers[1] : arenaPlayers[0];
+            }
         } else {
             let angle = Math.atan2(y - 160, x - 160);
             if (angle < 0) angle += 2 * Math.PI;
@@ -594,7 +630,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     function renderBetButtons() {
         const balance = parseFloat(currentUser.balance || 0);
-        // Если шарик запущен (игра завершается) или идет розыгрыш, кнопки ставок полностью блокируются
+        // Если шарик уже летит или игра закончена, кнопки блокируются!
         const blockBets = isBallAnimating || (arenaStatusStr === 'finished');
 
         for (let i = 0; i < 3; i++) {
@@ -615,19 +651,19 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    // Полностью синхронизированный расчет траектории на сиде (Никакого рассинхрона между игроками)
-    function simulateBallPathDeterministic(targetX, seedSignature, boardWidth = 320, boardHeight = 320, ballRadius = 8) {
-        const friction = 0.970; // Коэффициент трения для плавного скольжения и замедления
+    // ИСПРАВЛЕНО: Двумерный расчет траектории полета шарика с быстрым вылетом и красивым замедлением
+    function simulateBallPathDeterministic(targetX, targetY, seedSignature, boardWidth = 320, boardHeight = 320, ballRadius = 8) {
+        const friction = 0.955; // Мягкое гашение скорости для плавного скольжения к цели
         const rng = createPRNG(seedSignature);
 
-        // Поиск детерминированной траектории, оканчивающейся в секторе победителя
-        for (let trial = 0; trial < 2000; trial++) {
+        // Поиск детерминированной траектории, оканчивающейся точно в секторе
+        for (let trial = 0; trial < 3000; trial++) {
             const startX = boardWidth / 2;
             const startY = boardHeight / 2;
 
-            // Высокая стартовая скорость для мгновенного ускорения при запуске
+            // ИСПРАВЛЕНО: Очень высокая стартовая скорость для резкого ускорения в начале
             const angle = rng() * Math.PI * 2;
-            const speed = 28 + rng() * 8; 
+            const speed = 35 + rng() * 12; 
 
             let vx = Math.cos(angle) * speed;
             let vy = Math.sin(angle) * speed;
@@ -638,7 +674,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             let currentX = startX;
             let currentY = startY;
 
-            while (Math.abs(currentVx) > 0.08 || Math.abs(currentVy) > 0.08) {
+            while (Math.abs(currentVx) > 0.05 || Math.abs(currentVy) > 0.05) {
                 currentX += currentVx;
                 currentY += currentVy;
 
@@ -664,20 +700,21 @@ document.addEventListener('DOMContentLoaded', async () => {
                 path.push({ x: currentX, y: currentY });
             }
 
-            // Нам нужно, чтобы шарик приземлился в секторе победителя!
-            if (Math.abs(currentX - targetX) < 10) {
+            const dx = currentX - targetX;
+            const dy = currentY - targetY;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist < 15) { 
                 return { path };
             }
         }
-        return null;
+        return null; 
     }
 
     // Анимация полета шарика над аватарками с парящим динамическим юзернеймом
-    function animateBouncingBall(targetX, seedSignature, onComplete) {
+    function animateBouncingBall(targetX, targetY, seedSignature, onComplete) {
         if (isBallAnimating) return;
         isBallAnimating = true;
 
-        // Блокируем кнопки ставок на время полета шарика
         renderBetButtons();
 
         const ballCanvas = document.getElementById('arena-ball-svg');
@@ -705,7 +742,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const W = 320;
         const H = 320;
 
-        let simulation = simulateBallPathDeterministic(targetX, seedSignature, W, H, 8);
+        let simulation = simulateBallPathDeterministic(targetX, targetY, seedSignature, W, H, 8);
         if (!simulation) {
             let frame = 0;
             const totalFrames = 100;
@@ -719,12 +756,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const t = frame / totalFrames;
                 const easeOut = 1 - Math.pow(1 - t, 3);
                 const currentX = (W / 2) + (targetX - (W / 2)) * easeOut;
-                const currentY = (H / 2);
+                const currentY = (H / 2) + (targetY - (H / 2)) * easeOut;
 
                 ballElement.setAttribute("cx", currentX.toFixed(1));
                 ballElement.setAttribute("cy", currentY.toFixed(1));
 
-                // Умное авто-смещение юзернейма вверх/вниз у краев стены
+                // Умный перенос юзернейма вверх/вниз у краев стены
                 const textX = Math.max(45, Math.min(275, currentX));
                 const isNearTopWall = currentY < 35;
                 const textY = isNearTopWall ? (currentY + 24) : (currentY - 14);
@@ -815,14 +852,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                         countdownTimer.innerText = state.timeLeft;
                     }
                 } else if (state.status === 'finished') {
-                    const signature = state.winnerId + "_" + state.totalPool + "_" + state.winnerX;
-                    if (currentRoundSignature !== signature && state.winnerX) {
+                    const signature = state.winnerId + "_" + state.totalPool + "_" + state.winnerX + "_" + state.winnerY;
+                    if (currentRoundSignature !== signature && state.winnerX && state.winnerY) {
                         currentRoundSignature = signature;
                         
                         if (statusText) statusText.classList.add('hidden');
                         if (countdownTimer) countdownTimer.classList.add('hidden');
 
-                        animateBouncingBall(state.winnerX, signature, () => {
+                        animateBouncingBall(state.winnerX, state.winnerY, signature, () => {
                             const isWeWinner = (String(state.winnerId) === String(userId));
                             
                             if (isWeWinner) {
