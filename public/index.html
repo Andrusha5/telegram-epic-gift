@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>BestGifts</title>
-    <!-- Версионный маркер ?v=2.2.0 гарантирует моментальный сброс кэша в Telegram -->
-    <link rel="stylesheet" href="css/style.css?v=2.2.0">
+    <!-- Версия v=2.3.0 сбрасывает весь кэш в Telegram -->
+    <link rel="stylesheet" href="css/style.css?v=2.3.0">
 </head>
 <body>
 
@@ -136,17 +136,17 @@
 
         <div class="arena-game-container">
             <div class="arena-big-box" id="arena-box-container">
-                <!-- Слой секторов полей -->
+                <!-- SVG-холст полей секторов -->
                 <svg id="arena-svg-canvas" class="arena-canvas"></svg>
                 
-                <!-- Защитная сетка (Слой 2) -->
+                <!-- Инженерная защитная сетка -->
                 <div class="arena-grid-overlay"></div>
                 
-                <!-- Текст статуса игры -->
+                <!-- Статусные слои -->
                 <div class="arena-waiting-text" id="arena-status-text">Ждем ставки...</div>
                 <div class="arena-timer-circle hidden" id="arena-countdown-timer">15</div>
 
-                <!-- Контейнер плавающих аватарок -->
+                <!-- Контейнер аватарок (центрированных по геометрическим весам) -->
                 <div class="arena-avatars-overlay" id="arena-avatars-container"></div>
 
                 <!-- Верхний холст для отрисовки летающего шарика и его юзернейма -->
@@ -174,7 +174,7 @@
                 </button>
             </div>
 
-            <!-- СПИСОК УЧАСТНИКОВ -->
+            <!-- ИНТЕРАКТИВНЫЙ СПИСОК УЧАСТНИКОВ -->
             <div class="arena-players-list-box">
                 <h3 class="players-list-title">👥 Список участников</h3>
                 <div id="arena-players-list" class="players-list-container">
@@ -246,7 +246,7 @@
         </div>
     </section>
 
-    <!-- ================= НАВИГАЦИЯ ================= -->
+    <!-- ================= МЕНЮ НАВИГАЦИИ ================= -->
     <div class="floating-nav-container">
         <nav class="bottom-nav">
             <button class="nav-tab" data-target="inventory">
@@ -342,6 +342,6 @@
 
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>
-    <script src="js/app.js?v=2.2.0" defer></script>
+    <script src="js/app.js?v=2.3.0" defer></script>
 </body>
-                    </html>
+                                                                                                                                                                        </html>
