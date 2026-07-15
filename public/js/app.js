@@ -69,6 +69,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     let arenaPollInterval = null;
     let isBallAnimating = false;
     let currentRoundSignature = null;
+    let arenaStatusStr = "waiting"; // "waiting", "countdown", "finished"
 
     const safeSetText = (el, val) => { if (el) el.innerText = val; };
     const initialName = tg.initDataUnsafe?.user?.username || tg.initDataUnsafe?.user?.first_name || "Пользователь";
@@ -406,14 +407,32 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
+    // Вспомогательная функция для получения пересечения луча из центра (160,160) с границей квадрата 320x320
+    function getSquareIntersection(angle) {
+        const cx = 160, cy = 160;
+        const dx = Math.cos(angle);
+        const dy = Math.sin(angle);
+        let tMax = Infinity;
+
+        if (dx > 0) tMax = Math.min(tMax, (320 - cx) / dx);
+        else if (dx < 0) tMax = Math.min(tMax, (0 - cx) / dx);
+
+        if (dy > 0) tMax = Math.min(tMax, (320 - cy) / dy);
+        else if (dy < 0) tMax = Math.min(tMax, (0 - cy) / dy);
+
+        return {
+            x: cx + dx * tMax,
+            y: cy + dy * tMax
+        };
+    }
+
+    // Отрисовка секторов: Диагонали (2 игрока) или Треугольные лучи (3+ игрока)
     function drawArenaSegments() {
         const svg = document.getElementById('arena-svg-canvas');
         const avatarsContainer = document.getElementById('arena-avatars-container');
         if (!svg || !avatarsContainer) return;
 
-        if (isBallAnimating) {
-            return;
-        }
+        if (isBallAnimating) return;
 
         svg.innerHTML = '';
         avatarsContainer.innerHTML = '';
@@ -426,28 +445,70 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         const totalBetSum = arenaPlayers.reduce((sum, p) => sum + parseFloat(p.bet), 0);
 
-        let currentX = 0;
-
-        arenaPlayers.forEach((player) => {
-            const percentage = totalBetSum > 0 ? (parseFloat(player.bet) / totalBetSum) : (1 / N);
-            const segmentWidth = W * percentage;
-
+        if (N === 1) {
+            // 1 игрок - все поле закрашено его цветом
             const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-            rect.setAttribute("x", currentX.toFixed(1));
+            rect.setAttribute("x", "0");
             rect.setAttribute("y", "0");
-            rect.setAttribute("width", segmentWidth.toFixed(1));
+            rect.setAttribute("width", "100%");
             rect.setAttribute("height", "100%");
-            rect.setAttribute("fill", player.color);
+            rect.setAttribute("fill", arenaPlayers[0].color);
             svg.appendChild(rect);
 
-            const centerX = currentX + (segmentWidth / 2);
-            const centerY = H / 2;
+            createAvatarElement(160, 160, arenaPlayers[0].avatar, 64);
+        } else if (N === 2) {
+            // 2 игрока - поле делится красивой диагональю в зависимости от суммы ставок
+            const r = arenaPlayers[0].bet / totalBetSum;
+            const Y1 = H * r;
 
-            const calculatedAvatarSize = Math.min(64, Math.max(16, segmentWidth * 0.4));
-            createAvatarElement(centerX, centerY, player.avatar, calculatedAvatarSize);
+            // Диагональная граница от (0, 320 - Y1) до (320, Y1)
+            const poly1 = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
+            poly1.setAttribute("points", `0,0 320,0 320,${Y1.toFixed(1)} 0,${(320 - Y1).toFixed(1)}`);
+            poly1.setAttribute("fill", arenaPlayers[0].color);
+            svg.appendChild(poly1);
 
-            currentX += segmentWidth;
-        });
+            const poly2 = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
+            poly2.setAttribute("points", `0,${(320 - Y1).toFixed(1)} 320,${Y1.toFixed(1)} 320,320 0,320`);
+            poly2.setAttribute("fill", arenaPlayers[1].color);
+            svg.appendChild(poly2);
+
+            // Центры масс для аватарок двух полей
+            createAvatarElement(160, Y1 / 2, arenaPlayers[0].avatar, 48);
+            createAvatarElement(160, 320 - (320 - Y1) / 2, arenaPlayers[1].avatar, 48);
+        } else {
+            // 3+ игроков - разделение радиальными треугольными секторами из центра
+            let currentAngle = 0;
+            arenaPlayers.forEach((player) => {
+                const share = player.bet / totalBetSum;
+                const nextAngle = currentAngle + 2 * Math.PI * share;
+
+                // Создаем полигон радиального сектора
+                const pts = [];
+                pts.push({ x: 160, y: 160 }); // Начало в центре
+
+                const step = 0.05;
+                for (let a = currentAngle; a < nextAngle; a += step) {
+                    pts.push(getSquareIntersection(a));
+                }
+                pts.push(getSquareIntersection(nextAngle));
+
+                const poly = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
+                const pointsStr = pts.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+                poly.setAttribute("points", pointsStr);
+                poly.setAttribute("fill", player.color);
+                svg.appendChild(poly);
+
+                // Аватарка рендерится посередине дуги сектора
+                const midAngle = currentAngle + (nextAngle - currentAngle) / 2;
+                const edgePoint = getSquareIntersection(midAngle);
+                const avatarX = 160 + (edgePoint.x - 160) * 0.55;
+                const avatarY = 160 + (edgePoint.y - 160) * 0.55;
+
+                createAvatarElement(avatarX, avatarY, player.avatar, 38);
+
+                currentAngle = nextAngle;
+            });
+        }
     }
 
     function createAvatarElement(x, y, src, size) {
@@ -464,25 +525,39 @@ document.addEventListener('DOMContentLoaded', async () => {
         container.appendChild(img);
     }
 
-    // Детектор нахождения шарика на полях участников в реальном времени
-    function getPlayerAtX(x) {
-        if (arenaPlayers.length === 0) return null;
-        const W = 320;
-        const totalBetSum = arenaPlayers.reduce((sum, p) => sum + parseFloat(p.bet), 0);
-        let currentX = 0;
+    // Определение того, на чьей территории находится шарик в реальном времени
+    function getPlayerAtCoords(x, y) {
+        const N = arenaPlayers.length;
+        if (N === 0) return null;
+        if (N === 1) return arenaPlayers[0];
 
-        for (const player of arenaPlayers) {
-            const percentage = totalBetSum > 0 ? (parseFloat(player.bet) / totalBetSum) : (1 / arenaPlayers.length);
-            const segmentWidth = W * percentage;
-            if (x >= currentX && x <= currentX + segmentWidth) {
-                return player;
+        const totalBetSum = arenaPlayers.reduce((sum, p) => sum + parseFloat(p.bet), 0);
+
+        if (N === 2) {
+            const r = arenaPlayers[0].bet / totalBetSum;
+            const Y1 = 320 * r;
+            const Yline = (320 - Y1) + ((2 * Y1 - 320) / 320) * x;
+            return (y < Yline) ? arenaPlayers[0] : arenaPlayers[1];
+        } else {
+            let angle = Math.atan2(y - 160, x - 160);
+            if (angle < 0) angle += 2 * Math.PI;
+
+            let currentAngle = 0;
+            for (let i = 0; i < arenaPlayers.length; i++) {
+                const player = arenaPlayers[i];
+                const share = player.bet / totalBetSum;
+                const nextAngle = currentAngle + 2 * Math.PI * share;
+
+                if (angle >= currentAngle && angle <= nextAngle) {
+                    return player;
+                }
+                currentAngle = nextAngle;
             }
-            currentX += segmentWidth;
+            return arenaPlayers[arenaPlayers.length - 1];
         }
-        return arenaPlayers[arenaPlayers.length - 1]; 
     }
 
-    // Рендеринг списка участников снизу с шансом выигрыша (до сотых, например 1.45%)
+    // Интерактивный список участников с процентами шансов (до сотых долей)
     function updatePlayersListUI() {
         const listContainer = document.getElementById('arena-players-list');
         if (!listContainer) return;
@@ -519,6 +594,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     function renderBetButtons() {
         const balance = parseFloat(currentUser.balance || 0);
+        // Если шарик запущен (игра завершается) или идет розыгрыш, кнопки ставок полностью блокируются
+        const blockBets = isBallAnimating || (arenaStatusStr === 'finished');
+
         for (let i = 0; i < 3; i++) {
             const btn = document.getElementById(`bet-btn-${i + 1}`);
             if (!btn) continue;
@@ -527,7 +605,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             btn.querySelector('.bet-val').innerText = betVal.toString();
             btn.setAttribute('data-bet', betVal);
 
-            if (balance >= betVal) {
+            if (balance >= betVal && !blockBets) {
                 btn.className = "bet-button active";
                 btn.disabled = false;
             } else {
@@ -539,16 +617,17 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Полностью синхронизированный расчет траектории на сиде (Никакого рассинхрона между игроками)
     function simulateBallPathDeterministic(targetX, seedSignature, boardWidth = 320, boardHeight = 320, ballRadius = 8) {
-        const friction = 0.985;
+        const friction = 0.970; // Коэффициент трения для плавного скольжения и замедления
         const rng = createPRNG(seedSignature);
 
+        // Поиск детерминированной траектории, оканчивающейся в секторе победителя
         for (let trial = 0; trial < 2000; trial++) {
             const startX = boardWidth / 2;
             const startY = boardHeight / 2;
 
-            // Запуск на высокой стартовой скорости (быстрый старт)
+            // Высокая стартовая скорость для мгновенного ускорения при запуске
             const angle = rng() * Math.PI * 2;
-            const speed = 20 + rng() * 6; 
+            const speed = 28 + rng() * 8; 
 
             let vx = Math.cos(angle) * speed;
             let vy = Math.sin(angle) * speed;
@@ -585,6 +664,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 path.push({ x: currentX, y: currentY });
             }
 
+            // Нам нужно, чтобы шарик приземлился в секторе победителя!
             if (Math.abs(currentX - targetX) < 10) {
                 return { path };
             }
@@ -592,24 +672,27 @@ document.addEventListener('DOMContentLoaded', async () => {
         return null;
     }
 
-    // Бесшовный полет над аватарками с динамическим изменением юзернеймов на холсте z-index: 10
+    // Анимация полета шарика над аватарками с парящим динамическим юзернеймом
     function animateBouncingBall(targetX, seedSignature, onComplete) {
         if (isBallAnimating) return;
         isBallAnimating = true;
+
+        // Блокируем кнопки ставок на время полета шарика
+        renderBetButtons();
 
         const ballCanvas = document.getElementById('arena-ball-svg');
         if (!ballCanvas) return;
 
         ballCanvas.innerHTML = ''; 
 
-        // Чисто белый шарик без обводок
+        // Идеально белый шарик без обводок
         const ballElement = document.createElementNS("http://www.w3.org/2000/svg", "circle");
         ballElement.setAttribute("id", "physics-ball");
         ballElement.setAttribute("r", "8");
         ballElement.setAttribute("fill", "#ffffff");
         ballCanvas.appendChild(ballElement);
 
-        // Парящий юзернейм над шариком
+        // Парящий юзернейм над шариком (z-index 10)
         const textElement = document.createElementNS("http://www.w3.org/2000/svg", "text");
         textElement.setAttribute("id", "physics-ball-text");
         textElement.setAttribute("fill", "#ffffff");
@@ -637,12 +720,19 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const easeOut = 1 - Math.pow(1 - t, 3);
                 const currentX = (W / 2) + (targetX - (W / 2)) * easeOut;
                 const currentY = (H / 2);
+
                 ballElement.setAttribute("cx", currentX.toFixed(1));
                 ballElement.setAttribute("cy", currentY.toFixed(1));
 
-                textElement.setAttribute("x", currentX.toFixed(1));
-                textElement.setAttribute("y", (currentY - 16).toFixed(1));
-                const activePlayer = getPlayerAtX(currentX);
+                // Умное авто-смещение юзернейма вверх/вниз у краев стены
+                const textX = Math.max(45, Math.min(275, currentX));
+                const isNearTopWall = currentY < 35;
+                const textY = isNearTopWall ? (currentY + 24) : (currentY - 14);
+
+                textElement.setAttribute("x", textX.toFixed(1));
+                textElement.setAttribute("y", textY.toFixed(1));
+
+                const activePlayer = getPlayerAtCoords(currentX, currentY);
                 textElement.textContent = activePlayer ? activePlayer.username : "";
 
                 frame++;
@@ -667,9 +757,15 @@ document.addEventListener('DOMContentLoaded', async () => {
             ballElement.setAttribute("cx", pos.x.toFixed(1));
             ballElement.setAttribute("cy", pos.y.toFixed(1));
 
-            textElement.setAttribute("x", pos.x.toFixed(1));
-            textElement.setAttribute("y", (pos.y - 16).toFixed(1));
-            const activePlayer = getPlayerAtX(pos.x);
+            // Автоматический перенос юзернейма под шарик, когда он близко к потолку
+            const textX = Math.max(45, Math.min(275, pos.x));
+            const isNearTopWall = pos.y < 35;
+            const textY = isNearTopWall ? (pos.y + 24) : (pos.y - 14);
+
+            textElement.setAttribute("x", textX.toFixed(1));
+            textElement.setAttribute("y", textY.toFixed(1));
+
+            const activePlayer = getPlayerAtCoords(pos.x, pos.y);
             textElement.textContent = activePlayer ? activePlayer.username : "";
 
             frameIndex++;
@@ -696,6 +792,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if (!res.ok) return;
                 const state = await res.json();
 
+                arenaStatusStr = state.status;
+
                 arenaPlayers = state.bets.map(bet => ({
                     id: bet.userId,
                     username: bet.username,
@@ -721,7 +819,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     if (currentRoundSignature !== signature && state.winnerX) {
                         currentRoundSignature = signature;
                         
-                        if (statusText) statusText.classList.add('hidden'); // Полное скрытие надписей при полете
+                        if (statusText) statusText.classList.add('hidden');
                         if (countdownTimer) countdownTimer.classList.add('hidden');
 
                         animateBouncingBall(state.winnerX, signature, () => {
@@ -849,9 +947,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (editBetsClose) editBetsClose.addEventListener('click', closeEditBetsModal);
     if (cancelBetsBtn) cancelBetsBtn.addEventListener('click', closeEditBetsModal);
 
+    // Полное решение проблемы с вводом дробных на мобильных: авто-замена запятых на точки в реальном времени
     const enforceThreeDecimals = (e) => {
         let val = e.target.value;
-        val = val.replace(/[^0-9.]/g, ''); 
+        val = val.replace(/,/g, '.'); // Замена запятых на точки на лету
+        val = val.replace(/[^0-9.]/g, ''); // Удаление всех символов кроме цифр и точек
+        
         const dots = val.split('.');
         if (dots.length > 2) {
             val = dots[0] + '.' + dots.slice(1).join('');
