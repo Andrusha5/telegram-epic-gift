@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>BestGifts</title>
-    <!-- Версионный маркер ?v=2.1.2 гарантирует сброс кэша в Telegram -->
-    <link rel="stylesheet" href="css/style.css?v=2.1.2">
+    <!-- Версионный маркер ?v=2.2.0 гарантирует моментальный сброс кэша в Telegram -->
+    <link rel="stylesheet" href="css/style.css?v=2.2.0">
 </head>
 <body>
 
@@ -136,24 +136,24 @@
 
         <div class="arena-game-container">
             <div class="arena-big-box" id="arena-box-container">
-                <!-- SVG-холст для динамической отрисовки секторов (Диагональные / Треугольные) -->
+                <!-- Слой секторов полей -->
                 <svg id="arena-svg-canvas" class="arena-canvas"></svg>
                 
-                <!-- Сетка (Слой 2) -->
+                <!-- Защитная сетка (Слой 2) -->
                 <div class="arena-grid-overlay"></div>
                 
-                <!-- Статусы и таймеры -->
+                <!-- Текст статуса игры -->
                 <div class="arena-waiting-text" id="arena-status-text">Ждем ставки...</div>
                 <div class="arena-timer-circle hidden" id="arena-countdown-timer">15</div>
 
-                <!-- Контейнер аватарок игроков -->
+                <!-- Контейнер плавающих аватарок -->
                 <div class="arena-avatars-overlay" id="arena-avatars-container"></div>
 
-                <!-- Верхний холст для шарика и парящего никнейма (Z-index: 10 - Поверх всего!) -->
+                <!-- Верхний холст для отрисовки летающего шарика и его юзернейма -->
                 <svg id="arena-ball-svg" class="arena-ball-canvas"></svg>
             </div>
 
-            <!-- ПАНЕЛЬ УПРАВЛЕНИЯ СТАВКАМИ -->
+            <!-- ПАНЕЛЬ БЫСТРЫХ СТАВОК -->
             <div class="betting-row">
                 <button class="bet-edit-btn" id="bet-edit-trigger">
                     <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
@@ -161,20 +161,20 @@
                     </svg>
                 </button>
                 <button class="bet-button disabled" id="bet-btn-1">
-                    <span class="bet-val">1</span>
+                    <span class="bet-val">0.1</span>
                     <img src="/Images/Items/gram_popolnenie.png" class="bet-coin-icon" alt="GRAM">
                 </button>
                 <button class="bet-button disabled" id="bet-btn-2">
-                    <span class="bet-val">2</span>
+                    <span class="bet-val">1.0</span>
                     <img src="/Images/Items/gram_popolnenie.png" class="bet-coin-icon" alt="GRAM">
                 </button>
                 <button class="bet-button disabled" id="bet-btn-3">
-                    <span class="bet-val">3</span>
+                    <span class="bet-val">5.0</span>
                     <img src="/Images/Items/gram_popolnenie.png" class="bet-coin-icon" alt="GRAM">
                 </button>
             </div>
 
-            <!-- ИНТЕРАКТИВНЫЙ СПИСОК УЧАСТНИКОВ -->
+            <!-- СПИСОК УЧАСТНИКОВ -->
             <div class="arena-players-list-box">
                 <h3 class="players-list-title">👥 Список участников</h3>
                 <div id="arena-players-list" class="players-list-container">
@@ -246,7 +246,7 @@
         </div>
     </section>
 
-    <!-- ================= МЕНЮ НАВИГАЦИИ ================= -->
+    <!-- ================= НАВИГАЦИЯ ================= -->
     <div class="floating-nav-container">
         <nav class="bottom-nav">
             <button class="nav-tab" data-target="inventory">
@@ -290,19 +290,19 @@
             <button class="modal-close-x" id="edit-bets-close-btn">&times;</button>
             <div class="modal-icon">✏️</div>
             <h2 class="modal-title">Настройка кнопок</h2>
-            <p class="modal-message">Задайте суммы для быстрых ставок (не менее 0.001, макс. 3 знака после запятой):</p>
+            <p class="modal-message">Задайте суммы для быстрых ставок (не менее 0.1, макс. 3 знака после запятой):</p>
             <div class="modal-input-row">
                 <div class="bet-input-wrapper">
                     <label>Кнопка 1</label>
-                    <input type="text" id="bet-input-1" class="modal-deposit-field" inputmode="decimal" placeholder="1.0">
+                    <input type="text" id="bet-input-1" class="modal-deposit-field" inputmode="decimal" placeholder="0.1">
                 </div>
                 <div class="bet-input-wrapper">
                     <label>Кнопка 2</label>
-                    <input type="text" id="bet-input-2" class="modal-deposit-field" inputmode="decimal" placeholder="2.0">
+                    <input type="text" id="bet-input-2" class="modal-deposit-field" inputmode="decimal" placeholder="1.0">
                 </div>
                 <div class="bet-input-wrapper">
                     <label>Кнопка 3</label>
-                    <input type="text" id="bet-input-3" class="modal-deposit-field" inputmode="decimal" placeholder="3.0">
+                    <input type="text" id="bet-input-3" class="modal-deposit-field" inputmode="decimal" placeholder="5.0">
                 </div>
             </div>
             <div class="modal-actions" style="margin-top: 20px;">
@@ -342,6 +342,6 @@
 
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>
-    <script src="js/app.js?v=2.1.2" defer></script>
+    <script src="js/app.js?v=2.2.0" defer></script>
 </body>
-                                                                                                                                                                                                                    </html>
+                    </html>
