@@ -1174,7 +1174,7 @@ body {
 }
 
 /* ==========================================================================
-   ЭКРАН КОШЕЛЬКА И БАЛАНСА
+   ЭКРАН КОШЕЛЬКА И БАЛАНСА + ПРАВИЛЬНЫЙ РЕНДЕР КНОПОК ДЛЯ iPHONE
    ========================================================================== */
 .balance-header {
     width: 100%;
@@ -1270,19 +1270,30 @@ body {
     font-weight: normal;
 }
 
-.connect-wallet-btn {
+/* ИСПРАВЛЕННЫЙ iPHONE-SAFE ДИЗАЙН КНОПОК КОШЕЛЬКА */
+.connect-wallet-btn, .deposit-balance-btn {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    display: block;
     width: 100%;
-    background: linear-gradient(135deg, var(--accent-purple), #6a0dad);
-    color: #ffffff;
     border: none;
+    outline: none;
     border-radius: 16px;
-    padding: 16px;
-    font-size: 14px;
+    padding: 18px 12px; /* Увеличенная область клика для пальцев на iOS */
+    font-size: 15px;
     font-weight: 800;
     cursor: pointer;
-    box-shadow: 0 4px 15px rgba(141, 61, 245, 0.25);
-    transition: transform 0.1s, background 0.3s;
+    text-align: center;
+    font-family: inherit;
     box-sizing: border-box;
+    transition: transform 0.1s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+}
+
+.connect-wallet-btn {
+    background: linear-gradient(135deg, var(--accent-purple), #6a0dad);
+    color: #ffffff;
+    box-shadow: 0 4px 15px rgba(141, 61, 245, 0.25);
 }
 
 .connect-wallet-btn:active {
@@ -1290,23 +1301,20 @@ body {
 }
 
 .deposit-balance-btn {
-    width: 100%;
     background: linear-gradient(135deg, var(--green-success), #00b34a);
     color: #000000;
-    border: none;
-    border-radius: 16px;
-    padding: 16px;
-    font-size: 14px;
-    font-weight: 800;
-    cursor: pointer;
     box-shadow: 0 4px 15px rgba(0, 230, 118, 0.25);
-    box-sizing: border-box;
+}
+
+.deposit-balance-btn:active:not(:disabled) {
+    transform: scale(0.98);
 }
 
 .deposit-balance-btn:disabled {
     opacity: 0.35;
     cursor: not-allowed;
-    color: #ffffff;
+    color: rgba(0, 0, 0, 0.4);
+    box-shadow: none !important;
 }
 
 .deposit-notice {
@@ -1584,4 +1592,4 @@ body {
 .modal-btn-secondary {
     background: #241c44;
     color: #ffffff;
-   }
+       }
