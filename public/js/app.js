@@ -44,6 +44,20 @@ function preloadImages(urls) {
     });
 }
 
+// Детерминированный генератор случайных чисел (Seeded PRNG) для синхронизации физики движения
+function createPRNG(seedString) {
+    let h = 1779033703 ^ seedString.length;
+    for (let i = 0; i < seedString.length; i++) {
+        h = Math.imul(h ^ seedString.charCodeAt(i), 3432918353);
+        h = h << 13 | h >>> 19;
+    }
+    return function() {
+        h = Math.imul(h ^ (h >>> 16), 2246822507);
+        h = Math.imul(h ^ (h >>> 13), 3266489909);
+        return ((h ^= h >>> 16) >>> 0) / 4294967296;
+    }
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
     const API_BASE_URL = window.location.origin;
     let currentUser = {};
@@ -392,13 +406,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    // Динамический рендеринг сегментов в зависимости от суммы ставок (Пропорционально)
     function drawArenaSegments() {
         const svg = document.getElementById('arena-svg-canvas');
         const avatarsContainer = document.getElementById('arena-avatars-container');
         if (!svg || !avatarsContainer) return;
 
-        // Если шарик катится — не очищаем холст, чтобы не стереть движущийся шарик
         if (isBallAnimating) {
             return;
         }
@@ -409,7 +421,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const N = arenaPlayers.length;
         if (N === 0) return;
 
-        const W = 320; // Увеличенный размер
+        const W = 320; 
         const H = 320;
 
         const totalBetSum = arenaPlayers.reduce((sum, p) => sum + parseFloat(p.bet), 0);
@@ -452,6 +464,35 @@ document.addEventListener('DOMContentLoaded', async () => {
         container.appendChild(img);
     }
 
+    // Динамический рендеринг списка участников снизу
+    function updatePlayersListUI() {
+        const listContainer = document.getElementById('arena-players-list');
+        if (!listContainer) return;
+
+        if (arenaPlayers.length === 0) {
+            listContainer.innerHTML = `<div class="empty-list-placeholder">Ставок еще нет. Станьте первым!</div>`;
+            return;
+        }
+
+        listContainer.innerHTML = '';
+        arenaPlayers.forEach(p => {
+            const row = document.createElement('div');
+            row.className = 'player-list-row';
+            row.style.borderLeft = `4px solid ${p.color}`;
+            row.innerHTML = `
+                <div class="player-row-left">
+                    <img class="player-row-avatar" src="${p.avatar}" onerror="this.src='https://img.icons8.com/color/96/user.png';">
+                    <span class="player-row-name">${p.username}</span>
+                </div>
+                <div class="player-row-right">
+                    <span class="player-row-bet-value">${p.bet.toFixed(3)}</span>
+                    <img class="player-row-coin" src="${GRAMCOIN_ICON_URL}" alt="GRAM">
+                </div>
+            `;
+            listContainer.appendChild(row);
+        });
+    }
+
     function renderBetButtons() {
         const balance = parseFloat(currentUser.balance || 0);
         for (let i = 0; i < 3; i++) {
@@ -472,29 +513,29 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    // Симуляция траектории физического шарика (Pre-flight path finder)
-    function simulateBallPath(targetX, boardWidth = 320, boardHeight = 320, ballRadius = 8) {
+    // Полностью синхронизированный расчет траектории на сиде (Никакого рассинхрона между игроками)
+    function simulateBallPathDeterministic(targetX, seedSignature, boardWidth = 320, boardHeight = 320, ballRadius = 8) {
         const friction = 0.985;
-        for (let trial = 0; trial < 1000; trial++) {
+        const rng = createPRNG(seedSignature);
+
+        for (let trial = 0; trial < 2000; trial++) {
             const startX = boardWidth / 2;
             const startY = boardHeight / 2;
 
-            const angle = Math.random() * Math.PI * 2;
-            const speed = 14 + Math.random() * 4;
+            // Движения запускаются на высокой скорости (быстрый старт)
+            const angle = rng() * Math.PI * 2;
+            const speed = 19 + rng() * 5; 
 
             let vx = Math.cos(angle) * speed;
             let vy = Math.sin(angle) * speed;
 
-            let x = startX;
-            let y = startY;
-
             let path = [];
             let currentVx = vx;
             let currentVy = vy;
-            let currentX = x;
-            let currentY = y;
+            let currentX = startX;
+            let currentY = startY;
 
-            while (Math.abs(currentVx) > 0.1 || Math.abs(currentVy) > 0.1) {
+            while (Math.abs(currentVx) > 0.08 || Math.abs(currentVy) > 0.08) {
                 currentX += currentVx;
                 currentY += currentVy;
 
@@ -520,15 +561,15 @@ document.addEventListener('DOMContentLoaded', async () => {
                 path.push({ x: currentX, y: currentY });
             }
 
-            if (Math.abs(currentX - targetX) < 12) {
+            // Проверяем, остановился ли шарик на нужном секторе
+            if (Math.abs(currentX - targetX) < 10) {
                 return { path };
             }
         }
         return null;
     }
 
-    // Анимация катящегося шарика в реальном времени
-    function animateBouncingBall(targetX, onComplete) {
+    function animateBouncingBall(targetX, seedSignature, onComplete) {
         if (isBallAnimating) return;
         isBallAnimating = true;
 
@@ -538,22 +579,20 @@ document.addEventListener('DOMContentLoaded', async () => {
         let ballElement = document.getElementById('physics-ball');
         if (ballElement) ballElement.remove();
 
+        // Полностью белый шарик без обводок и рамок
         ballElement = document.createElementNS("http://www.w3.org/2000/svg", "circle");
         ballElement.setAttribute("id", "physics-ball");
         ballElement.setAttribute("r", "8");
         ballElement.setAttribute("fill", "#ffffff");
-        ballElement.setAttribute("stroke", "#8d3df5");
-        ballElement.setAttribute("stroke-width", "2.5");
-        ballElement.setAttribute("filter", "drop-shadow(0px 0px 8px #ffffff)");
         canvas.appendChild(ballElement);
 
         const W = 320;
         const H = 320;
 
-        let simulation = simulateBallPath(targetX, W, H, 8);
+        let simulation = simulateBallPathDeterministic(targetX, seedSignature, W, H, 8);
         if (!simulation) {
             let frame = 0;
-            const totalFrames = 120;
+            const totalFrames = 100;
             const step = () => {
                 if (frame >= totalFrames) {
                     isBallAnimating = false;
@@ -564,8 +603,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const easeOut = 1 - Math.pow(1 - t, 3);
                 const currentX = (W / 2) + (targetX - (W / 2)) * easeOut;
                 const currentY = (H / 2);
-                ballElement.setAttribute("cx", currentX);
-                ballElement.setAttribute("cy", currentY);
+                ballElement.setAttribute("cx", currentX.toFixed(1));
+                ballElement.setAttribute("cy", currentY.toFixed(1));
                 frame++;
                 requestAnimationFrame(step);
             };
@@ -611,15 +650,16 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if (!res.ok) return;
                 const state = await res.json();
 
-                // Синхронизация игроков
                 arenaPlayers = state.bets.map(bet => ({
                     id: bet.userId,
+                    username: bet.username,
                     avatar: bet.avatar || "https://img.icons8.com/color/96/user.png",
                     bet: parseFloat(bet.amount),
                     color: bet.color
                 }));
 
                 drawArenaSegments();
+                updatePlayersListUI();
 
                 const statusText = document.getElementById('arena-status-text');
                 const countdownTimer = document.getElementById('arena-countdown-timer');
@@ -631,7 +671,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         countdownTimer.innerText = state.timeLeft;
                     }
                 } else if (state.status === 'finished') {
-                    const signature = state.winnerId + "_" + state.totalPool;
+                    const signature = state.winnerId + "_" + state.totalPool + "_" + state.winnerX;
                     if (currentRoundSignature !== signature && state.winnerX) {
                         currentRoundSignature = signature;
                         
@@ -641,7 +681,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         }
                         if (countdownTimer) countdownTimer.classList.add('hidden');
 
-                        animateBouncingBall(state.winnerX, () => {
+                        animateBouncingBall(state.winnerX, signature, () => {
                             const isWeWinner = (String(state.winnerId) === String(userId));
                             
                             if (isWeWinner) {
