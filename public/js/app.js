@@ -58,6 +58,24 @@ function createPRNG(seedString) {
     }
 }
 
+// УНИВЕРСАЛЬНЫЙ КЛИЕНТСКИЙ FETCH С ТАЙМАУТОМ (ЗАЩИТА ОТ БЕСКОНЕЧНОЙ ЗАГРУЗКИ)
+async function fetchWithTimeout(resource, options = {}) {
+    const { timeout = 5000 } = options;
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), timeout);
+    try {
+        const response = await fetch(resource, {
+            ...options,
+            signal: controller.signal
+        });
+        clearTimeout(id);
+        return response;
+    } catch (e) {
+        clearTimeout(id);
+        throw e;
+    }
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
     const API_BASE_URL = window.location.origin;
     let currentUser = {};
@@ -309,11 +327,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     // ФОНОВЫЙ ПРЕДЗАПРОС АДРЕСА И PAYLOAD ДЛЯ ПРЕДОТВРАЩЕНИЯ БЛОКИРОВКИ НА iOS
     async function preloadPaymentParams() {
         try {
-            const resAddr = await fetch(`${API_BASE_URL}/api/deposit_address`);
+            const resAddr = await fetchWithTimeout(`${API_BASE_URL}/api/deposit_address`, { timeout: 3500 });
             const dataAddr = await resAddr.json();
             preloadedAdminAddress = dataAddr.address;
 
-            const resPayload = await fetch(`${API_BASE_URL}/api/generate_payload?text=${userId}`);
+            const resPayload = await fetchWithTimeout(`${API_BASE_URL}/api/generate_payload?text=${userId}`, { timeout: 3500 });
             const dataPayload = await resPayload.json();
             preloadedPayloadBase64 = dataPayload.payload;
         } catch (e) {
@@ -396,13 +414,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                         }
 
                         try {
-                            const verifyRes = await fetch(`${API_BASE_URL}/api/verify-payment`, {
+                            const verifyRes = await fetchWithTimeout(`${API_BASE_URL}/api/verify-payment`, {
                                 method: 'POST',
                                 headers: { 
                                     'Content-Type': 'application/json',
                                     'X-Telegram-Init-Data': tg.initData || ""
                                 },
-                                body: JSON.stringify({ amount: amount, userId: userId })
+                                body: JSON.stringify({ amount: amount, userId: userId }),
+                                timeout: 3500
                             });
                             const verifyData = await verifyRes.json();
                             if (verifyRes.ok && verifyData.success) {
@@ -925,8 +944,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
 
             try {
-                const res = await fetch(`${API_BASE_URL}/api/arena/state`, {
-                    headers: { 'X-Telegram-Init-Data': tg.initData || "" }
+                const res = await fetchWithTimeout(`${API_BASE_URL}/api/arena/state`, {
+                    headers: { 'X-Telegram-Init-Data': tg.initData || "" },
+                    timeout: 3000
                 });
                 if (!res.ok) return;
                 const state = await res.json();
@@ -1045,13 +1065,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         btn.disabled = true;
 
         try {
-            const res = await fetch(`${API_BASE_URL}/api/place_bet`, {
+            const res = await fetchWithTimeout(`${API_BASE_URL}/api/place_bet`, {
                 method: 'POST',
                 headers: { 
                     'Content-Type': 'application/json',
                     'X-Telegram-Init-Data': tg.initData || ""
                 },
-                body: JSON.stringify({ amount: betValue })
+                body: JSON.stringify({ amount: betValue }),
+                timeout: 4000
             });
             const data = await res.json();
             
@@ -1151,7 +1172,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    // Принудительная привязка клика по баннеру Арены для открытия игры
+    // Привязка клика по баннеру Арены для открытия игры
     const arenaTrigger = document.getElementById('game-arena-trigger');
     if (arenaTrigger) {
         arenaTrigger.addEventListener('click', () => {
@@ -1159,7 +1180,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    // Принудительная привязка клика для кнопки возврата из Арены
+    // Привязка клика для кнопки возврата из Арены
     const backFromArena = document.getElementById('back-to-home-from-arena');
     if (backFromArena) {
         backFromArena.addEventListener('click', () => {
@@ -1341,10 +1362,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                         primary: true,
                         onClick: async () => {
                             try {
-                                const res = await fetch(`${API_BASE_URL}/api/deposit_gift_request`, {
+                                const res = await fetchWithTimeout(`${API_BASE_URL}/api/deposit_gift_request`, {
                                     method: 'POST',
                                     headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': tg.initData || "" },
-                                    body: JSON.stringify({ itemId: itemId })
+                                    body: JSON.stringify({ itemId: itemId }),
+                                    timeout: 4000
                                 });
                                 if (res.ok) {
                                     showNotification(`Заявка на ввод отправлена!`, '📥');
@@ -1383,14 +1405,18 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     async function fetchUserData() {
         try {
-            const res = await fetch(`${API_BASE_URL}/api/user`, { 
-                headers: { 'X-Telegram-Init-Data': tg.initData || "" }
+            // Fetch с лимитом времени: если сервер завис, отпускает UI через 5 сек
+            const res = await fetchWithTimeout(`${API_BASE_URL}/api/user`, { 
+                headers: { 'X-Telegram-Init-Data': tg.initData || "" },
+                timeout: 5000 
             });
             if (!res.ok) throw new Error();
             currentUser = await res.json();
             
             saveUserDataToCache(currentUser);
-        } catch (e) {}
+        } catch (e) {
+            console.warn("Сбой сети: загружены локальные кэшированные данные");
+        }
 
         updateBalanceUI();
         
@@ -1468,8 +1494,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     async function fetchInventory() {
         if (!elements.inventoryGrid) return;
         try {
-            const res = await fetch(`${API_BASE_URL}/api/inventory`, { 
-                headers: { 'X-Telegram-Init-Data': tg.initData || "" }
+            const res = await fetchWithTimeout(`${API_BASE_URL}/api/inventory`, { 
+                headers: { 'X-Telegram-Init-Data': tg.initData || "" },
+                timeout: 5000
             });
             if (!res.ok) throw new Error();
             const items = await res.json();
@@ -1478,7 +1505,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (items.length === 0) {
                 elements.inventoryGrid.innerHTML = `
                     <div class="empty-inventory">
-                        🎒 Ваш инвентать пуст.<br>Открывайте кейсы!
+                        🎒 Ваш инвентарь пуст.<br>Открывайте кейсы!
                     </div>`;
                 return;
             }
@@ -1511,10 +1538,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                                 primary: true,
                                 onClick: async () => {
                                     try {
-                                        const withdrawRes = await fetch(`${API_BASE_URL}/api/withdraw_gift`, {
+                                        const withdrawRes = await fetchWithTimeout(`${API_BASE_URL}/api/withdraw_gift`, {
                                             method: 'POST',
                                             headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': tg.initData || "" },
-                                            body: JSON.stringify({ itemId: item.item_id })
+                                            body: JSON.stringify({ itemId: item.item_id }),
+                                            timeout: 4000
                                         });
                                         if (withdrawRes.ok) {
                                             showNotification(`Подарок в очереди на вывод!`, '📥');
@@ -1544,10 +1572,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                                 primary: true,
                                 onClick: async () => {
                                     try {
-                                        const sellRes = await fetch(`${API_BASE_URL}/api/sell_gift`, {
+                                        const sellRes = await fetchWithTimeout(`${API_BASE_URL}/api/sell_gift`, {
                                             method: 'POST',
                                             headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': tg.initData || "" },
-                                            body: JSON.stringify({ itemId: item.item_id, price: item.value })
+                                            body: JSON.stringify({ itemId: item.item_id, price: item.value }),
+                                            timeout: 4000
                                         });
                                         if (sellRes.ok) {
                                             const sellData = await sellRes.json();
@@ -1639,10 +1668,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                         primary: true,
                         onClick: async () => {
                             try {
-                                const sellRes = await fetch(`${API_BASE_URL}/api/sell_gift`, {
+                                const sellRes = await fetchWithTimeout(`${API_BASE_URL}/api/sell_gift`, {
                                     method: 'POST',
                                     headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': tg.initData || "" },
-                                    body: JSON.stringify({ itemId: winningGift.id, price: winningGift.rawPrice })
+                                    body: JSON.stringify({ itemId: winningGift.id, price: winningGift.rawPrice }),
+                                    timeout: 4000
                                 });
                                 if (sellRes.ok) {
                                     const sellData = await sellRes.json();
@@ -1683,9 +1713,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             setTimeout(async () => {
                 try {
                     const endpoint = isNewbieCaseMode ? `${API_BASE_URL}/api/open_newbie_case` : `${API_BASE_URL}/api/open_daily_case`;
-                    const response = await fetch(endpoint, {
+                    const response = await fetchWithTimeout(endpoint, {
                         method: 'POST',
-                        headers: { 'X-Telegram-Init-Data': tg.initData || "" }
+                        headers: { 'X-Telegram-Init-Data': tg.initData || "" },
+                        timeout: 5000
                     });
                     const data = await response.json();
 
@@ -1698,10 +1729,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                     } else {
                         fetchUserData(); 
                         if (data.error && data.error.includes('подписчиком канала')) {
-                            const infoRes = await fetch(`${API_BASE_URL}/api/daily_case_info`, { headers: { 'X-Telegram-Init-Data': tg.initData || "" } });
+                            const infoRes = await fetchWithTimeout(`${API_BASE_URL}/api/daily_case_info`, { 
+                                headers: { 'X-Telegram-Init-Data': tg.initData || "" },
+                                timeout: 4000
+                            });
                             const infoData = await infoRes.json();
                             
-                            // ИСПРАВЛЕНО: Нативный переход в канал через tg.openTelegramLink для iOS
+                            // Нативный мгновенный переход в канал через tg.openTelegramLink для iPhone
                             showCustomModal({
                                 icon: '📢',
                                 title: 'Нужна подписка',
