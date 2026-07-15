@@ -68,7 +68,7 @@ let arenaGameState = {
     winnerX: null,
     winnerY: null,
     totalPool: null,
-    resolvedAt: 0 // Системный timestamp завершения раунда
+    resolvedAt: 0 // Системный timestamp завершения раунда в миллисекундах
 };
 
 // Фоновый таймер арены
@@ -245,7 +245,7 @@ async function resolveArenaWinner() {
         arenaGameState.winnerX = targetX;
         arenaGameState.winnerY = targetY;
         arenaGameState.totalPool = totalPool;
-        arenaGameState.resolvedAt = Date.now(); // ИСПРАВЛЕНО: Время резолва в миллисекундах
+        arenaGameState.resolvedAt = Date.now(); // Время резолва в миллисекундах
 
         // Сброс стола через 12 секунд
         setTimeout(async () => {
@@ -401,9 +401,18 @@ app.use(async (req, res, next) => {
                         avatarUrl = await getUserAvatarUrl(req.telegramUser.id);
                     }
                     const isAdminUser = req.telegramUser.id.toString() === process.env.ADMIN_TELEGRAM_ID;
+                    
+                    // ИСПРАВЛЕНО: Защита от undefined при обновлении профиля в БД
                     await query(
                         'UPDATE users SET avatar_url = $1, username = $2, first_name = $3, last_name = $4, is_admin = $5 WHERE id = $6',
-                        [avatarUrl, req.telegramUser.username, req.telegramUser.first_name, req.telegramUser.last_name, isAdminUser, req.telegramUser.id]
+                        [
+                            avatarUrl || null, 
+                            req.telegramUser.username || null, 
+                            req.telegramUser.first_name || null, 
+                            req.telegramUser.last_name || null, 
+                            isAdminUser, 
+                            req.telegramUser.id
+                        ]
                     );
                 } catch (dbErr) {}
             }
@@ -518,7 +527,6 @@ app.get('/api/arena/state', async (req, res) => {
         
         const totalPool = bets.reduce((sum, b) => sum + b.amount, 0);
         
-        // ИСПРАВЛЕНО: Добавлены поля resolvedAt и serverTime для полной асинхронизации клиентов
         res.json({
             status: arenaGameState.status,
             timeLeft: arenaGameState.timeLeft,
@@ -544,8 +552,29 @@ app.get('/api/user', async (req, res) => {
         if (!user) {
             const avatarUrl = req.telegramUser.photo_url || null;
             const isAdminUser = req.telegramUser.id.toString() === process.env.ADMIN_TELEGRAM_ID;
-            user = { id: req.telegramUser.id, username: req.telegramUser.username, first_name: req.telegramUser.first_name, balance: 0.000, avatar_url: avatarUrl, last_daily_case_open: new Date('2000-01-01'), is_admin: isAdminUser };
-            await query('INSERT INTO users (id, username, first_name, last_name, avatar_url, is_admin) VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (id) DO NOTHING', [user.id, user.username, req.telegramUser.first_name, req.telegramUser.last_name, user.avatar_url, user.is_admin]);
+            
+            // ИСПРАВЛЕНО: Защита от undefined при INSERT нового пользователя без Username или Last Name
+            user = { 
+                id: req.telegramUser.id, 
+                username: req.telegramUser.username || null, 
+                first_name: req.telegramUser.first_name || null, 
+                balance: 0.000, 
+                avatar_url: avatarUrl, 
+                last_daily_case_open: new Date('2000-01-01'), 
+                is_admin: isAdminUser 
+            };
+            
+            await query(
+                'INSERT INTO users (id, username, first_name, last_name, avatar_url, is_admin) VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (id) DO NOTHING', 
+                [
+                    user.id, 
+                    user.username, 
+                    user.first_name, 
+                    req.telegramUser.last_name || null, 
+                    user.avatar_url || null, 
+                    user.is_admin
+                ]
+            );
         }
         res.json(user);
     } catch (error) { res.status(500).json({ error: 'Internal server error' }); }
