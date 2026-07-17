@@ -89,18 +89,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         let currentRoundSignature = null;
         let arenaStatusStr = "waiting";
 
-        // Синхронизация раундов и защита оптимистичных ставок
+        // Синхронизация раундов, блокировка баланса и оптимистичных ставок
         let lastKnownRound = 1;
         let serverLastUserBet = 0; 
         let localOptimisticUserBet = 0; 
+        let isBetRequestPending = false; // Блокиратор для предотвращения мерцания баланса во время ставки
 
         // Системные переменные для анимации баланса "бегущие цифры" (GTA style)
         let currentBalanceDisplayVal = 0;
         let balanceAnimationInterval = null;
-
-        // Переменные для агрегации плавающих изменений баланса в один капсульный контейнер
-        let balanceChangeBuffer = 0;
-        let balanceChangeTimeout = null;
 
         // Глобальные переменные для предзагруженных платежных реквизитов
         let preloadedAdminAddress = null;
@@ -176,7 +173,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             ];
             for (const url of addrEndpoints) {
                 try {
-                    const res = await fetchWithTimeout(url, { timeout: 15000 });
+                    const res = await fetchWithTimeout(url, { timeout: 8000 });
                     if (res.ok) {
                         const data = await res.json();
                         preloadedAdminAddress = data.address || data.deposit_address || data.wallet;
@@ -192,7 +189,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             ];
             for (const url of payloadEndpoints) {
                 try {
-                    const res = await fetchWithTimeout(url, { timeout: 15000 });
+                    const res = await fetchWithTimeout(url, { timeout: 8000 });
                     if (res.ok) {
                         const data = await res.json();
                         preloadedPayloadBase64 = data.payload || data.payload_base64;
@@ -272,31 +269,23 @@ document.addEventListener('DOMContentLoaded', async () => {
         // ----------------------------------------------------------------------------------
         // GTA STYLE АНИМАЦИЯ БАЛАНСА И ОРГАНИЧЕСКИЕ FLOATING ИНДИКАТОРЫ
         // ----------------------------------------------------------------------------------
-        function showBalanceNotification(diff) {
-            if (Math.abs(diff) < 0.0001) return;
-            
-            balanceChangeBuffer += diff;
-
-            if (balanceChangeTimeout) clearTimeout(balanceChangeTimeout);
-
-            balanceChangeTimeout = setTimeout(() => {
-                spawnAccurateIndicator(balanceChangeBuffer);
-                balanceChangeBuffer = 0; 
-            }, 400); 
-        }
-
-        function spawnAccurateIndicator(totalDiff) {
+        function showBalanceNotification(amount) {
+            if (Math.abs(amount) < 0.0001) return;
             const pill = document.getElementById('balance-pill');
             if (!pill) return;
 
+            // Удаляем старые активные уведомления, чтобы они не накладывались
+            const oldIndicators = pill.querySelectorAll('.balance-change-indicator');
+            oldIndicators.forEach(ind => ind.remove());
+
             const indicator = document.createElement('div');
-            indicator.className = `balance-change-indicator ${totalDiff > 0 ? 'positive' : 'negative'}`;
-            indicator.innerText = (totalDiff > 0 ? '+' : '') + totalDiff.toFixed(3);
+            indicator.className = `balance-change-indicator ${amount > 0 ? 'positive' : 'negative'}`;
+            indicator.innerText = (amount > 0 ? '+' : '') + amount.toFixed(3);
             
             pill.appendChild(indicator);
             setTimeout(() => {
                 indicator.remove();
-            }, 1500);
+            }, 1800);
         }
 
         function animateBalanceDisplay(targetVal) {
@@ -552,7 +541,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                         elements.depositAmountModal.classList.remove('hidden');
                         if (elements.modalDepositInput) elements.modalDepositInput.value = "0.1";
                     } else {
-                        showNotification("Не удалось получить адрес пополнения. Пожалуйста, попробуйте еще раз.", "⚠️");
+                        // В случае сбоя API, всё равно открываем окно, чтобы не блокировать процесс
+                        elements.depositAmountModal.classList.remove('hidden');
+                        if (elements.modalDepositInput) elements.modalDepositInput.value = "0.1";
+                        showNotification("Внимание: Реквизиты загружаются в фоновом режиме.", "⏳");
                     }
                 } catch(e) {
                     showNotification("Ошибка получения реквизитов.", "⚠️");
@@ -737,64 +729,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             return { x: cx, y: cy };
         }
 
-        function getSquareIntersection(angle) {
-            angle = (angle % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI); 
-            const cx = 160, cy = 160;
-            const half = 160;
-            
-            const cos = Math.cos(angle);
-            const sin = Math.sin(angle);
-            
-            let t_candidate = []; 
-            
-            if (cos > 1e-6) t_candidate.push({ t: half / cos, x: 320, y: cy + half * sin / cos });
-            if (cos < -1e-6) t_candidate.push({ t: -half / cos, x: 0, y: cy - half * sin / cos });
-            if (sin > 1e-6) t_candidate.push({ t: half / sin, x: cx + half * cos / sin, y: 320 });
-            if (sin < -1e-6) t_candidate.push({ t: -half / sin, x: cx - half * cos / sin, y: 0 });
-            
-            let best = null;
-            for (let cand of t_candidate) {
-                if (cand.t > 0 && 
-                    cand.x >= -0.1 && cand.x <= 320.1 && 
-                    cand.y >= -0.1 && cand.y <= 320.1) 
-                {
-                    if (best === null || cand.t < best.t) {
-                        best = cand;
-                    }
-                }
-            }
-            return { x: best ? Math.max(0, Math.min(320, best.x)) : cx, y: best ? Math.max(0, Math.min(320, best.y)) : cy };
-        }
-
-        function getCornersInInterval(startAngle, endAngle) {
-            const list = [];
-            const corners = [
-                { angle: Math.atan2(1, 1), x: 320, y: 320 },
-                { angle: Math.atan2(1, -1), x: 0, y: 320 },
-                { angle: Math.atan2(-1, -1), x: 0, y: 0 },
-                { angle: Math.atan2(-1, 1), x: 320, y: 0 }
-            ];
-            
-            let normalizedStart = (startAngle % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
-            let normalizedEnd = (endAngle % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
-
-            if (normalizedEnd <= normalizedStart) { 
-                normalizedEnd += 2 * Math.PI;
-            }
-
-            for (let c of corners) {
-                let ca = c.angle;
-                while (ca < normalizedStart - 1e-6) { 
-                    ca += 2 * Math.PI;
-                }
-                if (ca > normalizedStart + 1e-6 && ca < normalizedEnd - 1e-6) {
-                    list.push({ angle: ca, x: c.x, y: c.y });
-                }
-            }
-            list.sort((a, b) => a.angle - b.angle);
-            return list;
-        }
-
         function drawArenaSegments() {
             try {
                 const svg = document.getElementById('arena-svg-canvas');
@@ -807,62 +741,53 @@ document.addEventListener('DOMContentLoaded', async () => {
                 avatarsContainer.innerHTML = '';
 
                 const N = arenaPlayers.length;
-                
-                // Очистка холста, если нет игроков
-                if (N === 0) {
-                    return; 
-                }
-                
-                const W = 320; 
-                const H = 320;
-                const CX = W / 2;
-                const CY = H / 2;
+                if (N === 0) return; // Очистка при отсутствии игроков
 
-                const shares = calculateSharesProtection(arenaPlayers);
-                
+                const W = 320, H = 320;
+                const CX = 160, CY = 160;
+                const R = 230; // Большой радиус для идеального радиального перекрытия квадрата
+
                 if (N === 1) {
                     const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-                    rect.setAttribute("x", "0");
-                    rect.setAttribute("y", "0");
-                    rect.setAttribute("width", "100%");
-                    rect.setAttribute("height", "100%");
+                    rect.setAttribute("width", "320");
+                    rect.setAttribute("height", "320");
                     rect.setAttribute("fill", arenaPlayers[0].color);
                     svg.appendChild(rect);
-                    createAvatarElement(CX, CY, arenaPlayers[0].avatar, 56); 
-                    return; 
+                    createAvatarElement(CX, CY, arenaPlayers[0].avatar, 56);
+                    return;
                 }
 
-                // Отрисовка от верхней точки (-Math.PI / 2) по часовой стрелке
-                let currentAngle = -Math.PI / 2; 
+                const shares = calculateSharesProtection(arenaPlayers);
+                let startAngle = -Math.PI / 2; // Начало строго с 12 часов
 
                 for (let i = 0; i < N; i++) {
                     const player = arenaPlayers[i];
                     const share = shares[i];
-                    let nextAngle = currentAngle + 2 * Math.PI * share;
+                    const endAngle = startAngle + (share * 2 * Math.PI);
 
-                    const pathPoints = [];
-                    pathPoints.push({ x: CX, y: CY }); 
-                    pathPoints.push(getSquareIntersection(currentAngle));
+                    const x1 = CX + R * Math.cos(startAngle);
+                    const y1 = CY + R * Math.sin(startAngle);
+                    const x2 = CX + R * Math.cos(endAngle);
+                    const y2 = CY + R * Math.sin(endAngle);
 
-                    const crossedCorners = getCornersInInterval(currentAngle, nextAngle);
-                    for (let c of crossedCorners) {
-                        pathPoints.push({ x: c.x, y: c.y });
-                    }
-                    
-                    pathPoints.push(getSquareIntersection(nextAngle));
+                    const largeArcFlag = share > 0.5 ? 1 : 0;
 
-                    const poly = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
-                    poly.setAttribute("points", pathPoints.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' '));
-                    poly.setAttribute("fill", player.color);
-                    svg.appendChild(poly);
+                    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                    path.setAttribute("d", `M ${CX} ${CY} L ${x1} ${y1} A ${R} ${R} 0 ${largeArcFlag} 1 ${x2} ${y2} Z`);
+                    path.setAttribute("fill", player.color || "#8d3df5");
+                    svg.appendChild(path);
 
-                    const c = getPolygonCentroid(pathPoints);
-                    createAvatarElement(c.x, c.y, player.avatar, 24 + share * 24);
+                    // Центровка аватарки игрока внутри сектора
+                    const middleAngle = startAngle + (share * Math.PI);
+                    const avatarRadius = 80; 
+                    const ax = CX + avatarRadius * Math.cos(middleAngle);
+                    const ay = CY + avatarRadius * Math.sin(middleAngle);
+                    createAvatarElement(ax, ay, player.avatar, 24 + share * 24);
 
-                    currentAngle = nextAngle;
+                    startAngle = endAngle;
                 }
-            } catch(e) {
-                console.error("Error drawing arena segments:", e);
+            } catch (e) {
+                console.error("Error rendering arena segments:", e);
             }
         }
 
@@ -1168,7 +1093,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         roundNum = 1;
                     }
                     
-                    // Если начался новый раунд — сбрасываем локальные ставки
+                    // Если начался абсолютно новый раунд — сбрасываем локальные упреждающие ставки
                     if (parseInt(roundNum) !== lastKnownRound) {
                         lastKnownRound = parseInt(roundNum);
                         localOptimisticUserBet = 0;
@@ -1179,16 +1104,19 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                     const rawBets = state.bets || state.players || state.activeBets || [];
                     
+                    // Оптимистичное сглаживание: удаление дублей и расчет дельты ставки пользователя
                     const userRawBet = rawBets.find(b => String(b.userId || b.user_id || b.id) === String(userId));
                     const serverUserBetVal = userRawBet ? parseFloat(userRawBet.amount || userRawBet.bet || 0) : 0;
 
-                    if (serverUserBetVal > serverLastUserBet) {
-                        const diff = serverUserBetVal - serverLastUserBet;
-                        localOptimisticUserBet = Math.max(0, localOptimisticUserBet - diff);
+                    // Обновляем оптимистичную ставку только если нет активного запроса на ставку
+                    if (!isBetRequestPending) {
+                        if (serverUserBetVal > serverLastUserBet) {
+                            const diff = serverUserBetVal - serverLastUserBet;
+                            localOptimisticUserBet = Math.max(0, localOptimisticUserBet - diff);
+                        }
+                        serverLastUserBet = serverUserBetVal;
                     }
-                    serverLastUserBet = serverUserBetVal;
 
-                    // Обновляем список игроков
                     arenaPlayers = rawBets.map(bet => {
                         const isMe = String(bet.userId || bet.user_id || bet.id) === String(userId);
                         let betVal = parseFloat(bet.amount || bet.bet || 0);
@@ -1204,7 +1132,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         };
                     });
 
-                    // Сохраняем локальную ставку в списке до ее отображения на сервере
+                    // Восстанавливаем локальную ставку в списке игроков, пока её не подтвердил сервер
                     const userInList = arenaPlayers.some(p => String(p.id) === String(userId));
                     if (!userInList && localOptimisticUserBet > 0) {
                         arenaPlayers.push({
@@ -1215,7 +1143,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                             color: currentUser.color || "#8d3df5"
                         });
                     }
-                    
+
                     const statusText = document.getElementById('arena-status-text');
 
                     if (arenaStatusStr === 'waiting' && localOptimisticUserBet === 0) {
@@ -1277,7 +1205,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                                 } else {
                                     showNotification(`Игрок ${winName} выиграл ${parseFloat(tPool).toFixed(3)} GRAM!`, "🏆");
                                 }
-                                fetchUserData(); 
+                                fetchUserData();
                             });
                         }
                     } else {
@@ -1338,13 +1266,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         // ВЫСОКОСКОРОСТНОЙ И БЕЗОПАСНЫЙ ОТКЛИК НА СТАВКУ
         const handleBetClick = async (e) => {
             const btn = e.currentTarget;
-            if (btn.classList.contains('disabled')) return;
+            if (btn.classList.contains('disabled') || isBetRequestPending) return;
 
             const betValue = parseFloat(btn.getAttribute('data-bet'));
             if (isNaN(betValue) || betValue < 0.1) return; 
 
             btn.classList.add('disabled');
             btn.disabled = true;
+            isBetRequestPending = true;
 
             const balanceVal = parseFloat(currentUser.balance || 0);
             currentUser.balance = Math.max(0, balanceVal - betValue);
@@ -1394,24 +1323,30 @@ document.addEventListener('DOMContentLoaded', async () => {
                     currentUser.balance = data.newBalance;
                     animateBalanceDisplay(currentUser.balance); 
                 } else {
+                    // Возврат баланса при ошибке сервера
                     currentUser.balance = parseFloat(currentUser.balance || 0) + betValue;
                     animateBalanceDisplay(currentUser.balance);
-                    showBalanceNotification(betValue); // Возврат баланса при сбое
-                    localOptimisticUserBet -= betValue; 
+                    showBalanceNotification(betValue); 
+                    localOptimisticUserBet = Math.max(0, localOptimisticUserBet - betValue); 
                     drawArenaSegments(); 
                     updatePlayersListUI();
                     showNotification(data.error || "Ошибка ставки", "⚠️");
                 }
             } catch (err) {
+                // Возврат баланса при потере сети
                 currentUser.balance = parseFloat(currentUser.balance || 0) + betValue;
                 animateBalanceDisplay(currentUser.balance);
-                showBalanceNotification(betValue); // Возврат баланса при ошибке
-                localOptimisticUserBet -= betValue;
+                showBalanceNotification(betValue); 
+                localOptimisticUserBet = Math.max(0, localOptimisticUserBet - betValue);
                 drawArenaSegments();
                 updatePlayersListUI();
                 showNotification("Ошибка сети при совершении ставки.", "⚠️");
             } finally {
-                fetchUserData(); 
+                // Небольшая задержка, чтобы дать серверу завершить обновление данных перед разблокировкой поллинга
+                setTimeout(() => {
+                    isBetRequestPending = false;
+                    fetchUserData(); 
+                }, 1000);
             }
         };
 
@@ -1732,6 +1667,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         async function fetchUserData() {
+            // Если мы сейчас обрабатываем запрос на ставку, не запрашиваем баланс, чтобы не сбить локальные анимации
+            if (isBetRequestPending) return;
+
             try {
                 const res = await fetchWithTimeout(`${API_BASE_URL}/api/user`, { 
                     headers: { 'X-Telegram-Init-Data': tg.initData || "" },
