@@ -89,6 +89,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         let currentRoundSignature = null;
         let arenaStatusStr = "waiting";
 
+        // Синхронизатор ставок и баланса для исключения визуальных дублей и прыжков
+        let localExpectedBetAmount = 0;
+        let lastObservedRoundNumber = null;
+        let lastRenderedBalance = null;
+
         // Переменные для плавного плавного локального таймера
         let countdownIntervalId = null;
         let localCountdownValue = 0;
@@ -1037,6 +1042,45 @@ document.addEventListener('DOMContentLoaded', async () => {
             requestAnimationFrame(renderFrame);
         }
 
+        // КЛИЕНТСКИЙ МИКСЕР (RECONCILIATION ENGINE):
+        // Объединяет серверный список игроков с нашими оптимистичными ставками в реальном времени.
+        function getMergedPlayers(serverPlayers) {
+            const myIdStr = String(userId);
+            const serverMe = serverPlayers.find(p => String(p.userId) === myIdStr);
+            const serverMyBet = serverMe ? parseFloat(serverMe.bet) : 0;
+
+            // Если сервер уже обработал или превысил наши ожидания, синхронизируем локальные данные
+            if (serverMyBet >= localExpectedBetAmount) {
+                localExpectedBetAmount = serverMyBet;
+            }
+
+            const diff = localExpectedBetAmount - serverMyBet;
+            let merged = serverPlayers.map(p => ({ ...p }));
+
+            if (diff > 0) {
+                const existingMe = merged.find(p => String(p.userId) === myIdStr);
+                if (existingMe) {
+                    existingMe.bet = parseFloat(existingMe.bet) + diff;
+                } else {
+                    const myAvatar = currentUser.avatar_url || "https://img.icons8.com/color/96/user.png";
+                    const myName = currentUser.username || currentUser.first_name || "Я";
+                    
+                    const usedColors = merged.map(p => p.color);
+                    const defaultColors = ['#8d3df5', '#00e676', '#0088cc', '#ff9500', '#ff3b30', '#c25dff'];
+                    let chosenColor = defaultColors.find(c => !usedColors.includes(c)) || defaultColors[0];
+
+                    merged.push({
+                        userId: userId,
+                        username: myName,
+                        avatar: myAvatar,
+                        bet: diff,
+                        color: chosenColor
+                    });
+                }
+            }
+            return merged;
+        }
+
         // БЕЗОПАСНЫЙ И ВЫСОКОСКОРОСТНОЙ ПОЛЛИНГ ИГРЫ ARENA (БЕЗ НАЛОЖЕНИЙ)
         async function pollArenaLoop() {
             if (!isPollingActive) return;
@@ -1057,13 +1101,24 @@ document.addEventListener('DOMContentLoaded', async () => {
                     arenaStatusStr = state.status || state.state || "waiting";
 
                     const rawBets = state.bets || state.players || state.activeBets || [];
-                    arenaPlayers = rawBets.map(bet => ({
+                    const serverPlayers = rawBets.map(bet => ({
                         userId: bet.userId || bet.user_id || bet.id || "",
                         username: bet.username || bet.user_name || bet.name || "Игрок",
                         avatar: bet.avatar || bet.avatar_url || "https://img.icons8.com/color/96/user.png",
                         bet: parseFloat(bet.amount || bet.bet || 0),
                         color: bet.color || "#8d3df5"
                     }));
+
+                    const correctRoundNumber = state.roundNumber || 0;
+                    
+                    // Сброс ожидаемых ставок при начале новой игры
+                    if (correctRoundNumber !== lastObservedRoundNumber) {
+                        localExpectedBetAmount = 0;
+                        lastObservedRoundNumber = correctRoundNumber;
+                    }
+
+                    // Объединение серверов с нашими транзакциями
+                    arenaPlayers = getMergedPlayers(serverPlayers);
 
                     drawArenaSegments();
                     updatePlayersListUI();
@@ -1075,7 +1130,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                     const serverTime = state.serverTime || Date.now(); 
                     const resolvedAt = state.resolvedAt || 0; 
 
-                    const correctRoundNumber = state.roundNumber || 0;
                     safeSetText(elements.arenaRoundNumber, correctRoundNumber);
 
                     if (arenaStatusStr === 'countdown') {
@@ -1144,11 +1198,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                              if (statusText && !isBallAnimating) {
                                 statusText.classList.remove('hidden');
                                 statusText.innerText = "Ждем ставки...";
-                            }
-                            if (countdownTimer) countdownTimer.classList.add('hidden');
+                             }
+                             if (countdownTimer) countdownTimer.classList.add('hidden');
                             
-                            const ballCanvas = document.getElementById('arena-ball-svg');
-                            if (ballCanvas) ballCanvas.innerHTML = '';
+                             const ballCanvas = document.getElementById('arena-ball-svg');
+                             if (ballCanvas) ballCanvas.innerHTML = '';
                         }
                     } else {
                         clearInterval(countdownIntervalId);
@@ -1167,6 +1221,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     }
 
                     renderBetButtons();
+                    updateBalanceUI();
                 }
             } catch (err) {
                 console.error("Error polling arena state:", err);
@@ -1208,6 +1263,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             safeSetText(elements.arenaRoundNumber, '0');
             safeSetText(elements.arenaPlayersTotal, '0');
             arenaPlayers = []; 
+            localExpectedBetAmount = 0; // Сброс ожидаемых ставок
             updatePlayersListUI(); 
 
             renderBetButtons();
@@ -1220,36 +1276,17 @@ document.addEventListener('DOMContentLoaded', async () => {
             const betValue = parseFloat(btn.getAttribute('data-bet'));
             if (isNaN(betValue) || betValue < 0.1) return; 
 
+            // Сразу блокируем клики, чтобы пользователь не спамил
             btn.classList.add('disabled');
             btn.disabled = true;
 
-            const myIdStr = String(userId);
-            let myBetIndex = arenaPlayers.findIndex(p => String(p.userId) === myIdStr);
-            
-            const myAvatar = currentUser.avatar_url || "https://img.icons8.com/color/96/user.png";
-            const myName = currentUser.username || currentUser.first_name || "Я";
-            
-            if (myBetIndex !== -1) {
-                arenaPlayers[myBetIndex].bet += betValue;
-            } else {
-                const usedColors = arenaPlayers.map(p => p.color);
-                const defaultColors = ['#8d3df5', '#00e676', '#0088cc', '#ff9500', '#ff3b30', '#c25dff'];
-                let chosenColor = defaultColors.find(c => !usedColors.includes(c)) || defaultColors[0];
-                
-                arenaPlayers.push({
-                    userId: userId,
-                    username: myName,
-                    avatar: myAvatar,
-                    bet: betValue,
-                    color: chosenColor
-                });
-            }
+            // Мгновенная регистрация ставки локально
+            localExpectedBetAmount += betValue;
+            arenaPlayers = getMergedPlayers(arenaPlayers);
             
             drawArenaSegments();
             updatePlayersListUI();
-            
-            const currentBal = parseFloat(currentUser.balance || 0);
-            updateBalanceUI(Math.max(0, currentBal - betValue));
+            updateBalanceUI();
 
             try {
                 const res = await fetchWithTimeout(`${API_BASE_URL}/api/place_bet`, {
@@ -1269,10 +1306,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                     updateBalanceUI();
                 } else {
                     showNotification(data.error || "Ошибка ставки", "⚠️");
+                    // Откат ставки при отказе сервера
+                    localExpectedBetAmount = Math.max(0, localExpectedBetAmount - betValue);
                     fetchUserData();
                 }
             } catch (err) {
                 showNotification("Ошибка сети", "⚠️");
+                localExpectedBetAmount = Math.max(0, localExpectedBetAmount - betValue);
                 fetchUserData();
             }
         };
@@ -1627,10 +1667,22 @@ document.addEventListener('DOMContentLoaded', async () => {
             renderBetButtons(); 
         }
 
+        // Обновление баланса со встроенным оптимистичным фильтром наложений
         function updateBalanceUI(forcedValue = null) {
-            const balanceVal = (currentUser && currentUser.balance) ? currentUser.balance : 0;
-            const val = forcedValue !== null ? parseFloat(forcedValue) : parseFloat(balanceVal);
-            const balVal = isNaN(val) ? "0.000" : val.toFixed(3);
+            const baseBalance = (currentUser && currentUser.balance) ? parseFloat(currentUser.balance) : 0;
+            const val = forcedValue !== null ? parseFloat(forcedValue) : baseBalance;
+
+            const myIdStr = String(userId);
+            const serverMe = arenaPlayers.find(p => String(p.userId) === myIdStr);
+            const serverMyBet = serverMe ? parseFloat(serverMe.bet) : 0;
+            const diff = Math.max(0, localExpectedBetAmount - serverMyBet);
+
+            const finalBalance = Math.max(0, val - diff);
+            const balVal = isNaN(finalBalance) ? "0.000" : finalBalance.toFixed(3);
+            
+            if (lastRenderedBalance === balVal) return; // Блокировка ложных циклов анимации
+            lastRenderedBalance = balVal;
+
             safeSetText(elements.balanceDisplayPill, balVal);
             safeSetText(elements.largeBalanceDisplay, balVal);
         }
