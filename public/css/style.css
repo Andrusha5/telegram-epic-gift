@@ -138,6 +138,7 @@ body {
 }
 
 .balance-pill {
+    position: relative;
     background: rgba(0, 230, 118, 0.08);
     border: 1.5px solid rgba(0, 230, 118, 0.4);
     box-shadow: 0 0 12px rgba(0, 230, 118, 0.2);
@@ -164,6 +165,42 @@ body {
 .balance-icon {
     width: 18px;
     height: 18px;
+}
+
+/* КРАСИВЫЙ ОРГАНИЧЕСКИЙ FLOATING ИНДИКАТОР СПИСАНИЙ/ЗАЧИСЛЕНИЙ */
+.balance-change-indicator {
+    position: absolute;
+    bottom: -22px;
+    right: 14px;
+    font-size: 15px;
+    font-weight: 900;
+    pointer-events: none;
+    z-index: 1010;
+    opacity: 0;
+    animation: floatUpFade 1.2s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.6);
+}
+
+.balance-change-indicator.positive {
+    color: #00e676;
+}
+
+.balance-change-indicator.negative {
+    color: #ff3b30;
+}
+
+@keyframes floatUpFade {
+    0% {
+        transform: translateY(0);
+        opacity: 0;
+    }
+    15% {
+        opacity: 1;
+    }
+    100% {
+        transform: translateY(-40px);
+        opacity: 0;
+    }
 }
 
 /* ==========================================================================
