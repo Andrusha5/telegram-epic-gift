@@ -405,6 +405,37 @@ body {
 }
 
 /* ==========================================================================
+   ФУТЕР ИНФОРМАЦИИ ОБ ИГРЕ ARENA
+   ========================================================================== */
+.arena-game-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    max-width: 320px; /* Align with arena-big-box */
+    margin-top: 20px;
+    padding: 0 10px; /* Some padding for visual balance */
+    box-sizing: border-box;
+}
+
+.arena-players-count, .arena-game-round {
+    font-size: 14px;
+    font-weight: 800;
+    color: var(--light-text-color);
+    letter-spacing: 0.5px;
+}
+
+.arena-game-round #arena-round-number {
+    color: #ffffff;
+    font-weight: 900;
+}
+
+.arena-players-count #arena-players-total {
+    color: #ffffff;
+    font-weight: 900;
+}
+
+/* ==========================================================================
    КНОПКИ СТАВОК
    ========================================================================== */
 .betting-row {
