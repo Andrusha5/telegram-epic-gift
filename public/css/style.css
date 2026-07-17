@@ -48,6 +48,7 @@ body {
     display: none !important;
 }
 
+/* Скроллбары */
 ::-webkit-scrollbar {
     width: 6px;
 }
@@ -138,7 +139,6 @@ body {
 }
 
 .balance-pill {
-    position: relative;
     background: rgba(0, 230, 118, 0.08);
     border: 1.5px solid rgba(0, 230, 118, 0.4);
     box-shadow: 0 0 12px rgba(0, 230, 118, 0.2);
@@ -165,42 +165,6 @@ body {
 .balance-icon {
     width: 18px;
     height: 18px;
-}
-
-/* КРАСИВЫЙ ОРГАНИЧЕСКИЙ FLOATING ИНДИКАТОР СПИСАНИЙ/ЗАЧИСЛЕНИЙ */
-.balance-change-indicator {
-    position: absolute;
-    bottom: -22px;
-    right: 14px;
-    font-size: 15px;
-    font-weight: 900;
-    pointer-events: none;
-    z-index: 1010;
-    opacity: 0;
-    animation: floatUpFade 1.2s cubic-bezier(0.25, 1, 0.5, 1) forwards;
-    text-shadow: 0 2px 4px rgba(0,0,0,0.6);
-}
-
-.balance-change-indicator.positive {
-    color: #00e676;
-}
-
-.balance-change-indicator.negative {
-    color: #ff3b30;
-}
-
-@keyframes floatUpFade {
-    0% {
-        transform: translateY(0);
-        opacity: 0;
-    }
-    15% {
-        opacity: 1;
-    }
-    100% {
-        transform: translateY(-40px);
-        opacity: 0;
-    }
 }
 
 /* ==========================================================================
@@ -442,8 +406,43 @@ body {
 }
 
 /* ==========================================================================
-   ФУТЕР ИНФОРМАЦИИ ОБ ИГРЕ ARENA (ПОД ПОЛЕМ ТЕПЕРЬ ТОЛЬКО НОМЕР ИГРЫ)
+   КОМПОНОВКА СПИСКА УЧАСТНИКОВ И СЧЕТЧИКА
    ========================================================================== */
+.players-list-title-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.players-list-title {
+    font-size: 14px;
+    font-weight: 800;
+    color: #ffffff;
+    margin: 0 !important;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.arena-players-count-badge {
+    font-size: 12px;
+    font-weight: 800;
+    color: var(--accent-purple);
+    background: rgba(141, 61, 245, 0.12);
+    border: 1px solid rgba(141, 61, 245, 0.35);
+    padding: 4px 10px;
+    border-radius: 10px;
+    letter-spacing: 0.5px;
+    box-shadow: 0 0 8px rgba(141, 61, 245, 0.15);
+}
+
+.arena-players-count-badge span {
+    color: #ffffff;
+    font-weight: 900;
+}
+
 .arena-game-footer {
     display: flex;
     justify-content: center;
@@ -455,15 +454,14 @@ body {
 }
 
 .arena-game-round {
-    font-size: 15px;
+    font-size: 13px;
     font-weight: 800;
     color: var(--light-text-color);
     letter-spacing: 0.5px;
-}
-
-.arena-game-round #arena-round-number {
-    color: #ffffff;
-    font-weight: 900;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    padding: 4px 12px;
+    border-radius: 20px;
 }
 
 /* ==========================================================================
@@ -474,7 +472,7 @@ body {
     align-items: center;
     justify-content: center;
     gap: 12px;
-    margin-top: 18px;
+    margin-top: 24px;
     width: 100%;
     box-sizing: border-box;
 }
@@ -586,7 +584,7 @@ body {
 }
 
 /* ==========================================================================
-   СПИСОК УЧАСТНИКОВ BEST ARENA С ОБНОВЛЕННЫМ ДИЗАЙНОМ ИГРОКОВ
+   СПИСОК УЧАСТНИКОВ BEST ARENA
    ========================================================================== */
 .arena-players-list-box {
     width: 100%;
@@ -597,32 +595,6 @@ body {
     padding: 18px;
     box-sizing: border-box;
     box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
-}
-
-.players-list-title {
-    font-size: 14px;
-    font-weight: 800;
-    color: #ffffff;
-    margin: 0 0 14px 0;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    text-align: left;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.players-header-count {
-    font-size: 12px;
-    font-weight: 800;
-    color: var(--light-text-color);
-    text-transform: none;
-    letter-spacing: 0px;
-}
-
-.players-header-count #arena-players-total {
-    color: var(--green-success);
-    font-weight: 900;
 }
 
 .players-list-container {
@@ -1438,7 +1410,7 @@ body {
    ========================================================================== */
 .floating-nav-container {
     position: fixed;
-    bottom: calc(16px + env(safe-area-inset-bottom));
+    bottom: calc(16px + env(safe-area-inset-bottom)); 
     left: 16px;   
     right: 16px;  
     z-index: 2000;
@@ -1667,60 +1639,3 @@ body {
     background: #241c44;
     color: #ffffff;
    }
-
-/* ... (весь предыдущий CSS остается) ... */
-
-/* ОБНОВЛЕННЫЙ СТИЛЬ УВЕДОМЛЕНИЙ БАЛАНСА - НЕОНОВАЯ КАПСУЛА */
-.balance-change-indicator {
-    position: absolute;
-    bottom: -35px;
-    right: 0;
-    padding: 4px 12px;
-    border-radius: 20px;
-    font-size: 14px;
-    font-weight: 900;
-    pointer-events: none;
-    z-index: 1010;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    white-space: nowrap;
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    box-shadow: 0 4px 15px rgba(0,0,0,0.5);
-    opacity: 0;
-    animation: bounceInFloat 1.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
-}
-
-.balance-change-indicator.positive {
-    background: rgba(0, 230, 118, 0.2);
-    border: 1.5px solid #00e676;
-    color: #00e676;
-    box-shadow: 0 0 15px rgba(0, 230, 118, 0.4);
-}
-
-.balance-change-indicator.negative {
-    background: rgba(255, 59, 48, 0.2);
-    border: 1.5px solid #ff3b30;
-    color: #ff3b30;
-    box-shadow: 0 0 15px rgba(255, 59, 48, 0.4);
-}
-
-@keyframes bounceInFloat {
-    0% {
-        transform: translateY(0) scale(0.5);
-        opacity: 0;
-    }
-    20% {
-        transform: translateY(5px) scale(1.1);
-        opacity: 1;
-    }
-    80% {
-        transform: translateY(-15px) scale(1);
-        opacity: 1;
-    }
-    100% {
-        transform: translateY(-25px) scale(0.8);
-        opacity: 0;
-    }
-}
