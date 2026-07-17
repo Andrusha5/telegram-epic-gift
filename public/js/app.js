@@ -57,9 +57,9 @@ function createPRNG(seedString) {
     }
 }
 
-// УНИВЕРСАЛЬНЫЙ КЛИЕНТСКИЙ FETCH С ТАЙМАУТОМ (8 секунд для стабильности на 3G/LTE)
+// УНИВЕРСАЛЬНЫЙ КЛИЕНТСКИЙ FETCH С УВЕЛИЧЕННЫМ ТАЙМАУТОМ (10 секунд для стабильности на 3G/LTE)
 async function fetchWithTimeout(resource, options = {}) {
-    const { timeout = 8000 } = options; 
+    const { timeout = 10000 } = options; 
     const controller = new AbortController();
     const id = setTimeout(() => controller.abort(), timeout);
     try {
@@ -84,13 +84,15 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         let customBets = [0.1, 1.0, 5.0];
         let arenaPlayers = []; 
-        let isPollingActive = false; // Маркер последовательного поллинга
+        let isPollingActive = false;
         let isBallAnimating = false;
         let currentRoundSignature = null;
         let arenaStatusStr = "waiting";
 
+        // Глобальные переменные для предзагруженных платежных реквизитов
         let preloadedAdminAddress = null;
         let preloadedPayloadBase64 = null;
+        let isPreloadingPayment = false; // Флаг, чтобы избежать одновременных запросов
 
         const safeSetText = (el, val) => { if (el) el.innerText = val; };
 
@@ -137,11 +139,20 @@ document.addEventListener('DOMContentLoaded', async () => {
             modalDepositInput: document.getElementById('modal-deposit-input'),
             modalDepositConfirmBtn: document.getElementById('modal-deposit-confirm-btn'),
             modalDepositCancelBtn: document.getElementById('modal-deposit-cancel-btn'),
-            adminTgChatTrigger: document.getElementById('admin-tg-chat-trigger')
+            adminTgChatTrigger: document.getElementById('admin-tg-chat-trigger'),
+            arenaRoundNumber: document.getElementById('arena-round-number'),
+            arenaPlayersTotal: document.getElementById('arena-players-total')
         };
 
-        // УМНЫЙ FALLBACK ПЛАТЕЖНЫХ ЭНДПОИНТОВ (АВТОМАТИЧЕСКИЙ ПОДБОР ПУТИ НА ЛЮБОМ СЕРВЕРЕ)
-        async function preloadPaymentParams() {
+        // ----------------------------------------------------------------------------------
+        // УЛУЧШЕННАЯ ЛОГИКА ПРЕДЗАГРУЗКИ И ПРОВЕРКИ РЕКВИЗИТОВ ДЛЯ ПОПОЛНЕНИЯ БАЛАНСА
+        // ----------------------------------------------------------------------------------
+
+        // Фоновая функция для фактической загрузки адреса и Payload с сервера
+        async function fetchPaymentParamsInternal() {
+            preloadedAdminAddress = null;
+            preloadedPayloadBase64 = null;
+
             // Подбор адреса
             const addrEndpoints = [
                 `${API_BASE_URL}/api/deposit_address`,
@@ -150,13 +161,13 @@ document.addEventListener('DOMContentLoaded', async () => {
             ];
             for (const url of addrEndpoints) {
                 try {
-                    const res = await fetchWithTimeout(url, { timeout: 4000 });
+                    const res = await fetchWithTimeout(url, { timeout: 15000 }); // Долгий таймаут для стабильности
                     if (res.ok) {
                         const data = await res.json();
                         preloadedAdminAddress = data.address || data.deposit_address || data.wallet;
                         if (preloadedAdminAddress) break;
                     }
-                } catch (e) {}
+                } catch (e) { /* Пробуем следующий эндпоинт */ }
             }
 
             // Подбор пейлоада
@@ -167,16 +178,57 @@ document.addEventListener('DOMContentLoaded', async () => {
             ];
             for (const url of payloadEndpoints) {
                 try {
-                    const res = await fetchWithTimeout(url, { timeout: 4000 });
+                    const res = await fetchWithTimeout(url, { timeout: 15000 }); // Долгий таймаут для стабильности
                     if (res.ok) {
                         const data = await res.json();
                         preloadedPayloadBase64 = data.payload || data.payload_base64;
                         if (preloadedPayloadBase64) break;
                     }
-                } catch (e) {}
+                } catch (e) { /* Пробуем следующий эндпоинт */ }
             }
+
+            return preloadedAdminAddress && preloadedPayloadBase64;
         }
-        preloadPaymentParams();
+
+        // Функция для управляемой предзагрузки с повторными попытками и обратной связью (для пользовательских действий)
+        async function ensurePaymentParamsForUserAction() {
+            if (preloadedAdminAddress && preloadedPayloadBase64) {
+                return true; // Уже загружено
+            }
+
+            if (isPreloadingPayment) {
+                // Если фоновая загрузка уже идет, ждем ее завершения
+                let waitedTime = 0;
+                while (isPreloadingPayment && waitedTime < 15000) { // Ждем до 15 секунд
+                    await new Promise(r => setTimeout(r, 500));
+                    waitedTime += 500;
+                }
+                if (preloadedAdminAddress && preloadedPayloadBase64) return true;
+            }
+
+            // Если все еще не загружено, пытаемся загрузить с повторными попытками
+            isPreloadingPayment = true;
+            let attempts = 0;
+            const MAX_ATTEMPTS = 2; // Дополнительные попытки для пользовательских запросов
+            let success = false;
+            while (attempts < MAX_ATTEMPTS) {
+                success = await fetchPaymentParamsInternal(); // Эта функция обновит глобальные переменные
+                if (success) {
+                    break;
+                }
+                attempts++;
+                await new Promise(resolve => setTimeout(resolve, 2000)); // Ждем перед повторной попыткой
+            }
+            isPreloadingPayment = false;
+            return success;
+        }
+        
+        // Запускаем фоновую предзагрузку при старте приложения (без уведомлений и блокировок)
+        fetchPaymentParamsInternal();
+
+        // ----------------------------------------------------------------------------------
+        // ОСНОВНОЙ КОД APP
+        // ----------------------------------------------------------------------------------
 
         function loadSavedBets() {
             try {
@@ -363,14 +415,19 @@ document.addEventListener('DOMContentLoaded', async () => {
         } catch (err) {}
 
         if (elements.depositBalanceBtn) {
-            elements.depositBalanceBtn.addEventListener('click', () => {
-                preloadPaymentParams();
-                if (elements.depositAmountModal) {
+            elements.depositBalanceBtn.addEventListener('click', async () => {
+                elements.depositBalanceBtn.disabled = true; // Отключаем кнопку на время загрузки
+                
+                // Ждем загрузки реквизитов с обратной связью
+                const success = await ensurePaymentParamsForUserAction();
+                
+                if (success) {
                     elements.depositAmountModal.classList.remove('hidden');
-                    if (elements.modalDepositInput) {
-                        elements.modalDepositInput.value = "0.1";
-                    }
+                    if (elements.modalDepositInput) elements.modalDepositInput.value = "0.1";
+                } else {
+                    showNotification("Не удалось получить адрес пополнения. Пожалуйста, проверьте подключение или повторите попытку позже.", "⚠️");
                 }
+                elements.depositBalanceBtn.disabled = false; // Включаем кнопку обратно
             });
         }
 
@@ -394,14 +451,15 @@ document.addEventListener('DOMContentLoaded', async () => {
                     return;
                 }
 
+                // В качестве дополнительной защиты, перепроверяем наличие реквизитов
                 if (!preloadedAdminAddress || !preloadedPayloadBase64) {
-                    showNotification("Загружаем реквизиты, подождите 2 секунды...", "⏳");
-                    await preloadPaymentParams();
-                }
-
-                if (!preloadedAdminAddress) {
-                    showNotification("Не удалось получить адрес пополнения. Попробуйте еще раз.", "⚠️");
-                    return;
+                    showNotification("Реквизиты потеряны, повторная попытка...", "⏳");
+                    const success = await ensurePaymentParamsForUserAction();
+                    if (!success) {
+                        showNotification("Не удалось получить адрес пополнения. Попробуйте еще раз. (Ошибка сервера или сети)", "⚠️");
+                        closeDepositModal();
+                        return;
+                    }
                 }
 
                 closeDepositModal();
@@ -413,7 +471,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         validUntil: Math.floor(Date.now() / 1000) + 360,
                         messages: [
                             {
-                                address: preloadedAdminAddress,
+                                address: preloadedAdminAddress, // Используем предзагруженный адрес
                                 amount: nanoAmount,
                                 payload: preloadedPayloadBase64 
                             }
@@ -487,7 +545,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             let adjusted = [...rawShares];
             let iterations = 0;
-            while (iterations < 10) {
+            while (iterations < 10) { // Ограничиваем итерации, чтобы не зависнуть
                 let underMinCount = 0;
                 let underMinSum = 0;
                 let overMinSum = 0;
@@ -503,7 +561,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                 if (underMinCount === 0) break;
                 if (underMinSum >= 1.0) {
-                    return adjusted.map(() => 1 / N);
+                    return adjusted.map(() => 1 / N); // Если все "слишком маленькие", делим поровну
                 }
 
                 const scale = (1.0 - underMinSum) / overMinSum;
@@ -520,6 +578,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         function getPolygonCentroid(pts) {
+            if (pts.length === 0) return { x: 160, y: 160 };
             let first = pts[0];
             let last = pts[pts.length - 1];
             let closeCycle = false;
@@ -538,7 +597,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
             area = area / 2;
             if (closeCycle) pts.pop();
-            if (Math.abs(area) < 0.01) {
+            if (Math.abs(area) < 0.01) { // Fallback for very thin polygons or collinear points
                 let sx = 0, sy = 0;
                 pts.forEach(p => { sx += p.x; sy += p.y; });
                 return { x: sx / pts.length, y: sy / pts.length };
@@ -550,20 +609,46 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         function getSquareIntersection(angle) {
             const cx = 160, cy = 160;
-            const dx = Math.cos(angle);
-            const dy = Math.sin(angle);
-            let tMax = Infinity;
+            const size = 320;
+            const halfSize = size / 2;
+            const tan = Math.tan(angle);
 
-            if (dx > 0) tMax = Math.min(tMax, (320 - cx) / dx);
-            else if (dx < 0) tMax = Math.min(tMax, (0 - cx) / dx);
+            // Quadrant 1 (0 to PI/2)
+            if (angle >= 0 && angle < Math.PI / 2) {
+                if (tan <= 1) return { x: cx + halfSize, y: cy + halfSize * tan }; // Right edge
+                return { x: cx + halfSize / tan, y: cy + halfSize }; // Top edge
+            }
+            // Quadrant 2 (PI/2 to PI)
+            if (angle >= Math.PI / 2 && angle < Math.PI) {
+                if (tan >= -1) return { x: cx - halfSize / tan, y: cy + halfSize }; // Top edge
+                return { x: cx - halfSize, y: cy - halfSize * tan }; // Left edge
+            }
+            // Quadrant 3 (PI to 3PI/2)
+            if (angle >= Math.PI && angle < 3 * Math.PI / 2) {
+                if (tan <= 1) return { x: cx - halfSize, y: cy - halfSize * tan }; // Left edge
+                return { x: cx - halfSize / tan, y: cy - halfSize }; // Bottom edge
+            }
+            // Quadrant 4 (3PI/2 to 2PI)
+            if (angle >= 3 * Math.PI / 2 && angle <= 2 * Math.PI) {
+                if (tan >= -1) return { x: cx + halfSize / tan, y: cy - halfSize }; // Bottom edge
+                return { x: cx + halfSize, y: cy + halfSize * tan }; // Right edge
+            }
+            // Fallback for edge cases (e.g. angle exactly at PI/2, PI, etc.)
+            if (Math.abs(angle - Math.PI/2) < 0.001) return {x: cx, y: cy + halfSize};
+            if (Math.abs(angle - Math.PI) < 0.001) return {x: cx - halfSize, y: cy};
+            if (Math.abs(angle - 3*Math.PI/2) < 0.001) return {x: cx, y: cy - halfSize};
+            return { x: cx + halfSize, y: cy }; // Default to right side if something goes wrong
+        }
 
-            if (dy > 0) tMax = Math.min(tMax, (320 - cy) / dy);
-            else if (dy < 0) tMax = Math.min(tMax, (0 - cy) / dy);
-
-            return {
-                x: cx + dx * tMax,
-                y: cy + dy * tMax
-            };
+        function getCornerAnglesRad() {
+            // Angles in radians for each corner of the square, starting from positive X-axis
+            // Top-right, Bottom-right, Bottom-left, Top-left (relative to center)
+            return [
+                Math.atan2(1, 1),      // PI/4
+                Math.atan2(1, -1),     // 3PI/4
+                Math.atan2(-1, -1),    // -3PI/4 (or 5PI/4)
+                Math.atan2(-1, 1)      // -PI/4 (or 7PI/4)
+            ].map(a => (a < 0 ? a + 2 * Math.PI : a)); // Normalize to [0, 2PI)
         }
 
         function drawArenaSegments() {
@@ -582,9 +667,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                 const W = 320; 
                 const H = 320;
+                const CX = W / 2;
+                const CY = H / 2;
 
                 const shares = calculateSharesProtection(arenaPlayers);
-
+                
+                // --- Сценарий для 1 игрока (весь квадрат) ---
                 if (N === 1) {
                     const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
                     rect.setAttribute("x", "0");
@@ -593,100 +681,100 @@ document.addEventListener('DOMContentLoaded', async () => {
                     rect.setAttribute("height", "100%");
                     rect.setAttribute("fill", arenaPlayers[0].color);
                     svg.appendChild(rect);
-
-                    createAvatarElement(160, 160, arenaPlayers[0].avatar, 56);
-                } else if (N === 2) {
-                    const r = shares[0];
-
-                    if (r <= 0.5) {
-                        const s = Math.sqrt(2 * r);
-                        const sizeX = (W * s).toFixed(1);
-                        const sizeY = (H * s).toFixed(1);
-
-                        const bg = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-                        bg.setAttribute("width", "100%");
-                        bg.setAttribute("height", "100%");
-                        bg.setAttribute("fill", arenaPlayers[1].color);
-                        svg.appendChild(bg);
-
-                        const poly = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
-                        const p1Pts = [{x:0, y:0}, {x:parseFloat(sizeX), y:0}, {x:0, y:parseFloat(sizeY)}];
-                        poly.setAttribute("points", p1Pts.map(p => `${p.x},${p.y}`).join(' '));
-                        poly.setAttribute("fill", arenaPlayers[0].color);
-                        svg.appendChild(poly);
-
-                        const c1 = getPolygonCentroid(p1Pts);
-                        const p2Pts = [
-                            {x:parseFloat(sizeX), y:0}, 
-                            {x:320, y:0}, 
-                            {x:320, y:320}, 
-                            {x:0, y:320}, 
-                            {x:0, y:parseFloat(sizeY)}
-                        ];
-                        const c2 = getPolygonCentroid(p2Pts);
-
-                        createAvatarElement(c1.x, c1.y, arenaPlayers[0].avatar, 24 + r * 30);
-                        createAvatarElement(c2.x, c2.y, arenaPlayers[1].avatar, 24 + (1-r) * 30);
-                    } else {
-                        const s = Math.sqrt(2 * (1 - r));
-                        const sizeX = (W * s).toFixed(1);
-                        const sizeY = (H * s).toFixed(1);
-
-                        const bg = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-                        bg.setAttribute("width", "100%");
-                        bg.setAttribute("height", "100%");
-                        bg.setAttribute("fill", arenaPlayers[0].color);
-                        svg.appendChild(bg);
-
-                        const poly = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
-                        const p2Pts = [
-                            {x:320, y:320}, 
-                            {x:320 - parseFloat(sizeX), y:320}, 
-                            {x:320, y:320 - parseFloat(sizeY)}
-                        ];
-                        poly.setAttribute("points", p2Pts.map(p => `${p.x},${p.y}`).join(' '));
-                        poly.setAttribute("fill", arenaPlayers[1].color);
-                        svg.appendChild(poly);
-
-                        const p1Pts = [
-                            {x:0, y:0}, 
-                            {x:320, y:0}, 
-                            {x:320, y:320 - parseFloat(sizeY)}, 
-                            {x:320 - parseFloat(sizeX), y:320}, 
-                            {x:0, y:320}
-                        ];
-                        const c1 = getPolygonCentroid(p1Pts);
-                        const c2 = getPolygonCentroid(p2Pts);
-
-                        createAvatarElement(c1.x, c1.y, arenaPlayers[0].avatar, 24 + r * 30);
-                        createAvatarElement(c2.x, c2.y, arenaPlayers[1].avatar, 24 + (1-r) * 30);
-                    }
-                } else {
-                    let currentAngle = 0;
-                    for (let i = 0; i < arenaPlayers.length; i++) {
-                        const player = arenaPlayers[i];
-                        const share = shares[i];
-                        const nextAngle = currentAngle + 2 * Math.PI * share;
-
-                        const pts = [{ x: 160, y: 160 }];
-                        const step = 0.05;
-                        for (let a = currentAngle; a < nextAngle; a += step) {
-                            pts.push(getSquareIntersection(a));
-                        }
-                        pts.push(getSquareIntersection(nextAngle));
-
-                        const poly = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
-                        poly.setAttribute("points", pts.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' '));
-                        poly.setAttribute("fill", player.color);
-                        svg.appendChild(poly);
-
-                        const c = getPolygonCentroid(pts);
-                        createAvatarElement(c.x, c.y, player.avatar, 24 + share * 24);
-
-                        currentAngle = nextAngle;
-                    }
+                    createAvatarElement(CX, CY, arenaPlayers[0].avatar, 56); // Большой аватар для единственного игрока
+                    return; 
                 }
-            } catch(e) {}
+
+                // --- Сценарий для 2 игроков (треугольник и пентагон) ---
+                if (N === 2) {
+                    // Используем shares[0] для определения размера треугольника первого игрока
+                    const s = Math.sqrt(2 * shares[0]); // Пропорция стороны для треугольника
+                    const sizeX = (W * s);
+                    const sizeY = (H * s);
+
+                    const bg = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+                    bg.setAttribute("width", "100%");
+                    bg.setAttribute("height", "100%");
+                    bg.setAttribute("fill", arenaPlayers[1].color); // Фон занимает второй игрок
+                    svg.appendChild(bg);
+
+                    const poly = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
+                    const p1Pts = [{x:0, y:0}, {x:sizeX, y:0}, {x:0, y:sizeY}];
+                    poly.setAttribute("points", p1Pts.map(p => `${p.x},${p.y}`).join(' '));
+                    poly.setAttribute("fill", arenaPlayers[0].color); // Первый игрок - треугольник
+                    svg.appendChild(poly);
+
+                    const c1 = getPolygonCentroid(p1Pts);
+                    const p2Pts = [ 
+                        {x:sizeX, y:0}, {x:W, y:0}, {x:W, y:H}, {x:0, y:H}, {x:0, y:sizeY}
+                    ];
+                    const c2 = getPolygonCentroid(p2Pts);
+
+                    createAvatarElement(c1.x, c1.y, arenaPlayers[0].avatar, 24 + shares[0] * 30);
+                    createAvatarElement(c2.x, c2.y, arenaPlayers[1].avatar, 24 + shares[1] * 30);
+                    return; 
+                }
+
+                // --- Общий сценарий для 3 и более игроков (радиальная сегментация) ---
+                let currentAngle = -Math.PI / 2; // Начинаем с верхней центральной точки (направление вверх)
+                const corners = getCornerAnglesRad(); 
+
+                for (let i = 0; i < N; i++) {
+                    const player = arenaPlayers[i];
+                    const share = shares[i];
+                    let nextAngle = currentAngle + 2 * Math.PI * share;
+
+                    const pathPoints = [];
+                    pathPoints.push({ x: CX, y: CY }); // Центр квадрата
+
+                    // Начальная точка на периметре
+                    pathPoints.push(getSquareIntersection(currentAngle));
+
+                    // Нормализуем углы для сравнения в диапазоне [0, 2PI)
+                    let normalizedCurrent = (currentAngle % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
+                    let normalizedNext = (nextAngle % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
+                    
+                    // Обработка случая, когда сегмент пересекает "ноль" (2PI -> 0)
+                    if (nextAngle > currentAngle && normalizedNext < normalizedCurrent) {
+                        normalizedNext += 2 * Math.PI;
+                    }
+
+                    // Добавляем промежуточные углы углов квадрата, если сегмент их пересекает
+                    const crossedCorners = [];
+                    for (let cAngle of corners) {
+                        let normalizedCAngle = (cAngle % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
+                        
+                        // Корректируем угол угла, если он "до" текущего, но сегмент пересекает 0/2PI
+                        if (normalizedCAngle < normalizedCurrent && nextAngle > currentAngle) {
+                            normalizedCAngle += 2 * Math.PI;
+                        }
+
+                        if (normalizedCAngle > normalizedCurrent && normalizedCAngle < normalizedNext) {
+                            crossedCorners.push(cAngle); // Используем исходный cAngle для getSquareIntersection
+                        }
+                    }
+                    crossedCorners.sort((a, b) => a - b); // Сортируем углы по возрастанию
+
+                    for (let cAngle of crossedCorners) {
+                        pathPoints.push(getSquareIntersection(cAngle));
+                    }
+                    
+                    // Конечная точка на периметре
+                    pathPoints.push(getSquareIntersection(nextAngle));
+
+                    const poly = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
+                    poly.setAttribute("points", pathPoints.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' '));
+                    poly.setAttribute("fill", player.color);
+                    svg.appendChild(poly);
+
+                    const c = getPolygonCentroid(pathPoints);
+                    createAvatarElement(c.x, c.y, player.avatar, 24 + share * 24);
+
+                    currentAngle = nextAngle;
+                }
+            } catch(e) {
+                console.error("Error drawing arena segments:", e);
+            }
         }
 
         function getPlayerAtCoords(x, y) {
@@ -696,33 +784,48 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             const shares = calculateSharesProtection(arenaPlayers);
 
+            // Логика для 2 игроков (треугольник/пентагон)
             if (N === 2) {
-                const r = shares[0];
-                if (r <= 0.5) {
-                    const s = Math.sqrt(2 * r);
-                    const boundarySize = 320 * s;
-                    return (x + y <= boundarySize) ? arenaPlayers[0] : arenaPlayers[1];
-                } else {
-                    const s = Math.sqrt(2 * (1 - r));
-                    const boundarySize = 320 * s;
-                    return ((320 - x) + (320 - y) <= boundarySize) ? arenaPlayers[1] : arenaPlayers[0];
+                const W = 320, H = 320;
+                const s = Math.sqrt(2 * shares[0]);
+                const sizeX = (W * s);
+                const sizeY = (H * s);
+                // Проверяем, находится ли точка в верхнем левом треугольнике
+                if (x >= 0 && x <= sizeX && y >= 0 && y <= sizeY && (x/sizeX + y/sizeY <= 1)) {
+                    return arenaPlayers[0];
                 }
-            } else {
-                let angle = Math.atan2(y - 160, x - 160);
-                if (angle < 0) angle += 2 * Math.PI;
+                return arenaPlayers[1];
+            } 
+            // Логика для 3+ игроков (радиальные сектора)
+            else {
+                const CX = 160, CY = 160;
+                let angle = Math.atan2(y - CY, x - CX);
+                if (angle < 0) angle += 2 * Math.PI; // Нормализация к [0, 2PI)
 
-                let currentAngle = 0;
+                let currentSearchAngle = (-Math.PI / 2); // Начинаем оттуда же, откуда отрисовка
                 for (let i = 0; i < arenaPlayers.length; i++) {
                     const player = arenaPlayers[i];
                     const share = shares[i];
-                    const nextAngle = currentAngle + 2 * Math.PI * share;
+                    const nextSearchAngle = currentSearchAngle + 2 * Math.PI * share;
 
-                    if (angle >= currentAngle && angle <= nextAngle) {
+                    // Нормализуем углы для сравнения, учитывая возможный "переворот" через 0/2PI
+                    let normalizedCurrent = (currentSearchAngle % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
+                    let normalizedNext = (nextSearchAngle % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
+                    let normalizedAngle = angle;
+
+                    if (nextSearchAngle > currentSearchAngle && normalizedNext < normalizedCurrent) {
+                        normalizedNext += 2 * Math.PI;
+                    }
+                    if (normalizedAngle < normalizedCurrent && nextSearchAngle > currentSearchAngle) { // если angle пересек 0/2PI
+                        normalizedAngle += 2 * Math.PI;
+                    }
+
+                    if (normalizedAngle >= normalizedCurrent && normalizedAngle <= normalizedNext) {
                         return player;
                     }
-                    currentAngle = nextAngle;
+                    currentSearchAngle = nextSearchAngle;
                 }
-                return arenaPlayers[arenaPlayers.length - 1];
+                return arenaPlayers[arenaPlayers.length - 1]; // Fallback to last player
             }
         }
 
@@ -747,6 +850,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                 if (arenaPlayers.length === 0) {
                     listContainer.innerHTML = `<div class="empty-list-placeholder">Ставок еще нет. Станьте первым!</div>`;
+                    safeSetText(elements.arenaPlayersTotal, '0');
                     return;
                 }
 
@@ -759,7 +863,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 listContainer.innerHTML = '';
                 arenaPlayers.forEach(p => {
                     const pBet = parseFloat(p.bet) || 0;
-                    const chance = totalBetSum > 0 ? ((pBet / totalBetSum) * 100).toFixed(2) : (100 / arenaPlayers.length).toFixed(2);
+                    const chance = totalBetSum > 0 ? ((pBet / totalBetSum) * 100).toFixed(2) : '0.00';
                     const row = document.createElement('div');
                     row.className = 'player-list-row';
                     row.style.borderLeft = `4px solid ${p.color || '#8d3df5'}`;
@@ -778,7 +882,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                     `;
                     listContainer.appendChild(row);
                 });
-            } catch (e) {}
+                safeSetText(elements.arenaPlayersTotal, arenaPlayers.length);
+            } catch (e) { console.error("Error updating players list UI:", e); }
         }
 
         function renderBetButtons() {
@@ -1000,6 +1105,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                     const stateTimeLeft = state.timeLeft !== undefined ? state.timeLeft : (state.time_left !== undefined ? state.time_left : (state.timer !== undefined ? state.timer : ""));
 
+                    // Обновление номера игры
+                    safeSetText(elements.arenaRoundNumber, state.roundNumber || state.gameId || '0');
+
+
                     if (arenaStatusStr === 'countdown') {
                         if (statusText) statusText.classList.add('hidden');
                         if (countdownTimer) {
@@ -1016,14 +1125,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                         const signature = winId + "_" + tPool + "_" + winX + "_" + winY;
                         const age = (state.serverTime && state.resolvedAt) ? (state.serverTime - state.resolvedAt) : 99999;
 
-                        if (age > 9500) {
-                            currentRoundSignature = signature;
+                        if (age > 9500) { // Прошло достаточно времени после завершения раунда, сбросить состояние
+                            currentRoundSignature = signature; // Чтобы не запускать анимацию повторно
                             if (statusText && !isBallAnimating) {
                                 statusText.classList.remove('hidden');
                                 statusText.innerText = "Ждем ставки...";
                             }
                             if (countdownTimer) countdownTimer.classList.add('hidden');
-                        } else if (currentRoundSignature !== signature && winX && winY) {
+                        } else if (currentRoundSignature !== signature && winX !== undefined && winY !== undefined) {
                             currentRoundSignature = signature;
                             
                             if (statusText) statusText.classList.add('hidden');
@@ -1058,11 +1167,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                     renderBetButtons();
                 }
-            } catch (err) {}
-
-            // Перезапуск следующей итерации ПОСЛЕ завершения текущей (защита от лагов сети)
-            if (isPollingActive) {
-                setTimeout(pollArenaLoop, 1500);
+            } catch (err) {
+                console.error("Error polling arena state:", err);
+            } finally {
+                // Перезапуск следующей итерации ПОСЛЕ завершения текущей (защита от лагов сети)
+                if (isPollingActive) {
+                    setTimeout(pollArenaLoop, 1500); // 1.5 секунды задержка между запросами
+                }
             }
         }
 
@@ -1092,6 +1203,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (svg) svg.innerHTML = '';
             if (avatarsContainer) avatarsContainer.innerHTML = '';
             if (ballSvg) ballSvg.innerHTML = '';
+
+            safeSetText(elements.arenaRoundNumber, '0');
+            safeSetText(elements.arenaPlayersTotal, '0');
+            arenaPlayers = []; // Очищаем список игроков
+            updatePlayersListUI(); // Обновляем список, чтобы он показал "Ставок еще нет"
 
             renderBetButtons();
         }
@@ -1233,7 +1349,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
         }
 
-        // Награда
+        // Награды
         const GIFT_POOL = [
             { id: 1, name: "Статуя птицы серая", icon: "/Images/Items/rare_bird.jpg", price: "20 GRAM", rawPrice: 20.0, isGold: true, type: "gift" },
             { id: 2, name: "Тыква", icon: "/Images/Items/pumpkin.jpg", price: "8 GRAM", rawPrice: 8.0, isGold: true, type: "gift" },
@@ -1802,12 +1918,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                                     onClose: () => { elements.spinBtn.disabled = false; }
                                 });
                             } else {
-                                showNotification(data.error || 'Ошибка.', '⚠️');
+                                showNotification(data.error || 'Ошибка.', "⚠️");
                                 elements.spinBtn.disabled = false;
                             }
                         }
                     } catch (error) {
+                        console.error("Error opening case:", error);
                         fetchUserData(); elements.spinBtn.disabled = false;
+                        showNotification('Ошибка сети или сервера при открытии кейса.', '⚠️');
                     }
                 }, 50);
             });
@@ -1826,5 +1944,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     } catch (globalError) {
         console.error("Критический сбой инициализации UI:", globalError);
+        showNotification("Критическая ошибка приложения. Попробуйте перезапустить.", "❌");
     }
 });
