@@ -57,7 +57,7 @@ function createPRNG(seedString) {
     }
 }
 
-// УНИВЕРСАЛЬНЫЙ КЛИЕНТСКИЙ FETCH С УВЕЛИЧЕННЫМ ТАЙМАУТОМ
+// УНИВЕРСАЛЬНЫЙ КЛИЕНТСКИЙ FETCH С УВЕЛИЧЕННЫМ ТАЙМАУТОМ (10 секунд для стабильности на 3G/LTE)
 async function fetchWithTimeout(resource, options = {}) {
     const { timeout = 10000 } = options; 
     const controller = new AbortController();
@@ -89,24 +89,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         let currentRoundSignature = null;
         let arenaStatusStr = "waiting";
 
-        // Синхронизация раундов, блокировка баланса и оптимистичных ставок
-        let lastKnownRound = null; // null предотвращает ложный сброс при первом запросе к серверу
-        let serverLastUserBet = 0; 
-        let localOptimisticUserBet = 0; 
-        let isBetRequestPending = false; // Блокиратор для предотвращения мерцания баланса во время ставки
-
-        // Системные переменные для анимации баланса "бегущие цифры" (GTA style)
-        let currentBalanceDisplayVal = 0;
-        let balanceAnimationInterval = null;
+        // Переменные для плавного плавного локального таймера
+        let countdownIntervalId = null;
+        let localCountdownValue = 0;
 
         // Глобальные переменные для предзагруженных платежных реквизитов
         let preloadedAdminAddress = null;
         let preloadedPayloadBase64 = null;
-        let isPreloadingPayment = false;
-
-        // Переменные локального плавного таймера
-        let localTimerVal = 0;
-        let localTimerInterval = null;
+        let isPreloadingPayment = false; // Флаг, чтобы избежать одновременных запросов
 
         const safeSetText = (el, val) => { if (el) el.innerText = val; };
 
@@ -159,46 +149,46 @@ document.addEventListener('DOMContentLoaded', async () => {
         };
 
         // ----------------------------------------------------------------------------------
-        // ЛОГИКА ПРЕДЗАГРУЗКИ И ПРОВЕРКИ РЕКВИЗИТОВ ДЛЯ ПОПОЛНЕНИЯ БАЛАНСА
+        // УЛУЧШЕННАЯ ЛОГИКА ПРЕДЗАГРУЗКИ И ПРОВЕРКИ РЕКВИЗИТОВ ДЛЯ ПОПОЛНЕНИЯ БАЛАНСА
         // ----------------------------------------------------------------------------------
 
         async function fetchPaymentParamsInternal() {
             preloadedAdminAddress = null;
             preloadedPayloadBase64 = null;
 
-            try {
-                // Запускаем запросы параллельно для исключения сетевых задержек
-                const [addrRes, payloadRes] = await Promise.allSettled([
-                    fetchWithTimeout(`${API_BASE_URL}/api/deposit_address`, { timeout: 4000 }),
-                    fetchWithTimeout(`${API_BASE_URL}/api/generate_payload?text=${userId}`, { timeout: 4000 })
-                ]);
-
-                if (addrRes.status === 'fulfilled' && addrRes.value.ok) {
-                    const data = await addrRes.value.json();
-                    preloadedAdminAddress = data.address || data.deposit_address || data.wallet;
-                } else {
-                    const altAddrRes = await fetchWithTimeout(`${API_BASE_URL}/api/address`, { timeout: 3000 }).catch(() => null);
-                    if (altAddrRes && altAddrRes.ok) {
-                        const data = await altAddrRes.json();
+            const addrEndpoints = [
+                `${API_BASE_URL}/api/deposit_address`,
+                `${API_BASE_URL}/api/deposit-address`,
+                `${API_BASE_URL}/api/address`
+            ];
+            for (const url of addrEndpoints) {
+                try {
+                    const res = await fetchWithTimeout(url, { timeout: 15000 });
+                    if (res.ok) {
+                        const data = await res.json();
                         preloadedAdminAddress = data.address || data.deposit_address || data.wallet;
+                        if (preloadedAdminAddress) break;
                     }
-                }
-
-                if (payloadRes.status === 'fulfilled' && payloadRes.value.ok) {
-                    const data = await payloadRes.value.json();
-                    preloadedPayloadBase64 = data.payload || data.payload_base64;
-                } else {
-                    const altPayloadRes = await fetchWithTimeout(`${API_BASE_URL}/api/payload?text=${userId}`, { timeout: 3000 }).catch(() => null);
-                    if (altPayloadRes && altPayloadRes.ok) {
-                        const data = await altPayloadRes.json();
-                        preloadedPayloadBase64 = data.payload || data.payload_base64;
-                    }
-                }
-            } catch (e) {
-                console.error("Error preloading payment params:", e);
+                } catch (e) {}
             }
 
-            return preloadedAdminAddress !== null;
+            const payloadEndpoints = [
+                `${API_BASE_URL}/api/generate_payload?text=${userId}`,
+                `${API_BASE_URL}/api/generate-payload?text=${userId}`,
+                `${API_BASE_URL}/api/payload?text=${userId}`
+            ];
+            for (const url of payloadEndpoints) {
+                try {
+                    const res = await fetchWithTimeout(url, { timeout: 15000 });
+                    if (res.ok) {
+                        const data = await res.json();
+                        preloadedPayloadBase64 = data.payload || data.payload_base64;
+                        if (preloadedPayloadBase64) break;
+                    }
+                } catch (e) {}
+            }
+
+            return preloadedAdminAddress && preloadedPayloadBase64;
         }
 
         async function ensurePaymentParamsForUserAction() {
@@ -208,127 +198,28 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             if (isPreloadingPayment) {
                 let waitedTime = 0;
-                while (isPreloadingPayment && waitedTime < 5000) { 
-                    await new Promise(r => setTimeout(r, 200));
-                    waitedTime += 200;
+                while (isPreloadingPayment && waitedTime < 15000) { 
+                    await new Promise(r => setTimeout(r, 500));
+                    waitedTime += 500;
                 }
                 if (preloadedAdminAddress && preloadedPayloadBase64) return true;
             }
 
             isPreloadingPayment = true;
+            let attempts = 0;
+            const MAX_ATTEMPTS = 2; 
             let success = false;
-            try {
+            while (attempts < MAX_ATTEMPTS) {
                 success = await fetchPaymentParamsInternal();
-            } catch (e) {
-                console.error(e);
-            } finally {
-                isPreloadingPayment = false;
+                if (success) break;
+                attempts++;
+                await new Promise(resolve => setTimeout(resolve, 2000));
             }
+            isPreloadingPayment = false;
             return success;
         }
         
         fetchPaymentParamsInternal();
-
-        // ----------------------------------------------------------------------------------
-        // УПРАВЛЕНИЕ ЛОКАЛЬНЫМ ПЛАВНЫМ ТАЙМЕРОМ
-        // ----------------------------------------------------------------------------------
-        function startSmoothCountdown(serverSeconds) {
-            const timerCircle = document.getElementById('arena-countdown-timer');
-            if (!timerCircle) return;
-
-            if (localTimerInterval && Math.abs(localTimerVal - serverSeconds) <= 1.5) {
-                return; 
-            }
-
-            clearInterval(localTimerInterval);
-            localTimerVal = serverSeconds;
-            
-            timerCircle.classList.remove('hidden');
-            timerCircle.innerText = Math.round(localTimerVal);
-
-            localTimerInterval = setInterval(() => {
-                if (localTimerVal > 1) {
-                    localTimerVal -= 1;
-                    timerCircle.innerText = Math.round(localTimerVal);
-                } else {
-                    localTimerVal = 0;
-                    timerCircle.innerText = "0";
-                    clearInterval(localTimerInterval);
-                }
-            }, 1000);
-        }
-
-        function stopSmoothCountdown() {
-            clearInterval(localTimerInterval);
-            localTimerInterval = null;
-            localTimerVal = 0;
-            const timerCircle = document.getElementById('arena-countdown-timer');
-            if (timerCircle) timerCircle.classList.add('hidden');
-        }
-
-        // ----------------------------------------------------------------------------------
-        // GTA STYLE АНИМАЦИЯ БАЛАНСА И ОРГАНИЧЕСКИЕ FLOATING ИНДИКАТОРЫ
-        // ----------------------------------------------------------------------------------
-        function showBalanceNotification(amount) {
-            if (Math.abs(amount) < 0.0001) return;
-            const pill = document.getElementById('balance-pill');
-            if (!pill) return;
-
-            // Удаляем старые активные уведомления для исключения визуального наложения
-            const oldIndicators = pill.querySelectorAll('.balance-change-indicator');
-            oldIndicators.forEach(ind => ind.remove());
-
-            const indicator = document.createElement('div');
-            indicator.className = `balance-change-indicator ${amount > 0 ? 'positive' : 'negative'}`;
-            indicator.innerText = (amount > 0 ? '+' : '') + amount.toFixed(3);
-            
-            pill.appendChild(indicator);
-            setTimeout(() => {
-                indicator.remove();
-            }, 1800);
-        }
-
-        function animateBalanceDisplay(targetVal) {
-            if (isNaN(targetVal)) targetVal = 0;
-            
-            const startVal = currentBalanceDisplayVal;
-            const diff = targetVal - startVal;
-            
-            if (Math.abs(diff) < 0.0001) {
-                currentBalanceDisplayVal = targetVal;
-                updateBalanceDOM(targetVal);
-                return;
-            }
-
-            const duration = 800; 
-            const startTime = performance.now();
-
-            if (balanceAnimationInterval) {
-                cancelAnimationFrame(balanceAnimationInterval);
-            }
-
-            const step = (timestamp) => {
-                const progress = Math.min((timestamp - startTime) / duration, 1);
-                const ease = 1 - Math.pow(1 - progress, 4); 
-                const current = startVal + diff * ease;
-                currentBalanceDisplayVal = current;
-                updateBalanceDOM(current);
-
-                if (progress < 1) {
-                    balanceAnimationInterval = requestAnimationFrame(step);
-                } else {
-                    currentBalanceDisplayVal = targetVal;
-                    updateBalanceDOM(targetVal);
-                }
-            };
-            balanceAnimationInterval = requestAnimationFrame(step);
-        }
-
-        function updateBalanceDOM(val) {
-            const textVal = val.toFixed(3);
-            if (elements.balanceDisplayPill) elements.balanceDisplayPill.innerText = textVal;
-            if (elements.largeBalanceDisplay) elements.largeBalanceDisplay.innerText = textVal;
-        }
 
         // ----------------------------------------------------------------------------------
         // ОСНОВНОЙ КОД APP
@@ -358,8 +249,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     const cache = JSON.parse(cachedData);
                     if (cache) {
                         currentUser = cache;
-                        currentBalanceDisplayVal = parseFloat(currentUser.balance || 0);
-                        updateBalanceDOM(currentBalanceDisplayVal);
+                        updateBalanceUI();
                         const rawName = cache.username || cache.first_name || "Пользователь";
                         safeSetText(document.getElementById('user-username'), formatUsername(rawName));
                         
@@ -466,12 +356,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                                 elements.connectWalletBtn.style.background = 'linear-gradient(135deg, #00e676, #00b34a)';
                                 elements.connectWalletBtn.style.color = '#000000';
                             }
-                            if (elements.depositBalanceBtn) {
-                                elements.depositBalanceBtn.disabled = false;
-                                elements.depositBalanceBtn.removeAttribute('disabled');
-                                elements.depositBalanceBtn.style.opacity = "1";
-                                elements.depositBalanceBtn.style.pointerEvents = "auto";
-                            }
+                            if (elements.depositBalanceBtn) elements.depositBalanceBtn.removeAttribute('disabled');
                             if (elements.depositNoticeText) {
                                 elements.depositNoticeText.innerText = "Кошелек успешно подключен к системе!";
                                 elements.depositNoticeText.style.color = '#00e676';
@@ -482,12 +367,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                                 elements.connectWalletBtn.style.background = 'linear-gradient(135deg, var(--accent-purple), #6a0dad)';
                                 elements.connectWalletBtn.style.color = '#ffffff';
                             }
-                            if (elements.depositBalanceBtn) {
-                                elements.depositBalanceBtn.setAttribute('disabled', 'true');
-                                elements.depositBalanceBtn.disabled = true;
-                                elements.depositBalanceBtn.style.opacity = "0.5";
-                                elements.depositBalanceBtn.style.pointerEvents = "none";
-                            }
+                            if (elements.depositBalanceBtn) elements.depositBalanceBtn.setAttribute('disabled', 'true');
                             if (elements.depositNoticeText) {
                                 elements.depositNoticeText.innerText = "Пополнение доступно после привязки кошелька";
                                 elements.depositNoticeText.style.color = '#a5a1b8';
@@ -532,26 +412,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (elements.depositBalanceBtn) {
             elements.depositBalanceBtn.addEventListener('click', async () => {
                 elements.depositBalanceBtn.disabled = true; 
-                elements.depositBalanceBtn.innerText = "Загрузка...";
-                
-                try {
-                    const success = await ensurePaymentParamsForUserAction();
-                    
-                    if (success) {
-                        elements.depositAmountModal.classList.remove('hidden');
-                        if (elements.modalDepositInput) elements.modalDepositInput.value = "0.1";
-                    } else {
-                        // Открываем модальное окно в любом случае для стабильности интерфейса
-                        elements.depositAmountModal.classList.remove('hidden');
-                        if (elements.modalDepositInput) elements.modalDepositInput.value = "0.1";
-                        showNotification("Внимание: Реквизиты загружаются в фоновом режиме.", "⏳");
-                    }
-                } catch(e) {
-                    showNotification("Ошибка получения реквизитов.", "⚠️");
-                } finally {
-                    elements.depositBalanceBtn.disabled = false; 
-                    elements.depositBalanceBtn.innerText = "Пополнить баланс";
+                const success = await ensurePaymentParamsForUserAction();
+                if (success) {
+                    elements.depositAmountModal.classList.remove('hidden');
+                    if (elements.modalDepositInput) elements.modalDepositInput.value = "0.1";
+                } else {
+                    showNotification("Не удалось получить адрес пополнения. Пожалуйста, проверьте подключение или повторите попытку позже.", "⚠️");
                 }
+                elements.depositBalanceBtn.disabled = false; 
             });
         }
 
@@ -575,10 +443,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                     return;
                 }
 
-                if (!preloadedAdminAddress) {
-                    showNotification("Получение платежных реквизитов...", "⏳");
+                if (!preloadedAdminAddress || !preloadedPayloadBase64) {
+                    showNotification("Реквизиты потеряны, повторная попытка...", "⏳");
                     const success = await ensurePaymentParamsForUserAction();
-                    if (!success || !preloadedAdminAddress) {
+                    if (!success) {
                         showNotification("Не удалось получить адрес пополнения. Попробуйте еще раз.", "⚠️");
                         closeDepositModal();
                         return;
@@ -590,19 +458,15 @@ document.addEventListener('DOMContentLoaded', async () => {
                 try {
                     const nanoAmount = Math.floor(amount * 1000000000).toString();
 
-                    const message = {
-                        address: preloadedAdminAddress.trim(), 
-                        amount: nanoAmount
-                    };
-
-                    // ПРЕДОТВРАЩЕНИЕ КРАША КОШЕЛЬКА TON: Включаем payload только если он загружен и не пуст
-                    if (preloadedPayloadBase64 && preloadedPayloadBase64.trim() !== "") {
-                        message.payload = preloadedPayloadBase64.trim();
-                    }
-
                     const transaction = {
-                        validUntil: Math.floor(Date.now() / 1000) + 600, // 10 минут
-                        messages: [message]
+                        validUntil: Math.floor(Date.now() / 1000) + 360,
+                        messages: [
+                            {
+                                address: preloadedAdminAddress, 
+                                amount: nanoAmount,
+                                payload: preloadedPayloadBase64 
+                            }
+                        ]
                     };
 
                     showNotification("Подтвердите транзакцию...", "⏳");
@@ -638,6 +502,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                                         const verifyData = await verifyRes.json();
                                         if (verifyData.success) {
                                             clearInterval(checkInterval);
+                                            showNotification(`Баланс пополнен на +${amount.toFixed(2)} GRAM!`, "💎");
                                             fetchUserData();
                                             return;
                                         }
@@ -703,6 +568,73 @@ document.addEventListener('DOMContentLoaded', async () => {
             return adjusted;
         }
 
+        function getPolygonCentroid(pts) {
+            if (pts.length === 0) return { x: 160, y: 160 };
+            let first = pts[0];
+            let last = pts[pts.length - 1];
+            let closeCycle = false;
+            if (first.x !== last.x || first.y !== last.y) {
+                pts.push({ x: first.x, y: first.y });
+                closeCycle = true;
+            }
+            let area = 0, cx = 0, cy = 0;
+            for (let i = 0; i < pts.length - 1; i++) {
+                let p1 = pts[i];
+                let p2 = pts[i+1];
+                let factor = (p1.x * p2.y - p2.x * p1.y);
+                area += factor;
+                cx += (p1.x + p2.x) * factor;
+                cy += (p1.y + p2.y) * factor;
+            }
+            area = area / 2;
+            if (closeCycle) pts.pop();
+            if (Math.abs(area) < 0.01) { 
+                let sx = 0, sy = 0;
+                pts.forEach(p => { sx += p.x; sy += p.y; });
+                return { x: sx / pts.length, y: sy / pts.length };
+            }
+            cx = cx / (6 * area);
+            cy = cy / (6 * area);
+            return { x: cx, y: cy };
+        }
+
+        function getSquareIntersection(angle) {
+            const cx = 160, cy = 160;
+            const size = 320;
+            const halfSize = size / 2;
+            const tan = Math.tan(angle);
+
+            if (angle >= 0 && angle < Math.PI / 2) {
+                if (tan <= 1) return { x: cx + halfSize, y: cy + halfSize * tan }; 
+                return { x: cx + halfSize / tan, y: cy + halfSize }; 
+            }
+            if (angle >= Math.PI / 2 && angle < Math.PI) {
+                if (tan >= -1) return { x: cx - halfSize / tan, y: cy + halfSize }; 
+                return { x: cx - halfSize, y: cy - halfSize * tan }; 
+            }
+            if (angle >= Math.PI && angle < 3 * Math.PI / 2) {
+                if (tan <= 1) return { x: cx - halfSize, y: cy - halfSize * tan }; 
+                return { x: cx - halfSize / tan, y: cy - halfSize }; 
+            }
+            if (angle >= 3 * Math.PI / 2 && angle <= 2 * Math.PI) {
+                if (tan >= -1) return { x: cx + halfSize / tan, y: cy - halfSize }; 
+                return { x: cx + halfSize, y: cy + halfSize * tan }; 
+            }
+            if (Math.abs(angle - Math.PI/2) < 0.001) return {x: cx, y: cy + halfSize};
+            if (Math.abs(angle - Math.PI) < 0.001) return {x: cx - halfSize, y: cy};
+            if (Math.abs(angle - 3*Math.PI/2) < 0.001) return {x: cx, y: cy - halfSize};
+            return { x: cx + halfSize, y: cy }; 
+        }
+
+        function getCornerAnglesRad() {
+            return [
+                Math.atan2(1, 1),      
+                Math.atan2(1, -1),     
+                Math.atan2(-1, -1),    
+                Math.atan2(-1, 1)      
+            ].map(a => (a < 0 ? a + 2 * Math.PI : a)); 
+        }
+
         function drawArenaSegments() {
             try {
                 const svg = document.getElementById('arena-svg-canvas');
@@ -715,51 +647,106 @@ document.addEventListener('DOMContentLoaded', async () => {
                 avatarsContainer.innerHTML = '';
 
                 const N = arenaPlayers.length;
-                if (N === 0) return; // Полная очистка поля при отсутствии игроков
+                if (N === 0) return;
 
-                const CX = 160, CY = 160;
-                const R = 230; // Большой радиус для идеального и бесшовного радиального деления квадрата
-
-                if (N === 1) {
-                    const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-                    rect.setAttribute("width", "320");
-                    rect.setAttribute("height", "320");
-                    rect.setAttribute("fill", arenaPlayers[0].color);
-                    svg.appendChild(rect);
-                    createAvatarElement(CX, CY, arenaPlayers[0].avatar, 56);
-                    return;
-                }
+                const W = 320; 
+                const H = 320;
+                const CX = W / 2;
+                const CY = H / 2;
 
                 const shares = calculateSharesProtection(arenaPlayers);
-                let startAngle = -Math.PI / 2; // Начало ровно с 12 часов
+                
+                if (N === 1) {
+                    const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+                    rect.setAttribute("x", "0");
+                    rect.setAttribute("y", "0");
+                    rect.setAttribute("width", "100%");
+                    rect.setAttribute("height", "100%");
+                    rect.setAttribute("fill", arenaPlayers[0].color);
+                    svg.appendChild(rect);
+                    createAvatarElement(CX, CY, arenaPlayers[0].avatar, 56); 
+                    return; 
+                }
+
+                if (N === 2) {
+                    const s = Math.sqrt(2 * shares[0]); 
+                    const sizeX = (W * s);
+                    const sizeY = (H * s);
+
+                    const bg = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+                    bg.setAttribute("width", "100%");
+                    bg.setAttribute("height", "100%");
+                    bg.setAttribute("fill", arenaPlayers[1].color); 
+                    svg.appendChild(bg);
+
+                    const poly = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
+                    const p1Pts = [{x:0, y:0}, {x:sizeX, y:0}, {x:0, y:sizeY}];
+                    poly.setAttribute("points", p1Pts.map(p => `${p.x},${p.y}`).join(' '));
+                    poly.setAttribute("fill", arenaPlayers[0].color); 
+                    svg.appendChild(poly);
+
+                    const c1 = getPolygonCentroid(p1Pts);
+                    const p2Pts = [ 
+                        {x:sizeX, y:0}, {x:W, y:0}, {x:W, y:H}, {x:0, y:H}, {x:0, y:sizeY}
+                    ];
+                    const c2 = getPolygonCentroid(p2Pts);
+
+                    createAvatarElement(c1.x, c1.y, arenaPlayers[0].avatar, 24 + shares[0] * 30);
+                    createAvatarElement(c2.x, c2.y, arenaPlayers[1].avatar, 24 + shares[1] * 30);
+                    return; 
+                }
+
+                let currentAngle = -Math.PI / 2; 
+                const corners = getCornerAnglesRad(); 
 
                 for (let i = 0; i < N; i++) {
                     const player = arenaPlayers[i];
                     const share = shares[i];
-                    const endAngle = startAngle + (share * 2 * Math.PI);
+                    let nextAngle = currentAngle + 2 * Math.PI * share;
 
-                    const x1 = CX + R * Math.cos(startAngle);
-                    const y1 = CY + R * Math.sin(startAngle);
-                    const x2 = CX + R * Math.cos(endAngle);
-                    const y2 = CY + R * Math.sin(endAngle);
+                    const pathPoints = [];
+                    pathPoints.push({ x: CX, y: CY }); 
 
-                    const largeArcFlag = share > 0.5 ? 1 : 0;
+                    pathPoints.push(getSquareIntersection(currentAngle));
 
-                    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-                    path.setAttribute("d", `M ${CX} ${CY} L ${x1} ${y1} A ${R} ${R} 0 ${largeArcFlag} 1 ${x2} ${y2} Z`);
-                    path.setAttribute("fill", player.color || "#8d3df5");
-                    svg.appendChild(path);
+                    let normalizedCurrent = (currentAngle % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
+                    let normalizedNext = (nextAngle % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
+                    
+                    if (nextAngle > currentAngle && normalizedNext < normalizedCurrent) {
+                        normalizedNext += 2 * Math.PI;
+                    }
 
-                    // Центровка аватарок внутри секторов
-                    const middleAngle = startAngle + (share * Math.PI);
-                    const avatarRadius = 80; 
-                    const ax = CX + avatarRadius * Math.cos(middleAngle);
-                    const ay = CY + avatarRadius * Math.sin(middleAngle);
-                    createAvatarElement(ax, ay, player.avatar, 24 + share * 24);
+                    const crossedCorners = [];
+                    for (let cAngle of corners) {
+                        let normalizedCAngle = (cAngle % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
+                        
+                        if (normalizedCAngle < normalizedCurrent && nextAngle > currentAngle) {
+                            normalizedCAngle += 2 * Math.PI;
+                        }
 
-                    startAngle = endAngle;
+                        if (normalizedCAngle > normalizedCurrent && normalizedCAngle < normalizedNext) {
+                            crossedCorners.push(cAngle); 
+                        }
+                    }
+                    crossedCorners.sort((a, b) => a - b); 
+
+                    for (let cAngle of crossedCorners) {
+                        pathPoints.push(getSquareIntersection(cAngle));
+                    }
+                    
+                    pathPoints.push(getSquareIntersection(nextAngle));
+
+                    const poly = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
+                    poly.setAttribute("points", pathPoints.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' '));
+                    poly.setAttribute("fill", player.color);
+                    svg.appendChild(poly);
+
+                    const c = getPolygonCentroid(pathPoints);
+                    createAvatarElement(c.x, c.y, player.avatar, 24 + share * 24);
+
+                    currentAngle = nextAngle;
                 }
-            } catch (e) {
+            } catch(e) {
                 console.error("Error drawing arena segments:", e);
             }
         }
@@ -771,33 +758,44 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             const shares = calculateSharesProtection(arenaPlayers);
 
-            const CX = 160, CY = 160;
-            let angle = Math.atan2(y - CY, x - CX);
-            if (angle < 0) angle += 2 * Math.PI; 
-
-            let currentSearchAngle = -Math.PI / 2; 
-            for (let i = 0; i < arenaPlayers.length; i++) {
-                const player = arenaPlayers[i];
-                const share = shares[i];
-                const nextSearchAngle = currentSearchAngle + 2 * Math.PI * share;
-
-                let normalizedCurrent = (currentSearchAngle % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
-                let normalizedNext = (nextSearchAngle % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
-                let normalizedAngle = angle;
-
-                if (nextSearchAngle > currentSearchAngle && normalizedNext < normalizedCurrent) {
-                    normalizedNext += 2 * Math.PI;
+            if (N === 2) {
+                const W = 320, H = 320;
+                const s = Math.sqrt(2 * shares[0]);
+                const sizeX = (W * s);
+                const sizeY = (H * s);
+                if (x >= 0 && x <= sizeX && y >= 0 && y <= sizeY && (x/sizeX + y/sizeY <= 1)) {
+                    return arenaPlayers[0];
                 }
-                if (normalizedAngle < normalizedCurrent && nextSearchAngle > currentSearchAngle) { 
-                    normalizedAngle += 2 * Math.PI;
-                }
+                return arenaPlayers[1];
+            } else {
+                const CX = 160, CY = 160;
+                let angle = Math.atan2(y - CY, x - CX);
+                if (angle < 0) angle += 2 * Math.PI; 
 
-                if (normalizedAngle >= normalizedCurrent - 1e-6 && normalizedAngle <= normalizedNext + 1e-6) {
-                    return player;
+                let currentSearchAngle = (-Math.PI / 2); 
+                for (let i = 0; i < arenaPlayers.length; i++) {
+                    const player = arenaPlayers[i];
+                    const share = shares[i];
+                    const nextSearchAngle = currentSearchAngle + 2 * Math.PI * share;
+
+                    let normalizedCurrent = (currentSearchAngle % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
+                    let normalizedNext = (nextSearchAngle % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
+                    let normalizedAngle = angle;
+
+                    if (nextSearchAngle > currentSearchAngle && normalizedNext < normalizedCurrent) {
+                        normalizedNext += 2 * Math.PI;
+                    }
+                    if (normalizedAngle < normalizedCurrent && nextSearchAngle > currentSearchAngle) { 
+                        normalizedAngle += 2 * Math.PI;
+                    }
+
+                    if (normalizedAngle >= normalizedCurrent && normalizedAngle <= normalizedNext) {
+                        return player;
+                    }
+                    currentSearchAngle = nextSearchAngle;
                 }
-                currentSearchAngle = nextSearchAngle;
+                return arenaPlayers[arenaPlayers.length - 1]; 
             }
-            return arenaPlayers[arenaPlayers.length - 1]; 
         }
 
         function createAvatarElement(x, y, src, size) {
@@ -819,7 +817,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const listContainer = document.getElementById('arena-players-list');
                 if (!listContainer) return;
 
-                if (arenaPlayers.length === 0 && localOptimisticUserBet === 0) {
+                if (arenaPlayers.length === 0) {
                     listContainer.innerHTML = `<div class="empty-list-placeholder">Ставок еще нет. Станьте первым!</div>`;
                     safeSetText(elements.arenaPlayersTotal, '0');
                     return;
@@ -840,7 +838,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     row.style.borderLeft = `4px solid ${p.color || '#8d3df5'}`;
                     row.innerHTML = `
                         <div class="player-row-left">
-                            <img class="player-row-avatar" src="${p.avatar}" onerror="this.src='https://img.icons8.com/color/96/user.png';">
+                            <img class="player-row-avatar" src="${p.avatar}" onerror="this.src='https://img.icons8.com/color/96/user.png';" alt="Avatar">
                             <div class="player-info-column">
                                 <span class="player-row-name">${p.username || 'Игрок'}</span>
                                 <span class="player-row-chance">${chance}% шанс</span>
@@ -859,7 +857,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         function renderBetButtons() {
             const balance = parseFloat(currentUser.balance || 0);
-            const blockBets = isBallAnimating || (arenaStatusStr === 'finished');
+            const blockBets = isBallAnimating || (arenaStatusStr === 'countdown') || (arenaStatusStr === 'finished');
 
             for (let i = 0; i < 3; i++) {
                 const btn = document.getElementById(`bet-btn-${i + 1}`);
@@ -940,7 +938,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (isBallAnimating) return;
             isBallAnimating = true;
 
-            renderBetButtons();
+            renderBetButtons(); 
 
             const ballCanvas = document.getElementById('arena-ball-svg');
             if (!ballCanvas) return;
@@ -974,12 +972,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const step = () => {
                     if (frame >= totalFrames) {
                         isBallAnimating = false;
-                        ballCanvas.innerHTML = ''; 
                         onComplete();
                         return;
                     }
                     const t = frame / totalFrames;
-                    const easeOut = 1 - Math.pow(1 - t, 3);
+                    const easeOut = 1 - Math.pow(1 - t, 3); 
                     const currentX = (W / 2) + (targetX - (W / 2)) * easeOut;
                     const currentY = (H / 2) + (targetY - (H / 2)) * easeOut;
 
@@ -987,8 +984,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                     ballElement.setAttribute("cy", currentY.toFixed(1));
 
                     const textX = currentX;
-                    const isNearTopWall = currentY < 30;
-                    const textY = isNearTopWall ? (currentY + 24) : (currentY - 14);
+                    const isNearTopWall = currentY < 40;
+                    const textY = isNearTopWall ? (currentY + 24) : (currentY - 16);
 
                     textElement.setAttribute("x", textX.toFixed(1));
                     textElement.setAttribute("y", textY.toFixed(1));
@@ -1012,7 +1009,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             const renderFrame = () => {
                 if (frameIndex >= path.length) {
                     isBallAnimating = false;
-                    ballCanvas.innerHTML = ''; 
                     onComplete();
                     return;
                 }
@@ -1022,8 +1018,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 ballElement.setAttribute("cy", pos.y.toFixed(1));
 
                 const textX = pos.x;
-                const isNearTopWall = pos.y < 30;
-                const textY = isNearTopWall ? (pos.y + 24) : (pos.y - 14);
+                const isNearTopWall = pos.y < 40;
+                const textY = isNearTopWall ? (pos.y + 24) : (pos.y - 16);
 
                 textElement.setAttribute("x", textX.toFixed(1));
                 textElement.setAttribute("y", textY.toFixed(1));
@@ -1041,7 +1037,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             requestAnimationFrame(renderFrame);
         }
 
-        // БЕЗОПАСНЫЙ И ВЫСОКОСКОРОСТНОЙ ПОЛЛИНГ ИГРЫ ARENA
+        // БЕЗОПАСНЫЙ И ВЫСОКОСКОРОСТНОЙ ПОЛЛИНГ ИГРЫ ARENA (БЕЗ НАЛОЖЕНИЙ)
         async function pollArenaLoop() {
             if (!isPollingActive) return;
 
@@ -1060,129 +1056,113 @@ document.addEventListener('DOMContentLoaded', async () => {
                     const state = await res.json();
                     arenaStatusStr = state.status || state.state || "waiting";
 
-                    let roundNum = state.round_number || state.roundNumber || state.game_id || state.gameId || state.round;
-                    if (!roundNum || roundNum === 0 || roundNum === '0') {
-                        roundNum = 1;
-                    }
-                    
-                    // СБРОС ЛОКАЛЬНЫХ СТАВОК: Срабатывает исключительно при реальной смене раундов
-                    if (lastKnownRound !== null && parseInt(roundNum) !== lastKnownRound) {
-                        localOptimisticUserBet = 0;
-                        serverLastUserBet = 0;
-                    }
-                    lastKnownRound = parseInt(roundNum);
-
-                    safeSetText(elements.arenaRoundNumber, roundNum);
-
                     const rawBets = state.bets || state.players || state.activeBets || [];
-                    
-                    const userRawBet = rawBets.find(b => String(b.userId || b.user_id || b.id) === String(userId));
-                    const serverUserBetVal = userRawBet ? parseFloat(userRawBet.amount || userRawBet.bet || 0) : 0;
+                    arenaPlayers = rawBets.map(bet => ({
+                        userId: bet.userId || bet.user_id || bet.id || "",
+                        username: bet.username || bet.user_name || bet.name || "Игрок",
+                        avatar: bet.avatar || bet.avatar_url || "https://img.icons8.com/color/96/user.png",
+                        bet: parseFloat(bet.amount || bet.bet || 0),
+                        color: bet.color || "#8d3df5"
+                    }));
 
-                    // Учитываем разницу в ставках только когда нет активных запросов от пользователя
-                    if (!isBetRequestPending) {
-                        if (serverUserBetVal > serverLastUserBet) {
-                            const diff = serverUserBetVal - serverLastUserBet;
-                            localOptimisticUserBet = Math.max(0, localOptimisticUserBet - diff);
-                        }
-                        serverLastUserBet = serverUserBetVal;
-                    }
-
-                    arenaPlayers = rawBets.map(bet => {
-                        const isMe = String(bet.userId || bet.user_id || bet.id) === String(userId);
-                        let betVal = parseFloat(bet.amount || bet.bet || 0);
-                        if (isMe) {
-                            betVal += localOptimisticUserBet;
-                        }
-                        return {
-                            id: bet.userId || bet.user_id || bet.id || "",
-                            username: bet.username || bet.user_name || bet.name || "Игрок",
-                            avatar: bet.avatar || bet.avatar_url || "https://img.icons8.com/color/96/user.png",
-                            bet: betVal,
-                            color: bet.color || "#8d3df5"
-                        };
-                    });
-
-                    const userInList = arenaPlayers.some(p => String(p.id) === String(userId));
-                    if (!userInList && localOptimisticUserBet > 0) {
-                        arenaPlayers.push({
-                            id: userId,
-                            username: currentUser.username || tg.initDataUnsafe?.user?.username || "Вы",
-                            avatar: currentUser.avatar_url || "https://img.icons8.com/color/96/user.png",
-                            bet: localOptimisticUserBet,
-                            color: currentUser.color || "#8d3df5"
-                        });
-                    }
+                    drawArenaSegments();
+                    updatePlayersListUI();
 
                     const statusText = document.getElementById('arena-status-text');
-
-                    if (arenaStatusStr === 'waiting' && localOptimisticUserBet === 0) {
-                        resetArenaGame(); 
-                    } else if (arenaStatusStr === 'waiting' && localOptimisticUserBet > 0) {
-                        if (statusText) {
-                            statusText.classList.remove('hidden');
-                            statusText.innerText = "Ждем соперников...";
-                        }
-                        drawArenaSegments();
-                        updatePlayersListUI();
-                    } else { 
-                        if (statusText) statusText.classList.add('hidden'); 
-                        drawArenaSegments();
-                        updatePlayersListUI();
-                    }
+                    const countdownTimer = document.getElementById('arena-countdown-timer');
 
                     const stateTimeLeft = state.timeLeft !== undefined ? state.timeLeft : (state.time_left !== undefined ? state.time_left : (state.timer !== undefined ? state.timer : ""));
+                    const serverTime = state.serverTime || Date.now(); 
+                    const resolvedAt = state.resolvedAt || 0; 
 
-                    if (arenaStatusStr === 'countdown' && stateTimeLeft) {
+                    const correctRoundNumber = state.roundNumber || 0;
+                    safeSetText(elements.arenaRoundNumber, correctRoundNumber);
+
+                    if (arenaStatusStr === 'countdown') {
                         if (statusText) statusText.classList.add('hidden');
-                        startSmoothCountdown(parseFloat(stateTimeLeft));
+                        
+                        localCountdownValue = parseInt(stateTimeLeft, 10);
+                        if (!isNaN(localCountdownValue)) {
+                            if (countdownTimer) {
+                                countdownTimer.classList.remove('hidden');
+                                countdownTimer.innerText = localCountdownValue;
+                            }
+                            
+                            clearInterval(countdownIntervalId);
+                            countdownIntervalId = setInterval(() => {
+                                localCountdownValue--;
+                                if (localCountdownValue <= 0) {
+                                    clearInterval(countdownIntervalId);
+                                    if (countdownTimer) countdownTimer.classList.add('hidden');
+                                } else {
+                                    if (countdownTimer) {
+                                        countdownTimer.classList.remove('hidden');
+                                        countdownTimer.innerText = localCountdownValue;
+                                    }
+                                }
+                            }, 1000);
+                        }
                     } else if (arenaStatusStr === 'finished') {
-                        stopSmoothCountdown();
+                        clearInterval(countdownIntervalId);
+                        if (countdownTimer) countdownTimer.classList.add('hidden');
+
                         const winId = state.winnerId || state.winner_id || "";
                         const winX = state.winnerX || state.winner_x || 0;
                         const winY = state.winnerY || state.winner_y || 0;
                         const winName = state.winnerName || state.winner_name || "Победитель";
                         const tPool = state.totalPool || state.total_pool || state.pool || 0;
 
-                        const signature = winId + "_" + tPool + "_" + winX + "_" + winY;
-                        const age = (state.serverTime && state.resolvedAt) ? (state.serverTime - state.resolvedAt) : 99999;
+                        const signature = winId + "_" + tPool + "_" + winX + "_" + winY + "_" + correctRoundNumber;
+                        const age = serverTime - resolvedAt; 
 
-                        if (age > 9500) { 
-                            currentRoundSignature = signature; 
-                            if (statusText && !isBallAnimating) {
-                                statusText.classList.remove('hidden');
-                                statusText.innerText = "Ждем ставки...";
-                            }
-                            const ballCanvas = document.getElementById('arena-ball-svg');
-                            if (ballCanvas) ballCanvas.innerHTML = ''; 
-                        } else if (currentRoundSignature !== signature && winX !== undefined && winY !== undefined) {
+                        if (currentRoundSignature !== signature && winX !== undefined && winY !== undefined && age < 9500) {
                             currentRoundSignature = signature;
                             
                             if (statusText) statusText.classList.add('hidden');
 
                             animateBouncingBall(winX, winY, signature, () => {
-                                document.getElementById('arena-ball-svg').innerHTML = ''; 
                                 const isWeWinner = (String(winId) === String(userId));
                                 if (isWeWinner) {
-                                    const poolVal = parseFloat(tPool);
-                                    showBalanceNotification(poolVal); 
                                     showCustomModal({
                                         icon: '🏆',
                                         title: 'Победа!',
-                                        message: `🎉 Поздравляем! Белый шарик остановился на вашем секторе! Вы получили весь банк: +${poolVal.toFixed(3)} GRAM!`,
+                                        message: `🎉 Поздравляем! Белый шарик остановился на вашем секторе! Вы получили весь банк: +${parseFloat(tPool).toFixed(3)} GRAM!`,
                                         buttons: [{ text: 'Забрать!', primary: true }]
                                     });
+                                    showNotification(`Зачислено: +${parseFloat(tPool).toFixed(3)} GRAM!`, "💎");
                                 } else {
                                     showNotification(`Игрок ${winName} выиграл ${parseFloat(tPool).toFixed(3)} GRAM!`, "🏆");
                                 }
+                                
+                                const ballCanvas = document.getElementById('arena-ball-svg');
+                                if (ballCanvas) ballCanvas.innerHTML = '';
+                                
                                 fetchUserData();
                             });
+                        } else if (age >= 9500) {
+                             clearInterval(countdownIntervalId);
+                             if (statusText && !isBallAnimating) {
+                                statusText.classList.remove('hidden');
+                                statusText.innerText = "Ждем ставки...";
+                            }
+                            if (countdownTimer) countdownTimer.classList.add('hidden');
+                            
+                            const ballCanvas = document.getElementById('arena-ball-svg');
+                            if (ballCanvas) ballCanvas.innerHTML = '';
                         }
                     } else {
-                        stopSmoothCountdown();
-                        if (statusText && !isBallAnimating && localOptimisticUserBet === 0) { 
+                        clearInterval(countdownIntervalId);
+                        if (statusText && !isBallAnimating) {
                             statusText.classList.remove('hidden');
                             statusText.innerText = (arenaStatusStr === 'active' || arenaStatusStr === 'running') ? "Игра идет..." : "Ждем ставки...";
+                        }
+                        if (countdownTimer) {
+                            countdownTimer.classList.add('hidden');
+                        }
+                        
+                        if (!isBallAnimating) {
+                            const ballCanvas = document.getElementById('arena-ball-svg');
+                            if (ballCanvas) ballCanvas.innerHTML = '';
                         }
                     }
 
@@ -1205,11 +1185,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         function stopArenaPolling() {
             isPollingActive = false;
-            stopSmoothCountdown();
+            clearInterval(countdownIntervalId);
         }
 
         function resetArenaGame() {
+            stopArenaPolling();
             const statusText = document.getElementById('arena-status-text');
+            const countdownTimer = document.getElementById('arena-countdown-timer');
             const svg = document.getElementById('arena-svg-canvas');
             const avatarsContainer = document.getElementById('arena-avatars-container');
             const ballSvg = document.getElementById('arena-ball-svg');
@@ -1218,14 +1200,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                 statusText.classList.remove('hidden');
                 statusText.innerText = "Ждем ставки...";
             }
-            stopSmoothCountdown();
+            if (countdownTimer) countdownTimer.classList.add('hidden');
             if (svg) svg.innerHTML = '';
             if (avatarsContainer) avatarsContainer.innerHTML = '';
-            if (ballSvg) ballSvg.innerHTML = '';
+            if (ballSvg) ballSvg.innerHTML = ''; 
 
-            let curRound = elements.arenaRoundNumber.innerText;
-            if (curRound === '0' || !curRound) safeSetText(elements.arenaRoundNumber, '1'); 
-            
+            safeSetText(elements.arenaRoundNumber, '0');
             safeSetText(elements.arenaPlayersTotal, '0');
             arenaPlayers = []; 
             updatePlayersListUI(); 
@@ -1233,50 +1213,43 @@ document.addEventListener('DOMContentLoaded', async () => {
             renderBetButtons();
         }
 
-        // ВЫСОКОСКОРОСТНОЙ И БЕЗОПАСНЫЙ ОТКЛИК НА СТАВКУ
         const handleBetClick = async (e) => {
-            e.preventDefault(); // Предотвращение двойных кликов (ghost clicks) на мобильных устройствах
             const btn = e.currentTarget;
-            if (btn.classList.contains('disabled') || isBetRequestPending) return;
+            if (btn.classList.contains('disabled')) return;
 
             const betValue = parseFloat(btn.getAttribute('data-bet'));
             if (isNaN(betValue) || betValue < 0.1) return; 
 
             btn.classList.add('disabled');
             btn.disabled = true;
-            isBetRequestPending = true;
 
-            const balanceVal = parseFloat(currentUser.balance || 0);
-            currentUser.balance = Math.max(0, balanceVal - betValue);
+            const myIdStr = String(userId);
+            let myBetIndex = arenaPlayers.findIndex(p => String(p.userId) === myIdStr);
             
-            // Локальное обновление баланса с вылетом индикатора изменений
-            animateBalanceDisplay(currentUser.balance);
-            showBalanceNotification(-betValue); // Строгое списание ставки
-
-            localOptimisticUserBet += betValue;
-
-            const userInList = arenaPlayers.some(p => String(p.id) === String(userId));
-            if (!userInList) {
-                arenaPlayers.push({
-                    id: userId,
-                    username: currentUser.username || tg.initDataUnsafe?.user?.username || "Вы",
-                    avatar: currentUser.avatar_url || "https://img.icons8.com/color/96/user.png",
-                    bet: localOptimisticUserBet,
-                    color: currentUser.color || "#8d3df5"
-                });
+            const myAvatar = currentUser.avatar_url || "https://img.icons8.com/color/96/user.png";
+            const myName = currentUser.username || currentUser.first_name || "Я";
+            
+            if (myBetIndex !== -1) {
+                arenaPlayers[myBetIndex].bet += betValue;
             } else {
-                const me = arenaPlayers.find(p => String(p.id) === String(userId));
-                me.bet = serverLastUserBet + localOptimisticUserBet;
+                const usedColors = arenaPlayers.map(p => p.color);
+                const defaultColors = ['#8d3df5', '#00e676', '#0088cc', '#ff9500', '#ff3b30', '#c25dff'];
+                let chosenColor = defaultColors.find(c => !usedColors.includes(c)) || defaultColors[0];
+                
+                arenaPlayers.push({
+                    userId: userId,
+                    username: myName,
+                    avatar: myAvatar,
+                    bet: betValue,
+                    color: chosenColor
+                });
             }
-
-            const statusText = document.getElementById('arena-status-text');
-            if (statusText) {
-                statusText.classList.remove('hidden');
-                statusText.innerText = "Ждем соперников...";
-            }
-
+            
             drawArenaSegments();
             updatePlayersListUI();
+            
+            const currentBal = parseFloat(currentUser.balance || 0);
+            updateBalanceUI(Math.max(0, currentBal - betValue));
 
             try {
                 const res = await fetchWithTimeout(`${API_BASE_URL}/api/place_bet`, {
@@ -1291,33 +1264,16 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const data = await res.json();
                 
                 if (res.ok && data.success) {
+                    showNotification(`Ставка добавлена: -${betValue} GRAM`, "🎮");
                     currentUser.balance = data.newBalance;
-                    animateBalanceDisplay(currentUser.balance); 
+                    updateBalanceUI();
                 } else {
-                    // Возврат баланса при ошибке сервера
-                    currentUser.balance = parseFloat(currentUser.balance || 0) + betValue;
-                    animateBalanceDisplay(currentUser.balance);
-                    showBalanceNotification(betValue); 
-                    localOptimisticUserBet = Math.max(0, localOptimisticUserBet - betValue); 
-                    drawArenaSegments(); 
-                    updatePlayersListUI();
                     showNotification(data.error || "Ошибка ставки", "⚠️");
+                    fetchUserData();
                 }
             } catch (err) {
-                // Возврат баланса при потере сети
-                currentUser.balance = parseFloat(currentUser.balance || 0) + betValue;
-                animateBalanceDisplay(currentUser.balance);
-                showBalanceNotification(betValue); 
-                localOptimisticUserBet = Math.max(0, localOptimisticUserBet - betValue);
-                drawArenaSegments();
-                updatePlayersListUI();
-                showNotification("Ошибка сети при совершении ставки.", "⚠️");
-            } finally {
-                // Разблокируем поллинг баланса через секунду после обработки транзакции
-                setTimeout(() => {
-                    isBetRequestPending = false;
-                    fetchUserData(); 
-                }, 1000);
+                showNotification("Ошибка сети", "⚠️");
+                fetchUserData();
             }
         };
 
@@ -1397,7 +1353,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 } catch(e) {}
 
                 closeEditBetsModal();
-                showNotification("Кнопки ставок настроены!", "✏️");
+                showNotification("Кнопки ставок успешно настроены!", "✏️");
                 renderBetButtons();
             });
         }
@@ -1638,9 +1594,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         async function fetchUserData() {
-            // Если выполняется транзакция ставки, пропускаем фоновый опрос для стабильности интерфейса
-            if (isBetRequestPending) return;
-
             try {
                 const res = await fetchWithTimeout(`${API_BASE_URL}/api/user`, { 
                     headers: { 'X-Telegram-Init-Data': tg.initData || "" },
@@ -1648,7 +1601,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 });
                 if (!res.ok) throw new Error();
                 currentUser = await res.json();
-                
                 saveUserDataToCache(currentUser);
             } catch (e) {
                 console.warn("Локальная работа: загружен кэш");
@@ -1656,8 +1608,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             if (!currentUser) currentUser = {};
 
-            const balanceVal = parseFloat(currentUser.balance || 0);
-            animateBalanceDisplay(balanceVal); 
+            updateBalanceUI();
             
             const mainAvatar = document.getElementById('user-avatar');
             if (mainAvatar) {
@@ -1674,6 +1625,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             safeSetText(document.getElementById('user-username'), formatUsername(rawName));
             updateDailyCaseTimer();
             renderBetButtons(); 
+        }
+
+        function updateBalanceUI(forcedValue = null) {
+            const balanceVal = (currentUser && currentUser.balance) ? currentUser.balance : 0;
+            const val = forcedValue !== null ? parseFloat(forcedValue) : parseFloat(balanceVal);
+            const balVal = isNaN(val) ? "0.000" : val.toFixed(3);
+            safeSetText(elements.balanceDisplayPill, balVal);
+            safeSetText(elements.largeBalanceDisplay, balVal);
         }
 
         let dailyCaseTimerInterval;
@@ -1794,7 +1753,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                     });
 
                     card.querySelector('.sell-btn').addEventListener('click', () => {
-                        const sellPrice = parseFloat(item.value) || 0;
                         showCustomModal({
                             icon: '💰',
                             title: 'Продажа подарка',
@@ -1814,8 +1772,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                                             if (sellRes.ok) {
                                                 const sellData = await sellRes.json();
                                                 currentUser.balance = sellData.newBalance;
-                                                animateBalanceDisplay(currentUser.balance);
-                                                showBalanceNotification(sellPrice); // Точный вылет начисления при продаже
                                                 showNotification(`Подарок успешно продан!`, '💰');
                                                 fetchUserData();
                                                 fetchInventory();
@@ -1877,16 +1833,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         function processWinning(winningGift, apiNewBalance = null) {
             const isBalance = winningGift.type === "balance" || winningGift.name.toLowerCase().includes("пополнение");
-            const winVal = parseFloat(winningGift.rawPrice || 0);
-
             if (apiNewBalance !== null) {
                 currentUser.balance = apiNewBalance;
-                animateBalanceDisplay(currentUser.balance);
+                updateBalanceUI();
             }
             if (isNewbieCaseMode && elements.spinBtn) elements.spinBtn.disabled = false;
 
             if (isBalance) {
-                showBalanceNotification(winVal); // Точный вылет выигрыша на счет
                 showCustomModal({
                     icon: '💰',
                     title: 'Баланс пополнен!',
@@ -1915,8 +1868,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                                     if (sellRes.ok) {
                                         const sellData = await sellRes.json();
                                         currentUser.balance = sellData.newBalance;
-                                        animateBalanceDisplay(currentUser.balance);
-                                        showBalanceNotification(winVal); // Точный вылет продажи предмета
                                         showNotification("Продано!", "💰");
                                         fetchUserData();
                                     }
@@ -1946,9 +1897,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
                 elements.spinBtn.disabled = true;
                 if (isNewbieCaseMode) {
-                    const localBalance = Math.max(0, parseFloat(currentUser.balance || 0) - spinCost);
-                    animateBalanceDisplay(localBalance);
-                    showBalanceNotification(-spinCost); // Точное списание за кейс
+                    updateBalanceUI(Math.max(0, parseFloat(currentUser.balance || 0) - spinCost));
                 }
                 initRouletteTrack();
 
