@@ -57,7 +57,7 @@ function createPRNG(seedString) {
     }
 }
 
-// УНИВЕРСАЛЬНЫЙ КЛИЕНТСКИЙ FETCH С УВЕЛИЧЕННЫМ ТАЙМАУТОМ (10 секунд для стабильности на 3G/LTE)
+// УНИВЕРСАЛЬНЫЙ КЛИЕНТСКИЙ FETCH С УВЕЛИЧЕННЫМ ТАЙМАУТОМ
 async function fetchWithTimeout(resource, options = {}) {
     const { timeout = 10000 } = options; 
     const controller = new AbortController();
@@ -89,7 +89,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         let currentRoundSignature = null;
         let arenaStatusStr = "waiting";
 
-        // Системные переменные для оптимистического обновления арены (Исключают мерцания поля)
+        // Системные переменные для бесконфликтного Optimistic UI
         let serverLastUserBet = 0;
         let localOptimisticUserBet = 0;
 
@@ -97,12 +97,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         let currentBalanceDisplayVal = 0;
         let balanceAnimationInterval = null;
 
+        // Переменные для агрегации плавающих изменений баланса в один капсульный контейнер
+        let balanceChangeBuffer = 0;
+        let balanceChangeTimeout = null;
+
         // Глобальные переменные для предзагруженных платежных реквизитов
         let preloadedAdminAddress = null;
         let preloadedPayloadBase64 = null;
         let isPreloadingPayment = false;
 
-        // Переменные локального плавного таймера (исключают прыжки с 9 на 7 и т.д.)
+        // Переменные локального плавного таймера
         let localTimerVal = 0;
         let localTimerInterval = null;
 
@@ -271,45 +275,49 @@ document.addEventListener('DOMContentLoaded', async () => {
         // ----------------------------------------------------------------------------------
         // GTA STYLE АНИМАЦИЯ БАЛАНСА И ОРГАНИЧЕСКИЕ FLOATING ИНДИКАТОРЫ
         // ----------------------------------------------------------------------------------
-        function spawnFloatingIndicator(diff) {
-            const pill = document.getElementById('balance-pill');
-            if (!pill || Math.abs(diff) < 0.001) return;
-
-            const indicator = document.createElement('span');
-            indicator.className = 'balance-change-indicator';
+        function triggerBalanceNotification(diff) {
+            if (Math.abs(diff) < 0.0001) return;
             
-            if (diff > 0) {
-                indicator.innerText = `+${diff.toFixed(3)}`;
-                indicator.classList.add('positive');
-            } else {
-                indicator.innerText = `${diff.toFixed(3)}`;
-                indicator.classList.add('negative');
-            }
+            balanceChangeBuffer += diff;
 
+            if (balanceChangeTimeout) clearTimeout(balanceChangeTimeout);
+
+            balanceChangeTimeout = setTimeout(() => {
+                spawnAccurateIndicator(balanceChangeBuffer);
+                balanceChangeBuffer = 0; 
+            }, 400); 
+        }
+
+        function spawnAccurateIndicator(totalDiff) {
+            const pill = document.getElementById('balance-pill');
+            if (!pill) return;
+
+            const indicator = document.createElement('div');
+            indicator.className = `balance-change-indicator ${totalDiff > 0 ? 'positive' : 'negative'}`;
+            indicator.innerText = (totalDiff > 0 ? '+' : '') + totalDiff.toFixed(3);
+            
             pill.appendChild(indicator);
-
             setTimeout(() => {
                 indicator.remove();
-            }, 1200);
+            }, 1500);
         }
 
         function animateBalanceDisplay(targetVal) {
             if (isNaN(targetVal)) targetVal = 0;
             
-            const diff = targetVal - currentBalanceDisplayVal;
+            const startVal = currentBalanceDisplayVal;
+            const diff = targetVal - startVal;
+            
             if (Math.abs(diff) < 0.0001) {
                 currentBalanceDisplayVal = targetVal;
                 updateBalanceDOM(targetVal);
                 return;
             }
 
-            // Вызываем аккуратный летающий индикатор изменения
-            spawnFloatingIndicator(diff);
+            triggerBalanceNotification(diff);
 
-            // GTA Style анимация наката/сброса цифр
-            const duration = 1000; // 1 секунда анимации
+            const duration = 800; 
             const startTime = performance.now();
-            const startVal = currentBalanceDisplayVal;
 
             if (balanceAnimationInterval) {
                 cancelAnimationFrame(balanceAnimationInterval);
@@ -317,7 +325,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             const step = (timestamp) => {
                 const progress = Math.min((timestamp - startTime) / duration, 1);
-                const ease = 1 - Math.pow(1 - progress, 3); // cubic ease-out
+                const ease = 1 - Math.pow(1 - progress, 4); 
                 const current = startVal + diff * ease;
                 currentBalanceDisplayVal = current;
                 updateBalanceDOM(current);
@@ -754,7 +762,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             ].map(a => (a < 0 ? a + 2 * Math.PI : a)); 
         }
 
-        // КРАСИВОЕ ДВУМЕРНОЕ SVG РАЗДЕЛЕНИЕ НА СЕКТОРЫ (ДЛЯ 2 И БОЛЕЕ ИГРОКОВ)
         function drawArenaSegments() {
             try {
                 const svg = document.getElementById('arena-svg-canvas');
@@ -767,7 +774,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 avatarsContainer.innerHTML = '';
 
                 const N = arenaPlayers.length;
-                if (N === 0) return;
+                if (N === 0 || arenaStatusStr === 'waiting') return;
 
                 const W = 320; 
                 const H = 320;
@@ -788,7 +795,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                     return; 
                 }
 
-                // Единая, геометрически надежная и плавная радиальная сегментация
                 let currentAngle = -Math.PI / 2; 
                 const corners = getCornerAnglesRad(); 
 
@@ -1054,7 +1060,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const step = () => {
                     if (frame >= totalFrames) {
                         isBallAnimating = false;
-                        // Шарик полностью пропадает после игры
                         ballCanvas.innerHTML = ''; 
                         onComplete();
                         return;
@@ -1067,7 +1072,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                     ballElement.setAttribute("cx", currentX.toFixed(1));
                     ballElement.setAttribute("cy", currentY.toFixed(1));
 
-                    // ИМЯ СЛЕДУЕТ ЗА ШАРИКОМ ВПЛОТЬ ДО ГРАНИЦЫ И СПУСКАЕТСЯ ТОЛЬКО ПРИ y < 30
                     const textX = currentX;
                     const isNearTopWall = currentY < 30;
                     const textY = isNearTopWall ? (currentY + 24) : (currentY - 14);
@@ -1094,7 +1098,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             const renderFrame = () => {
                 if (frameIndex >= path.length) {
                     isBallAnimating = false;
-                    // Шарик полностью пропадает после игры
                     ballCanvas.innerHTML = ''; 
                     onComplete();
                     return;
@@ -1104,7 +1107,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 ballElement.setAttribute("cx", pos.x.toFixed(1));
                 ballElement.setAttribute("cy", pos.y.toFixed(1));
 
-                // ИМЯ СЛЕДУЕТ ЗА ШАРИКОМ ВПЛОТЬ ДО ГРАНИЦЫ И СПУСКАЕТСЯ ТОЛЬКО ПРИ y < 30
                 const textX = pos.x;
                 const isNearTopWall = pos.y < 30;
                 const textY = isNearTopWall ? (pos.y + 24) : (pos.y - 14);
@@ -1183,18 +1185,22 @@ document.addEventListener('DOMContentLoaded', async () => {
                         });
                     }
 
-                    drawArenaSegments();
-                    updatePlayersListUI();
+                    // Поддержка корректного отображения раундов с сервера
+                    let roundNum = state.round_number || state.roundNumber || state.game_id || state.gameId || state.round;
+                    if (!roundNum || roundNum === 0 || roundNum === '0') {
+                        roundNum = 1;
+                    }
+                    safeSetText(elements.arenaRoundNumber, roundNum);
+
+                    if (arenaStatusStr === 'waiting') {
+                        resetArenaGame(); 
+                    } else {
+                        drawArenaSegments();
+                        updatePlayersListUI();
+                    }
 
                     const statusText = document.getElementById('arena-status-text');
                     const stateTimeLeft = state.timeLeft !== undefined ? state.timeLeft : (state.time_left !== undefined ? state.time_left : (state.timer !== undefined ? state.timer : ""));
-
-                    // Инициализация и поддержание правильного номера игры (не меньше 1)
-                    let rNum = state.roundNumber || state.gameId || state.game_id || state.round_number || state.round;
-                    if (!rNum || rNum === 0 || rNum === '0') {
-                        rNum = 1;
-                    }
-                    safeSetText(elements.arenaRoundNumber, rNum);
 
                     if (arenaStatusStr === 'countdown' && stateTimeLeft) {
                         if (statusText) statusText.classList.add('hidden');
@@ -1224,6 +1230,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                             if (statusText) statusText.classList.add('hidden');
 
                             animateBouncingBall(winX, winY, signature, () => {
+                                document.getElementById('arena-ball-svg').innerHTML = ''; 
                                 const isWeWinner = (String(winId) === String(userId));
                                 if (isWeWinner) {
                                     showCustomModal({
@@ -1269,7 +1276,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         function resetArenaGame() {
-            stopArenaPolling();
             const statusText = document.getElementById('arena-status-text');
             const svg = document.getElementById('arena-svg-canvas');
             const avatarsContainer = document.getElementById('arena-avatars-container');
@@ -1284,7 +1290,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (avatarsContainer) avatarsContainer.innerHTML = '';
             if (ballSvg) ballSvg.innerHTML = '';
 
-            safeSetText(elements.arenaRoundNumber, '1');
+            let curRound = elements.arenaRoundNumber.innerText;
+            if (curRound === '0') safeSetText(elements.arenaRoundNumber, '1');
+            
             safeSetText(elements.arenaPlayersTotal, '0');
             arenaPlayers = []; 
             updatePlayersListUI(); 
@@ -1303,12 +1311,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             btn.classList.add('disabled');
             btn.disabled = true;
 
-            // Снятие средств с баланса (сразу локально запускает бегущую анимацию и красный индикатор у баланса)
             const balanceVal = parseFloat(currentUser.balance || 0);
             currentUser.balance = Math.max(0, balanceVal - betValue);
             animateBalanceDisplay(currentUser.balance);
 
-            // МГНОВЕННОЕ локальное добавление ставки игрока (Flicker-Free Optimistic UI)
             localOptimisticUserBet += betValue;
 
             const userInList = arenaPlayers.some(p => String(p.id) === String(userId));
@@ -1325,7 +1331,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 me.bet = serverLastUserBet + localOptimisticUserBet;
             }
 
-            // Мгновенная плавная перерисовка сегментов и участников (БЕЗ ЖИМА И ЗАДЕРЖЕК)
             drawArenaSegments();
             updatePlayersListUI();
 
@@ -1342,7 +1347,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const data = await res.json();
                 
                 if (res.ok && data.success) {
-                    // Уведомление внизу экрана УБРАНО в соответствии с ТЗ.
                     currentUser.balance = data.newBalance;
                     animateBalanceDisplay(currentUser.balance);
                 } else {
