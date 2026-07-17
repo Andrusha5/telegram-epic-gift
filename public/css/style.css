@@ -405,32 +405,26 @@ body {
 }
 
 /* ==========================================================================
-   ФУТЕР ИНФОРМАЦИИ ОБ ИГРЕ ARENA
+   ФУТЕР ИНФОРМАЦИИ ОБ ИГРЕ ARENA (ПОД ПОЛЕМ ТЕПЕРЬ ТОЛЬКО НОМЕР ИГРЫ)
    ========================================================================== */
 .arena-game-footer {
     display: flex;
-    justify-content: space-between;
+    justify-content: center;
     align-items: center;
     width: 100%;
-    max-width: 320px; /* Align with arena-big-box */
-    margin-top: 20px;
-    padding: 0 10px; /* Some padding for visual balance */
+    max-width: 320px;
+    margin-top: 14px;
     box-sizing: border-box;
 }
 
-.arena-players-count, .arena-game-round {
-    font-size: 14px;
+.arena-game-round {
+    font-size: 15px;
     font-weight: 800;
     color: var(--light-text-color);
     letter-spacing: 0.5px;
 }
 
 .arena-game-round #arena-round-number {
-    color: #ffffff;
-    font-weight: 900;
-}
-
-.arena-players-count #arena-players-total {
     color: #ffffff;
     font-weight: 900;
 }
@@ -443,7 +437,7 @@ body {
     align-items: center;
     justify-content: center;
     gap: 12px;
-    margin-top: 24px;
+    margin-top: 18px;
     width: 100%;
     box-sizing: border-box;
 }
@@ -555,7 +549,7 @@ body {
 }
 
 /* ==========================================================================
-   СПИСОК УЧАСТНИКОВ BEST ARENA
+   СПИСОК УЧАСТНИКОВ BEST ARENA С ОБНОВЛЕННЫМ ДИЗАЙНОМ ИГРОКОВ
    ========================================================================== */
 .arena-players-list-box {
     width: 100%;
@@ -576,6 +570,22 @@ body {
     text-transform: uppercase;
     letter-spacing: 1px;
     text-align: left;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.players-header-count {
+    font-size: 12px;
+    font-weight: 800;
+    color: var(--light-text-color);
+    text-transform: none;
+    letter-spacing: 0px;
+}
+
+.players-header-count #arena-players-total {
+    color: var(--green-success);
+    font-weight: 900;
 }
 
 .players-list-container {
