@@ -153,9 +153,9 @@
                 <svg id="arena-ball-svg" class="arena-ball-canvas" viewBox="0 0 320 320" width="320" height="320"></svg>
             </div>
 
-            <!-- ИНФОРМАЦИЯ О НОМЕРЕ ТЕКУЩЕЙ ИГРЫ -->
+            <!-- ИНФОРМАЦИЯ ОБ ИГРЕ -->
             <div class="arena-game-footer">
-                <span class="arena-game-round">Игра #<span id="arena-round-number">1</span></span>
+                <span class="arena-game-round">Игра #<span id="arena-round-number">0</span></span>
             </div>
 
             <!-- ПАНЕЛЬ БЫСТРЫХ СТАВОК -->
@@ -179,12 +179,12 @@
                 </button>
             </div>
 
-            <!-- ИНТЕРАКТИВНЫЙ СПИСОК УЧАСТНИКОВ (СЮДА ПЕРЕНЕСЕН СЧЕТЧИК ИГРОКОВ) -->
+            <!-- ИНТЕРАКТИВНЫЙ СПИСОК УЧАСТНИКОВ -->
             <div class="arena-players-list-box">
-                <h3 class="players-list-title">
-                    👥 Список участников 
-                    <span class="players-header-count">Игроки · <span id="arena-players-total">0</span></span>
-                </h3>
+                <div class="players-list-title-row">
+                    <h3 class="players-list-title">👥 Список участников</h3>
+                    <div class="arena-players-count-badge">Игроки: <span id="arena-players-total">0</span></div>
+                </div>
                 <div id="arena-players-list" class="players-list-container">
                     <div class="empty-list-placeholder">Ставок еще нет. Станьте первым!</div>
                 </div>
@@ -352,4 +352,4 @@
     <script src="https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>
     <script src="js/app.js?v=2.7.2" defer></script>
 </body>
-    </html>
+            </html>
