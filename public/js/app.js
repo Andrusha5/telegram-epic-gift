@@ -91,8 +91,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         // Синхронизация раундов и защита оптимистичных ставок
         let lastKnownRound = 1;
-        let serverLastUserBet = 0; // Последняя подтвержденная сервером ставка пользователя
-        let localOptimisticUserBet = 0; // Наша ставка, еще не подтвержденная сервером
+        let serverLastUserBet = 0; 
+        let localOptimisticUserBet = 0; 
 
         // Системные переменные для анимации баланса "бегущие цифры" (GTA style)
         let currentBalanceDisplayVal = 0;
@@ -211,9 +211,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             if (isPreloadingPayment) {
                 let waitedTime = 0;
-                while (isPreloadingPayment && waitedTime < 15000) { 
-                    await new Promise(r => setTimeout(r, 500));
-                    waitedTime += 500;
+                while (isPreloadingPayment && waitedTime < 6000) { 
+                    await new Promise(r => setTimeout(r, 200));
+                    waitedTime += 200;
                 }
                 if (preloadedAdminAddress && preloadedPayloadBase64) return true;
             }
@@ -221,16 +221,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             isPreloadingPayment = true;
             let success = false;
             try {
-                let attempts = 0;
-                const MAX_ATTEMPTS = 2; 
-                while (attempts < MAX_ATTEMPTS) {
-                    success = await fetchPaymentParamsInternal(); 
-                    if (success) {
-                        break;
-                    }
-                    attempts++;
-                    await new Promise(resolve => setTimeout(resolve, 2000)); 
-                }
+                success = await fetchPaymentParamsInternal();
+            } catch (e) {
+                console.error(e);
             } finally {
                 isPreloadingPayment = false;
             }
@@ -279,7 +272,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         // ----------------------------------------------------------------------------------
         // GTA STYLE АНИМАЦИЯ БАЛАНСА И ОРГАНИЧЕСКИЕ FLOATING ИНДИКАТОРЫ
         // ----------------------------------------------------------------------------------
-        function triggerBalanceNotification(diff) {
+        function showBalanceNotification(diff) {
             if (Math.abs(diff) < 0.0001) return;
             
             balanceChangeBuffer += diff;
@@ -306,7 +299,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             }, 1500);
         }
 
-        function animateBalanceDisplay(targetVal, triggerNotification = false) {
+        function animateBalanceDisplay(targetVal) {
             if (isNaN(targetVal)) targetVal = 0;
             
             const startVal = currentBalanceDisplayVal;
@@ -316,10 +309,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 currentBalanceDisplayVal = targetVal;
                 updateBalanceDOM(targetVal);
                 return;
-            }
-
-            if (triggerNotification) {
-                triggerBalanceNotification(diff);
             }
 
             const duration = 800; 
@@ -488,7 +477,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                                 elements.connectWalletBtn.style.background = 'linear-gradient(135deg, #00e676, #00b34a)';
                                 elements.connectWalletBtn.style.color = '#000000';
                             }
-                            if (elements.depositBalanceBtn) elements.depositBalanceBtn.removeAttribute('disabled');
+                            if (elements.depositBalanceBtn) {
+                                elements.depositBalanceBtn.disabled = false;
+                                elements.depositBalanceBtn.removeAttribute('disabled');
+                                elements.depositBalanceBtn.style.opacity = "1";
+                                elements.depositBalanceBtn.style.pointerEvents = "auto";
+                            }
                             if (elements.depositNoticeText) {
                                 elements.depositNoticeText.innerText = "Кошелек успешно подключен к системе!";
                                 elements.depositNoticeText.style.color = '#00e676';
@@ -499,7 +493,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                                 elements.connectWalletBtn.style.background = 'linear-gradient(135deg, var(--accent-purple), #6a0dad)';
                                 elements.connectWalletBtn.style.color = '#ffffff';
                             }
-                            if (elements.depositBalanceBtn) elements.depositBalanceBtn.setAttribute('disabled', 'true');
+                            if (elements.depositBalanceBtn) {
+                                elements.depositBalanceBtn.setAttribute('disabled', 'true');
+                                elements.depositBalanceBtn.disabled = true;
+                                elements.depositBalanceBtn.style.opacity = "0.5";
+                                elements.depositBalanceBtn.style.pointerEvents = "none";
+                            }
                             if (elements.depositNoticeText) {
                                 elements.depositNoticeText.innerText = "Пополнение доступно после привязки кошелька";
                                 elements.depositNoticeText.style.color = '#a5a1b8';
@@ -544,6 +543,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (elements.depositBalanceBtn) {
             elements.depositBalanceBtn.addEventListener('click', async () => {
                 elements.depositBalanceBtn.disabled = true; 
+                elements.depositBalanceBtn.innerText = "Загрузка...";
                 
                 try {
                     const success = await ensurePaymentParamsForUserAction();
@@ -552,10 +552,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                         elements.depositAmountModal.classList.remove('hidden');
                         if (elements.modalDepositInput) elements.modalDepositInput.value = "0.1";
                     } else {
-                        showNotification("Не удалось получить адрес пополнения. Пожалуйста, проверьте подключение или повторите попытку позже.", "⚠️");
+                        showNotification("Не удалось получить адрес пополнения. Пожалуйста, попробуйте еще раз.", "⚠️");
                     }
+                } catch(e) {
+                    showNotification("Ошибка получения реквизитов.", "⚠️");
                 } finally {
                     elements.depositBalanceBtn.disabled = false; 
+                    elements.depositBalanceBtn.innerText = "Пополнить баланс";
                 }
             });
         }
@@ -639,7 +642,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                                         const verifyData = await verifyRes.json();
                                         if (verifyData.success) {
                                             clearInterval(checkInterval);
-                                            fetchUserData(true);
+                                            fetchUserData();
                                             return;
                                         }
                                     }
@@ -735,22 +738,18 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         function getSquareIntersection(angle) {
-            angle = (angle % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI); // Normalize angle to [0, 2*PI)
+            angle = (angle % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI); 
             const cx = 160, cy = 160;
             const half = 160;
             
             const cos = Math.cos(angle);
             const sin = Math.sin(angle);
             
-            let t_candidate = []; // Array to store potential intersection points
+            let t_candidate = []; 
             
-            // Intersection with right edge (x=320)
             if (cos > 1e-6) t_candidate.push({ t: half / cos, x: 320, y: cy + half * sin / cos });
-            // Intersection with left edge (x=0)
             if (cos < -1e-6) t_candidate.push({ t: -half / cos, x: 0, y: cy - half * sin / cos });
-            // Intersection with bottom edge (y=320)
             if (sin > 1e-6) t_candidate.push({ t: half / sin, x: cx + half * cos / sin, y: 320 });
-            // Intersection with top edge (y=0)
             if (sin < -1e-6) t_candidate.push({ t: -half / sin, x: cx - half * cos / sin, y: 0 });
             
             let best = null;
@@ -764,7 +763,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                     }
                 }
             }
-            // Fallback to center if no valid intersection found (e.g., exactly at a corner with small epsilon)
             return { x: best ? Math.max(0, Math.min(320, best.x)) : cx, y: best ? Math.max(0, Math.min(320, best.y)) : cy };
         }
 
@@ -777,17 +775,16 @@ document.addEventListener('DOMContentLoaded', async () => {
                 { angle: Math.atan2(-1, 1), x: 320, y: 0 }
             ];
             
-            // Normalize angles to ensure correct interval check across 2*PI boundary
             let normalizedStart = (startAngle % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
             let normalizedEnd = (endAngle % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
 
-            if (normalizedEnd <= normalizedStart) { // Interval crosses the 0/2*PI boundary
+            if (normalizedEnd <= normalizedStart) { 
                 normalizedEnd += 2 * Math.PI;
             }
 
             for (let c of corners) {
                 let ca = c.angle;
-                while (ca < normalizedStart - 1e-6) { // Adjust corner angle to be in the same "cycle" as normalizedStart
+                while (ca < normalizedStart - 1e-6) { 
                     ca += 2 * Math.PI;
                 }
                 if (ca > normalizedStart + 1e-6 && ca < normalizedEnd - 1e-6) {
@@ -811,9 +808,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                 const N = arenaPlayers.length;
                 
-                // Если нет игроков И нет оптимистичной ставки, или статус "waiting"
-                if (N === 0 && localOptimisticUserBet === 0 || arenaStatusStr === 'waiting' && localOptimisticUserBet === 0) {
-                    return; // Полностью очищаем поле в состоянии ожидания без ставок
+                // Очистка холста, если нет игроков
+                if (N === 0) {
+                    return; 
                 }
                 
                 const W = 320; 
@@ -835,7 +832,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     return; 
                 }
 
-                // Начинаем отрисовку с верхней центральной точки (1.5 * PI или -0.5 * PI), идем по часовой стрелке
+                // Отрисовка от верхней точки (-Math.PI / 2) по часовой стрелке
                 let currentAngle = -Math.PI / 2; 
 
                 for (let i = 0; i < N; i++) {
@@ -880,7 +877,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             let angle = Math.atan2(y - CY, x - CX);
             if (angle < 0) angle += 2 * Math.PI; 
 
-            let currentSearchAngle = -Math.PI / 2; // Начало с верхней центральной точки
+            let currentSearchAngle = -Math.PI / 2; 
             for (let i = 0; i < arenaPlayers.length; i++) {
                 const player = arenaPlayers[i];
                 const share = shares[i];
@@ -1171,7 +1168,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         roundNum = 1;
                     }
                     
-                    // Если начался абсолютно новый раунд — сбрасываем локальные упреждающие ставки
+                    // Если начался новый раунд — сбрасываем локальные ставки
                     if (parseInt(roundNum) !== lastKnownRound) {
                         lastKnownRound = parseInt(roundNum);
                         localOptimisticUserBet = 0;
@@ -1182,7 +1179,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                     const rawBets = state.bets || state.players || state.activeBets || [];
                     
-                    // Оптимистичное сглаживание: удаление дублей и расчет дельты ставки пользователя
                     const userRawBet = rawBets.find(b => String(b.userId || b.user_id || b.id) === String(userId));
                     const serverUserBetVal = userRawBet ? parseFloat(userRawBet.amount || userRawBet.bet || 0) : 0;
 
@@ -1192,7 +1188,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     }
                     serverLastUserBet = serverUserBetVal;
 
-                    // Обновляем список игроков, добавляя локальную оптимистичную ставку к нашей серверной
+                    // Обновляем список игроков
                     arenaPlayers = rawBets.map(bet => {
                         const isMe = String(bet.userId || bet.user_id || bet.id) === String(userId);
                         let betVal = parseFloat(bet.amount || bet.bet || 0);
@@ -1208,7 +1204,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         };
                     });
 
-                    // Восстанавливаем локальную ставку в списке игроков, пока её не подтвердил сервер
+                    // Сохраняем локальную ставку в списке до ее отображения на сервере
                     const userInList = arenaPlayers.some(p => String(p.id) === String(userId));
                     if (!userInList && localOptimisticUserBet > 0) {
                         arenaPlayers.push({
@@ -1222,20 +1218,17 @@ document.addEventListener('DOMContentLoaded', async () => {
                     
                     const statusText = document.getElementById('arena-status-text');
 
-                    // Логика отрисовки поля и статуса в зависимости от состояния и локальных ставок
                     if (arenaStatusStr === 'waiting' && localOptimisticUserBet === 0) {
-                        resetArenaGame(); // Полностью очищаем поле, если "waiting" и нет локальных ставок
+                        resetArenaGame(); 
                     } else if (arenaStatusStr === 'waiting' && localOptimisticUserBet > 0) {
-                        // Если "waiting" но есть локальная ставка, показываем ее и ждем соперников
                         if (statusText) {
                             statusText.classList.remove('hidden');
                             statusText.innerText = "Ждем соперников...";
                         }
                         drawArenaSegments();
                         updatePlayersListUI();
-                    }
-                    else { // Активная игра или отсчет
-                        if (statusText) statusText.classList.add('hidden'); // Скрываем "Ждем ставки"
+                    } else { 
+                        if (statusText) statusText.classList.add('hidden'); 
                         drawArenaSegments();
                         updatePlayersListUI();
                     }
@@ -1273,21 +1266,22 @@ document.addEventListener('DOMContentLoaded', async () => {
                                 document.getElementById('arena-ball-svg').innerHTML = ''; 
                                 const isWeWinner = (String(winId) === String(userId));
                                 if (isWeWinner) {
+                                    const poolVal = parseFloat(tPool);
+                                    showBalanceNotification(poolVal); // Показ уведомления выигрыша
                                     showCustomModal({
                                         icon: '🏆',
                                         title: 'Победа!',
-                                        message: `🎉 Поздравляем! Белый шарик остановился на вашем секторе! Вы получили весь банк: +${parseFloat(tPool).toFixed(3)} GRAM!`,
+                                        message: `🎉 Поздравляем! Белый шарик остановился на вашем секторе! Вы получили весь банк: +${poolVal.toFixed(3)} GRAM!`,
                                         buttons: [{ text: 'Забрать!', primary: true }]
                                     });
                                 } else {
                                     showNotification(`Игрок ${winName} выиграл ${parseFloat(tPool).toFixed(3)} GRAM!`, "🏆");
                                 }
-                                fetchUserData(true); // Для победителей и проигравших показываем индикатор изменения
+                                fetchUserData(); 
                             });
                         }
                     } else {
                         stopSmoothCountdown();
-                        // Если статус не countdown и не finished, то показываем "Ждем ставки..." или "Игра идет..."
                         if (statusText && !isBallAnimating && localOptimisticUserBet === 0) { 
                             statusText.classList.remove('hidden');
                             statusText.innerText = (arenaStatusStr === 'active' || arenaStatusStr === 'running') ? "Игра идет..." : "Ждем ставки...";
@@ -1332,7 +1326,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (ballSvg) ballSvg.innerHTML = '';
 
             let curRound = elements.arenaRoundNumber.innerText;
-            if (curRound === '0' || !curRound) safeSetText(elements.arenaRoundNumber, '1'); // Убедиться, что номер игры не 0
+            if (curRound === '0' || !curRound) safeSetText(elements.arenaRoundNumber, '1'); 
             
             safeSetText(elements.arenaPlayersTotal, '0');
             arenaPlayers = []; 
@@ -1355,10 +1349,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             const balanceVal = parseFloat(currentUser.balance || 0);
             currentUser.balance = Math.max(0, balanceVal - betValue);
             
-            // Локальное списание средств с вылетом индикатора изменений
-            animateBalanceDisplay(currentUser.balance, true);
+            // Локальное обновление баланса с вылетом индикатора изменений
+            animateBalanceDisplay(currentUser.balance);
+            showBalanceNotification(-betValue); // Строгое списание ставки
 
-            // Мгновенная упреждающая инициализация сектора пользователя
             localOptimisticUserBet += betValue;
 
             const userInList = arenaPlayers.some(p => String(p.id) === String(userId));
@@ -1375,7 +1369,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 me.bet = serverLastUserBet + localOptimisticUserBet;
             }
 
-            // После ставки всегда показываем "Ждем соперников"
             const statusText = document.getElementById('arena-status-text');
             if (statusText) {
                 statusText.classList.remove('hidden');
@@ -1399,27 +1392,26 @@ document.addEventListener('DOMContentLoaded', async () => {
                 
                 if (res.ok && data.success) {
                     currentUser.balance = data.newBalance;
-                    animateBalanceDisplay(currentUser.balance, false); // Баланс обновился, индикатор уже был показан
+                    animateBalanceDisplay(currentUser.balance); 
                 } else {
-                    // Если ставка не прошла, возвращаем деньги локально и показываем индикатор
                     currentUser.balance = parseFloat(currentUser.balance || 0) + betValue;
-                    animateBalanceDisplay(currentUser.balance, true); 
-                    localOptimisticUserBet -= betValue; // Сбрасываем оптимистичную ставку
-                    drawArenaSegments(); // Перерисовываем поле, чтобы убрать нашу ставку
+                    animateBalanceDisplay(currentUser.balance);
+                    showBalanceNotification(betValue); // Возврат баланса при сбое
+                    localOptimisticUserBet -= betValue; 
+                    drawArenaSegments(); 
                     updatePlayersListUI();
                     showNotification(data.error || "Ошибка ставки", "⚠️");
                 }
             } catch (err) {
-                // Если ошибка сети, также возвращаем деньги локально и показываем индикатор
                 currentUser.balance = parseFloat(currentUser.balance || 0) + betValue;
-                animateBalanceDisplay(currentUser.balance, true);
+                animateBalanceDisplay(currentUser.balance);
+                showBalanceNotification(betValue); // Возврат баланса при ошибке
                 localOptimisticUserBet -= betValue;
                 drawArenaSegments();
                 updatePlayersListUI();
-                showNotification("Ошибка сети или сервера при ставке.", "⚠️");
+                showNotification("Ошибка сети при совершении ставки.", "⚠️");
             } finally {
-                // В любом случае, пытаемся получить актуальные данные с сервера для полной синхронизации
-                fetchUserData(false); 
+                fetchUserData(); 
             }
         };
 
@@ -1739,7 +1731,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
         }
 
-        async function fetchUserData(triggerNotification = false) {
+        async function fetchUserData() {
             try {
                 const res = await fetchWithTimeout(`${API_BASE_URL}/api/user`, { 
                     headers: { 'X-Telegram-Init-Data': tg.initData || "" },
@@ -1756,7 +1748,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (!currentUser) currentUser = {};
 
             const balanceVal = parseFloat(currentUser.balance || 0);
-            animateBalanceDisplay(balanceVal, triggerNotification);
+            animateBalanceDisplay(balanceVal); 
             
             const mainAvatar = document.getElementById('user-avatar');
             if (mainAvatar) {
@@ -1893,6 +1885,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     });
 
                     card.querySelector('.sell-btn').addEventListener('click', () => {
+                        const sellPrice = parseFloat(item.value) || 0;
                         showCustomModal({
                             icon: '💰',
                             title: 'Продажа подарка',
@@ -1912,9 +1905,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                                             if (sellRes.ok) {
                                                 const sellData = await sellRes.json();
                                                 currentUser.balance = sellData.newBalance;
-                                                animateBalanceDisplay(currentUser.balance, true);
+                                                animateBalanceDisplay(currentUser.balance);
+                                                showBalanceNotification(sellPrice); // Ручной вылет точного начисления
                                                 showNotification(`Подарок успешно продан!`, '💰');
-                                                fetchUserData(false);
+                                                fetchUserData();
                                                 fetchInventory();
                                             }
                                         } catch (err) {}
@@ -1974,20 +1968,23 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         function processWinning(winningGift, apiNewBalance = null) {
             const isBalance = winningGift.type === "balance" || winningGift.name.toLowerCase().includes("пополнение");
+            const winVal = parseFloat(winningGift.rawPrice || 0);
+
             if (apiNewBalance !== null) {
                 currentUser.balance = apiNewBalance;
-                animateBalanceDisplay(currentUser.balance, true);
+                animateBalanceDisplay(currentUser.balance);
             }
             if (isNewbieCaseMode && elements.spinBtn) elements.spinBtn.disabled = false;
 
             if (isBalance) {
+                showBalanceNotification(winVal); // Ручной вылет точного выигрыша пополнения
                 showCustomModal({
                     icon: '💰',
                     title: 'Баланс пополнен!',
                     message: `🎉 Вы выиграли пополнение счета на +${winningGift.price}!`,
                     buttons: [{ text: 'Отлично!', primary: true }]
                 });
-                fetchUserData(false);
+                fetchUserData();
                 if (!isNewbieCaseMode && elements.spinBtn) elements.spinBtn.disabled = false;
             } else { 
                 showCustomModal({
@@ -2009,9 +2006,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                                     if (sellRes.ok) {
                                         const sellData = await sellRes.json();
                                         currentUser.balance = sellData.newBalance;
-                                        animateBalanceDisplay(currentUser.balance, true);
+                                        animateBalanceDisplay(currentUser.balance);
+                                        showBalanceNotification(winVal); // Ручной вылет точной продажи
                                         showNotification("Продано!", "💰");
-                                        fetchUserData(false);
+                                        fetchUserData();
                                     }
                                 } catch (e) {}
                             }
@@ -2021,7 +2019,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                             primary: false,
                             onClick: () => {
                                 showNotification(`📦 Сохранено!`, '🎒');
-                                fetchUserData(false);
+                                fetchUserData();
                             }
                         }
                     ]
@@ -2040,7 +2038,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 elements.spinBtn.disabled = true;
                 if (isNewbieCaseMode) {
                     const localBalance = Math.max(0, parseFloat(currentUser.balance || 0) - spinCost);
-                    animateBalanceDisplay(localBalance, true);
+                    animateBalanceDisplay(localBalance);
+                    showBalanceNotification(-spinCost); // Ручное списание стоимости кейса
                 }
                 initRouletteTrack();
 
@@ -2061,7 +2060,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                             
                             spinRoulette(winningGift, () => { processWinning(winningGift, data.newBalance); });
                         } else {
-                            fetchUserData(false); 
+                            fetchUserData(); 
                             if (data.error && data.error.includes('подписчиком канала')) {
                                 const infoRes = await fetchWithTimeout(`${API_BASE_URL}/api/daily_case_info`, { 
                                     headers: { 'X-Telegram-Init-Data': tg.initData || "" },
@@ -2095,7 +2094,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         }
                     } catch (error) {
                         console.error("Error opening case:", error);
-                        fetchUserData(false); elements.spinBtn.disabled = false;
+                        fetchUserData(); elements.spinBtn.disabled = false;
                         showNotification('Ошибка сети или сервера при открытии кейса.', '⚠️');
                     }
                 }, 50);
@@ -2110,7 +2109,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         renderRewardsGrid();
-        fetchUserData(false); // Начальная загрузка данных без всплывающих индикаторов
+        fetchUserData(); 
         navigateTo('home'); 
 
     } catch (globalError) {
