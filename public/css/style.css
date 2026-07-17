@@ -1667,3 +1667,60 @@ body {
     background: #241c44;
     color: #ffffff;
    }
+
+/* ... (весь предыдущий CSS остается) ... */
+
+/* ОБНОВЛЕННЫЙ СТИЛЬ УВЕДОМЛЕНИЙ БАЛАНСА - НЕОНОВАЯ КАПСУЛА */
+.balance-change-indicator {
+    position: absolute;
+    bottom: -35px;
+    right: 0;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 14px;
+    font-weight: 900;
+    pointer-events: none;
+    z-index: 1010;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    white-space: nowrap;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+    opacity: 0;
+    animation: bounceInFloat 1.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+.balance-change-indicator.positive {
+    background: rgba(0, 230, 118, 0.2);
+    border: 1.5px solid #00e676;
+    color: #00e676;
+    box-shadow: 0 0 15px rgba(0, 230, 118, 0.4);
+}
+
+.balance-change-indicator.negative {
+    background: rgba(255, 59, 48, 0.2);
+    border: 1.5px solid #ff3b30;
+    color: #ff3b30;
+    box-shadow: 0 0 15px rgba(255, 59, 48, 0.4);
+}
+
+@keyframes bounceInFloat {
+    0% {
+        transform: translateY(0) scale(0.5);
+        opacity: 0;
+    }
+    20% {
+        transform: translateY(5px) scale(1.1);
+        opacity: 1;
+    }
+    80% {
+        transform: translateY(-15px) scale(1);
+        opacity: 1;
+    }
+    100% {
+        transform: translateY(-25px) scale(0.8);
+        opacity: 0;
+    }
+}
