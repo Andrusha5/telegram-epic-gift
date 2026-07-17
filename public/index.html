@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>BestGifts</title>
-    <!-- Версия v=2.7.0 гарантирует сброс кэша во всех версиях Telegram -->
-    <link rel="stylesheet" href="css/style.css?v=2.7.0">
+    <!-- Версия v=2.7.1 гарантирует сброс кэша во всех версиях Telegram -->
+    <link rel="stylesheet" href="css/style.css?v=2.7.1">
 </head>
 <body>
 
@@ -126,7 +126,7 @@
     <section id="arena-section" class="app-section hidden">
         <div class="case-open-header">
             <button class="back-btn-square" id="back-to-home-from-arena">
-                <svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></polyline></svg>
+                <svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
             </button>
             <div class="header-title-container">
                 <h1 class="case-title">Best Arena</h1>
@@ -153,9 +153,8 @@
                 <svg id="arena-ball-svg" class="arena-ball-canvas" viewBox="0 0 320 320" width="320" height="320"></svg>
             </div>
 
-            <!-- ИНФОРМАЦИЯ ОБ ИГРЕ -->
+            <!-- ИНФОРМАЦИЯ О НОМЕРЕ ТЕКУЩЕЙ ИГРЫ -->
             <div class="arena-game-footer">
-                <span class="arena-players-count">Игроки · <span id="arena-players-total">0</span></span>
                 <span class="arena-game-round">Игра #<span id="arena-round-number">0</span></span>
             </div>
 
@@ -180,9 +179,12 @@
                 </button>
             </div>
 
-            <!-- ИНТЕРАКТИВНЫЙ СПИСОК УЧАСТНИКОВ -->
+            <!-- ИНТЕРАКТИВНЫЙ СПИСОК УЧАСТНИКОВ (СЮДА ПЕРЕНЕСЕН СЧЕТЧИК ИГРОКОВ) -->
             <div class="arena-players-list-box">
-                <h3 class="players-list-title">👥 Список участников</h3>
+                <h3 class="players-list-title">
+                    👥 Список участников 
+                    <span class="players-header-count">Игроки · <span id="arena-players-total">0</span></span>
+                </h3>
                 <div id="arena-players-list" class="players-list-container">
                     <div class="empty-list-placeholder">Ставок еще нет. Станьте первым!</div>
                 </div>
@@ -348,6 +350,6 @@
 
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>
-    <script src="js/app.js?v=2.7.0" defer></script>
+    <script src="js/app.js?v=2.7.1" defer></script>
 </body>
-                </html>
+    </html>
