@@ -89,6 +89,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         let currentRoundSignature = null;
         let arenaStatusStr = "waiting";
 
+        // Системные переменные для оптимистического обновления арены (Исключают мерцания поля)
+        let serverLastUserBet = 0;
+        let localOptimisticUserBet = 0;
+
+        // Системные переменные для анимации баланса "бегущие цифры" (GTA style)
+        let currentBalanceDisplayVal = 0;
+        let balanceAnimationInterval = null;
+
         // Глобальные переменные для предзагруженных платежных реквизитов
         let preloadedAdminAddress = null;
         let preloadedPayloadBase64 = null;
@@ -230,7 +238,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             const timerCircle = document.getElementById('arena-countdown-timer');
             if (!timerCircle) return;
 
-            // Если таймер запущен и разница с сервером незначительна (менее 1.5 сек), не дергаем его
             if (localTimerInterval && Math.abs(localTimerVal - serverSeconds) <= 1.5) {
                 return; 
             }
@@ -262,6 +269,76 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         // ----------------------------------------------------------------------------------
+        // GTA STYLE АНИМАЦИЯ БАЛАНСА И ОРГАНИЧЕСКИЕ FLOATING ИНДИКАТОРЫ
+        // ----------------------------------------------------------------------------------
+        function spawnFloatingIndicator(diff) {
+            const pill = document.getElementById('balance-pill');
+            if (!pill || Math.abs(diff) < 0.001) return;
+
+            const indicator = document.createElement('span');
+            indicator.className = 'balance-change-indicator';
+            
+            if (diff > 0) {
+                indicator.innerText = `+${diff.toFixed(3)}`;
+                indicator.classList.add('positive');
+            } else {
+                indicator.innerText = `${diff.toFixed(3)}`;
+                indicator.classList.add('negative');
+            }
+
+            pill.appendChild(indicator);
+
+            setTimeout(() => {
+                indicator.remove();
+            }, 1200);
+        }
+
+        function animateBalanceDisplay(targetVal) {
+            if (isNaN(targetVal)) targetVal = 0;
+            
+            const diff = targetVal - currentBalanceDisplayVal;
+            if (Math.abs(diff) < 0.0001) {
+                currentBalanceDisplayVal = targetVal;
+                updateBalanceDOM(targetVal);
+                return;
+            }
+
+            // Вызываем аккуратный летающий индикатор изменения
+            spawnFloatingIndicator(diff);
+
+            // GTA Style анимация наката/сброса цифр
+            const duration = 1000; // 1 секунда анимации
+            const startTime = performance.now();
+            const startVal = currentBalanceDisplayVal;
+
+            if (balanceAnimationInterval) {
+                cancelAnimationFrame(balanceAnimationInterval);
+            }
+
+            const step = (timestamp) => {
+                const progress = Math.min((timestamp - startTime) / duration, 1);
+                const ease = 1 - Math.pow(1 - progress, 3); // cubic ease-out
+                const current = startVal + diff * ease;
+                currentBalanceDisplayVal = current;
+                updateBalanceDOM(current);
+
+                if (progress < 1) {
+                    balanceAnimationInterval = requestAnimationFrame(step);
+                } else {
+                    currentBalanceDisplayVal = targetVal;
+                    updateBalanceDOM(targetVal);
+                }
+            };
+            balanceAnimationInterval = requestAnimationFrame(step);
+        }
+
+        function updateBalanceDOM(val) {
+            const textVal = val.toFixed(3);
+            if (elements.balanceDisplayPill) elements.balanceDisplayPill.innerText = textVal;
+            if (elements.largeBalanceDisplay) elements.largeBalanceDisplay.innerText = textVal;
+        }
+
+        // ----------------------------------------------------------------------------------
         // ОСНОВНОЙ КОД APP
         // ----------------------------------------------------------------------------------
 
@@ -289,7 +366,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                     const cache = JSON.parse(cachedData);
                     if (cache) {
                         currentUser = cache;
-                        updateBalanceUI();
+                        currentBalanceDisplayVal = parseFloat(currentUser.balance || 0);
+                        updateBalanceDOM(currentBalanceDisplayVal);
                         const rawName = cache.username || cache.first_name || "Пользователь";
                         safeSetText(document.getElementById('user-username'), formatUsername(rawName));
                         
@@ -544,7 +622,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                                         const verifyData = await verifyRes.json();
                                         if (verifyData.success) {
                                             clearInterval(checkInterval);
-                                            showNotification(`Баланс пополнен на +${amount.toFixed(2)} GRAM!`, "💎");
                                             fetchUserData();
                                             return;
                                         }
@@ -677,6 +754,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             ].map(a => (a < 0 ? a + 2 * Math.PI : a)); 
         }
 
+        // КРАСИВОЕ ДВУМЕРНОЕ SVG РАЗДЕЛЕНИЕ НА СЕКТОРЫ (ДЛЯ 2 И БОЛЕЕ ИГРОКОВ)
         function drawArenaSegments() {
             try {
                 const svg = document.getElementById('arena-svg-canvas');
@@ -710,35 +788,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     return; 
                 }
 
-                if (N === 2) {
-                    const s = Math.sqrt(2 * shares[0]); 
-                    const sizeX = (W * s);
-                    const sizeY = (H * s);
-
-                    const bg = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-                    bg.setAttribute("width", "100%");
-                    bg.setAttribute("height", "100%");
-                    bg.setAttribute("fill", arenaPlayers[1].color); 
-                    svg.appendChild(bg);
-
-                    const poly = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
-                    const p1Pts = [{x:0, y:0}, {x:sizeX, y:0}, {x:0, y:sizeY}];
-                    poly.setAttribute("points", p1Pts.map(p => `${p.x},${p.y}`).join(' '));
-                    poly.setAttribute("fill", arenaPlayers[0].color); 
-                    svg.appendChild(poly);
-
-                    const c1 = getPolygonCentroid(p1Pts);
-                    const p2Pts = [ 
-                        {x:sizeX, y:0}, {x:W, y:0}, {x:W, y:H}, {x:0, y:H}, {x:0, y:sizeY}
-                    ];
-                    const c2 = getPolygonCentroid(p2Pts);
-
-                    createAvatarElement(c1.x, c1.y, arenaPlayers[0].avatar, 24 + shares[0] * 30);
-                    createAvatarElement(c2.x, c2.y, arenaPlayers[1].avatar, 24 + shares[1] * 30);
-                    return; 
-                }
-
-                // КРАСИВОЕ РАЗДЕЛЕНИЕ НА СЕКТОРЫ (ДЛЯ 3 И БОЛЕЕ ИГРОКОВ)
+                // Единая, геометрически надежная и плавная радиальная сегментация
                 let currentAngle = -Math.PI / 2; 
                 const corners = getCornerAnglesRad(); 
 
@@ -801,45 +851,33 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             const shares = calculateSharesProtection(arenaPlayers);
 
-            if (N === 2) {
-                const W = 320, H = 320;
-                const s = Math.sqrt(2 * shares[0]);
-                const sizeX = (W * s);
-                const sizeY = (H * s);
-                if (x >= 0 && x <= sizeX && y >= 0 && y <= sizeY && (x/sizeX + y/sizeY <= 1)) {
-                    return arenaPlayers[0];
+            const CX = 160, CY = 160;
+            let angle = Math.atan2(y - CY, x - CX);
+            if (angle < 0) angle += 2 * Math.PI; 
+
+            let currentSearchAngle = (-Math.PI / 2); 
+            for (let i = 0; i < arenaPlayers.length; i++) {
+                const player = arenaPlayers[i];
+                const share = shares[i];
+                const nextSearchAngle = currentSearchAngle + 2 * Math.PI * share;
+
+                let normalizedCurrent = (currentSearchAngle % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
+                let normalizedNext = (nextSearchAngle % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
+                let normalizedAngle = angle;
+
+                if (nextSearchAngle > currentSearchAngle && normalizedNext < normalizedCurrent) {
+                    normalizedNext += 2 * Math.PI;
                 }
-                return arenaPlayers[1];
-            } 
-            else {
-                const CX = 160, CY = 160;
-                let angle = Math.atan2(y - CY, x - CX);
-                if (angle < 0) angle += 2 * Math.PI; 
-
-                let currentSearchAngle = (-Math.PI / 2); 
-                for (let i = 0; i < arenaPlayers.length; i++) {
-                    const player = arenaPlayers[i];
-                    const share = shares[i];
-                    const nextSearchAngle = currentSearchAngle + 2 * Math.PI * share;
-
-                    let normalizedCurrent = (currentSearchAngle % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
-                    let normalizedNext = (nextSearchAngle % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
-                    let normalizedAngle = angle;
-
-                    if (nextSearchAngle > currentSearchAngle && normalizedNext < normalizedCurrent) {
-                        normalizedNext += 2 * Math.PI;
-                    }
-                    if (normalizedAngle < normalizedCurrent && nextSearchAngle > currentSearchAngle) { 
-                        normalizedAngle += 2 * Math.PI;
-                    }
-
-                    if (normalizedAngle >= normalizedCurrent && normalizedAngle <= normalizedNext) {
-                        return player;
-                    }
-                    currentSearchAngle = nextSearchAngle;
+                if (normalizedAngle < normalizedCurrent && nextSearchAngle > currentSearchAngle) { 
+                    normalizedAngle += 2 * Math.PI;
                 }
-                return arenaPlayers[arenaPlayers.length - 1]; 
+
+                if (normalizedAngle >= normalizedCurrent && normalizedAngle <= normalizedNext) {
+                    return player;
+                }
+                currentSearchAngle = nextSearchAngle;
             }
+            return arenaPlayers[arenaPlayers.length - 1]; 
         }
 
         function createAvatarElement(x, y, src, size) {
@@ -1016,7 +1054,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const step = () => {
                     if (frame >= totalFrames) {
                         isBallAnimating = false;
-                        // Очистка шарика и текста с игрового поля после игры
+                        // Шарик полностью пропадает после игры
                         ballCanvas.innerHTML = ''; 
                         onComplete();
                         return;
@@ -1056,7 +1094,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const renderFrame = () => {
                 if (frameIndex >= path.length) {
                     isBallAnimating = false;
-                    // Очистка шарика и текста с игрового поля после игры
+                    // Шарик полностью пропадает после игры
                     ballCanvas.innerHTML = ''; 
                     onComplete();
                     return;
@@ -1087,7 +1125,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             requestAnimationFrame(renderFrame);
         }
 
-        // ПОЛЛИНГ ИГРЫ ARENA
+        // БЕЗОПАСНЫЙ И ВЫСОКОСКОРОСТНОЙ ПОЛЛИНГ ИГРЫ ARENA
         async function pollArenaLoop() {
             if (!isPollingActive) return;
 
@@ -1106,25 +1144,57 @@ document.addEventListener('DOMContentLoaded', async () => {
                     const state = await res.json();
                     arenaStatusStr = state.status || state.state || "waiting";
 
-                    // Поддержка любых названий переменных в JSON структуры сервера
                     const rawBets = state.bets || state.players || state.activeBets || [];
-                    arenaPlayers = rawBets.map(bet => ({
-                        id: bet.userId || bet.user_id || bet.id || "",
-                        username: bet.username || bet.user_name || bet.name || "Игрок",
-                        avatar: bet.avatar || bet.avatar_url || "https://img.icons8.com/color/96/user.png",
-                        bet: parseFloat(bet.amount || bet.bet || 0),
-                        color: bet.color || "#8d3df5"
-                    }));
+                    
+                    // Алгоритм слияния (Оптимистичное сглаживание)
+                    const userRawBet = rawBets.find(b => String(b.userId || b.user_id || b.id) === String(userId));
+                    const serverUserBetVal = userRawBet ? parseFloat(userRawBet.amount || userRawBet.bet || 0) : 0;
+
+                    if (serverUserBetVal > serverLastUserBet) {
+                        const diff = serverUserBetVal - serverLastUserBet;
+                        localOptimisticUserBet = Math.max(0, localOptimisticUserBet - diff);
+                    }
+                    serverLastUserBet = serverUserBetVal;
+
+                    arenaPlayers = rawBets.map(bet => {
+                        const isMe = String(bet.userId || bet.user_id || bet.id) === String(userId);
+                        let betVal = parseFloat(bet.amount || bet.bet || 0);
+                        if (isMe) {
+                            betVal += localOptimisticUserBet;
+                        }
+                        return {
+                            id: bet.userId || bet.user_id || bet.id || "",
+                            username: bet.username || bet.user_name || bet.name || "Игрок",
+                            avatar: bet.avatar || bet.avatar_url || "https://img.icons8.com/color/96/user.png",
+                            bet: betVal,
+                            color: bet.color || "#8d3df5"
+                        };
+                    });
+
+                    // Если ставка локально принята, но сервер её еще не вернул вообще
+                    const userInList = arenaPlayers.some(p => String(p.id) === String(userId));
+                    if (!userInList && localOptimisticUserBet > 0) {
+                        arenaPlayers.push({
+                            id: userId,
+                            username: currentUser.username || tg.initDataUnsafe?.user?.username || "Вы",
+                            avatar: currentUser.avatar_url || "https://img.icons8.com/color/96/user.png",
+                            bet: localOptimisticUserBet,
+                            color: currentUser.color || "#8d3df5"
+                        });
+                    }
 
                     drawArenaSegments();
                     updatePlayersListUI();
 
                     const statusText = document.getElementById('arena-status-text');
-
                     const stateTimeLeft = state.timeLeft !== undefined ? state.timeLeft : (state.time_left !== undefined ? state.time_left : (state.timer !== undefined ? state.timer : ""));
 
-                    // Запись номера игры
-                    safeSetText(elements.arenaRoundNumber, state.roundNumber || state.gameId || state.game_id || state.round_number || state.round || '0');
+                    // Инициализация и поддержание правильного номера игры (не меньше 1)
+                    let rNum = state.roundNumber || state.gameId || state.game_id || state.round_number || state.round;
+                    if (!rNum || rNum === 0 || rNum === '0') {
+                        rNum = 1;
+                    }
+                    safeSetText(elements.arenaRoundNumber, rNum);
 
                     if (arenaStatusStr === 'countdown' && stateTimeLeft) {
                         if (statusText) statusText.classList.add('hidden');
@@ -1147,7 +1217,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                                 statusText.innerText = "Ждем ставки...";
                             }
                             const ballCanvas = document.getElementById('arena-ball-svg');
-                            if (ballCanvas) ballCanvas.innerHTML = ''; // Очистка при сбросе раунда
+                            if (ballCanvas) ballCanvas.innerHTML = ''; 
                         } else if (currentRoundSignature !== signature && winX !== undefined && winY !== undefined) {
                             currentRoundSignature = signature;
                             
@@ -1162,7 +1232,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                                         message: `🎉 Поздравляем! Белый шарик остановился на вашем секторе! Вы получили весь банк: +${parseFloat(tPool).toFixed(3)} GRAM!`,
                                         buttons: [{ text: 'Забрать!', primary: true }]
                                     });
-                                    showNotification(`Зачислено: +${parseFloat(tPool).toFixed(3)} GRAM!`, "💎");
                                 } else {
                                     showNotification(`Игрок ${winName} выиграл ${parseFloat(tPool).toFixed(3)} GRAM!`, "🏆");
                                 }
@@ -1215,7 +1284,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (avatarsContainer) avatarsContainer.innerHTML = '';
             if (ballSvg) ballSvg.innerHTML = '';
 
-            safeSetText(elements.arenaRoundNumber, '0');
+            safeSetText(elements.arenaRoundNumber, '1');
             safeSetText(elements.arenaPlayersTotal, '0');
             arenaPlayers = []; 
             updatePlayersListUI(); 
@@ -1223,7 +1292,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             renderBetButtons();
         }
 
-        // МГНОВЕННЫЙ ОТКЛИК НА СТАВКУ (OPTIMISTIC UI)
+        // ВЫСОКОСКОРОСТНОЙ И БЕЗОПАСНЫЙ ОТКЛИК НА СТАВКУ
         const handleBetClick = async (e) => {
             const btn = e.currentTarget;
             if (btn.classList.contains('disabled')) return;
@@ -1234,25 +1303,29 @@ document.addEventListener('DOMContentLoaded', async () => {
             btn.classList.add('disabled');
             btn.disabled = true;
 
-            // МГНОВЕННОЕ локальное добавление игрока в список участников (Optimistic update)
-            const exists = arenaPlayers.some(p => p.id === userId);
-            const myName = currentUser.username || tg.initDataUnsafe?.user?.username || "Вы";
-            const myAvatar = currentUser.avatar_url || "https://img.icons8.com/color/96/user.png";
-            
-            if (!exists) {
+            // Снятие средств с баланса (сразу локально запускает бегущую анимацию и красный индикатор у баланса)
+            const balanceVal = parseFloat(currentUser.balance || 0);
+            currentUser.balance = Math.max(0, balanceVal - betValue);
+            animateBalanceDisplay(currentUser.balance);
+
+            // МГНОВЕННОЕ локальное добавление ставки игрока (Flicker-Free Optimistic UI)
+            localOptimisticUserBet += betValue;
+
+            const userInList = arenaPlayers.some(p => String(p.id) === String(userId));
+            if (!userInList) {
                 arenaPlayers.push({
                     id: userId,
-                    username: myName,
-                    avatar: myAvatar,
-                    bet: betValue,
-                    color: currentUser.color || "#8d3df5" 
+                    username: currentUser.username || tg.initDataUnsafe?.user?.username || "Вы",
+                    avatar: currentUser.avatar_url || "https://img.icons8.com/color/96/user.png",
+                    bet: localOptimisticUserBet,
+                    color: currentUser.color || "#8d3df5"
                 });
             } else {
-                const p = arenaPlayers.find(p => p.id === userId);
-                p.bet += betValue;
+                const me = arenaPlayers.find(p => String(p.id) === String(userId));
+                me.bet = serverLastUserBet + localOptimisticUserBet;
             }
 
-            // МГНОВЕННО перерисовываем поле, обновляем список и увеличиваем счетчик участников
+            // Мгновенная плавная перерисовка сегментов и участников (БЕЗ ЖИМА И ЗАДЕРЖЕК)
             drawArenaSegments();
             updatePlayersListUI();
 
@@ -1269,9 +1342,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const data = await res.json();
                 
                 if (res.ok && data.success) {
-                    showNotification(`Ставка добавлена: -${betValue} GRAM`, "🎮");
+                    // Уведомление внизу экрана УБРАНО в соответствии с ТЗ.
                     currentUser.balance = data.newBalance;
-                    updateBalanceUI();
+                    animateBalanceDisplay(currentUser.balance);
                 } else {
                     showNotification(data.error || "Ошибка ставки", "⚠️");
                 }
@@ -1358,7 +1431,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 } catch(e) {}
 
                 closeEditBetsModal();
-                showNotification("Кнопки ставок успешно настроены!", "✏️");
+                showNotification("Кнопки ставок настроены!", "✏️");
                 renderBetButtons();
             });
         }
@@ -1550,7 +1623,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 showCustomModal({
                     icon: `<img src="${selectedGift.icon}" style="width:70px;height:70px;object-fit:contain;" onerror="this.src='https://img.icons8.com/color/96/gift.png'">`,
                     title: 'Подтвердить передачу?',
-                    message: `Вы действительно отправили подарок "${formatItemName(selectedGift.name)}" на аккауйн @Sintopa в Telegram?`,
+                    message: `Вы действительно отправили подарок "${formatItemName(selectedGift.name)}" на аккаунт @Sintopa в Telegram?`,
                     buttons: [
                         {
                             text: 'Да, подтверждаю',
@@ -1614,7 +1687,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             if (!currentUser) currentUser = {};
 
-            updateBalanceUI();
+            const balanceVal = parseFloat(currentUser.balance || 0);
+            animateBalanceDisplay(balanceVal);
             
             const mainAvatar = document.getElementById('user-avatar');
             if (mainAvatar) {
@@ -1631,14 +1705,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             safeSetText(document.getElementById('user-username'), formatUsername(rawName));
             updateDailyCaseTimer();
             renderBetButtons(); 
-        }
-
-        function updateBalanceUI(forcedValue = null) {
-            const balanceVal = (currentUser && currentUser.balance) ? currentUser.balance : 0;
-            const val = forcedValue !== null ? parseFloat(forcedValue) : parseFloat(balanceVal);
-            const balVal = isNaN(val) ? "0.000" : val.toFixed(3);
-            safeSetText(elements.balanceDisplayPill, balVal);
-            safeSetText(elements.largeBalanceDisplay, balVal);
         }
 
         let dailyCaseTimerInterval;
@@ -1778,6 +1844,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                                             if (sellRes.ok) {
                                                 const sellData = await sellRes.json();
                                                 currentUser.balance = sellData.newBalance;
+                                                animateBalanceDisplay(currentUser.balance);
                                                 showNotification(`Подарок успешно продан!`, '💰');
                                                 fetchUserData();
                                                 fetchInventory();
@@ -1841,7 +1908,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const isBalance = winningGift.type === "balance" || winningGift.name.toLowerCase().includes("пополнение");
             if (apiNewBalance !== null) {
                 currentUser.balance = apiNewBalance;
-                updateBalanceUI();
+                animateBalanceDisplay(currentUser.balance);
             }
             if (isNewbieCaseMode && elements.spinBtn) elements.spinBtn.disabled = false;
 
@@ -1874,6 +1941,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                                     if (sellRes.ok) {
                                         const sellData = await sellRes.json();
                                         currentUser.balance = sellData.newBalance;
+                                        animateBalanceDisplay(currentUser.balance);
                                         showNotification("Продано!", "💰");
                                         fetchUserData();
                                     }
@@ -1903,7 +1971,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
                 elements.spinBtn.disabled = true;
                 if (isNewbieCaseMode) {
-                    updateBalanceUI(Math.max(0, parseFloat(currentUser.balance || 0) - spinCost));
+                    const localBalance = Math.max(0, parseFloat(currentUser.balance || 0) - spinCost);
+                    animateBalanceDisplay(localBalance);
                 }
                 initRouletteTrack();
 
