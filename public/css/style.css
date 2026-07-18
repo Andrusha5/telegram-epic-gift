@@ -138,6 +138,13 @@ body {
     text-overflow: ellipsis;
 }
 
+/* СТИЛЬНЫЙ КОНТЕЙНЕР БАЛАНСА И СВЕТЯЩИХСЯ ПИЛЮЛЬ */
+.balance-area-wrapper {
+    position: relative;
+    display: inline-block;
+    margin-top: -12px;
+}
+
 .balance-pill {
     background: rgba(0, 230, 118, 0.08);
     border: 1.5px solid rgba(0, 230, 118, 0.4);
@@ -148,7 +155,6 @@ body {
     align-items: center;
     gap: 6px;
     cursor: pointer;
-    margin-top: -12px;
     transition: transform 0.1s, box-shadow 0.2s;
 }
 
@@ -165,6 +171,67 @@ body {
 .balance-icon {
     width: 18px;
     height: 18px;
+}
+
+/* КОНТЕЙНЕР ДЛЯ ПОДВЕШЕННЫХ ПИЛЮЛЬ ИЗМЕНЕНИЯ БАЛАНСА (КРАСНЫХ/ЗЕЛЕНЫХ) */
+.balance-badge-container {
+    position: absolute;
+    bottom: -22px;
+    right: 4px;
+    pointer-events: none;
+    z-index: 1010;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+}
+
+.balance-popup-badge {
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 900;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: popupSlideInOut 2.2s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+    white-space: nowrap;
+}
+
+/* Красная пилюля списания */
+.balance-popup-badge.negative {
+    background: rgba(255, 59, 48, 0.18);
+    border: 1.5px solid rgba(255, 59, 48, 0.75);
+    color: #ff3b30;
+    box-shadow: 0 0 15px rgba(255, 59, 48, 0.4);
+}
+
+/* Зеленая пилюля пополнения */
+.balance-popup-badge.positive {
+    background: rgba(0, 230, 118, 0.18);
+    border: 1.5px solid rgba(0, 230, 118, 0.75);
+    color: #00e676;
+    box-shadow: 0 0 15px rgba(0, 230, 118, 0.4);
+}
+
+@keyframes popupSlideInOut {
+    0% {
+        opacity: 0;
+        transform: translateY(-8px) scale(0.85);
+    }
+    15% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+    80% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+    100% {
+        opacity: 0;
+        transform: translateY(14px) scale(0.8);
+    }
 }
 
 /* ==========================================================================
@@ -791,9 +858,8 @@ body {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    width: 100%; /* Убедитесь, что ширина задана для ellipsis */
+    width: 100%;
 }
-
 
 .case-card.locked {
     opacity: 0.55;
@@ -1040,7 +1106,7 @@ body {
 }
 
 /* ==========================================================================
-   ЭКРАН ИНВЕНТАРЯ И КРАСИВЫЙ Web3 ВВОД ПОДАРКОВ
+   ЭКРАН ИНВЕНТАРЯ И Web3 ВВОД ПОДАРКОВ
    ========================================================================== */
 .inventory-grid {
     display: grid;
@@ -1226,7 +1292,7 @@ body {
 }
 
 /* ==========================================================================
-   ЭКРАН КОШЕЛЬКА И БАЛАНСА + ПРАВИЛЬНЫЙ РЕНДЕР КНОПОК ДЛЯ iPHONE
+   ЭКРАН КОШЕЛЬКА И БАЛАНСА + РЕНДЕР КНОПОК
    ========================================================================== */
 .balance-header {
     width: 100%;
@@ -1411,7 +1477,7 @@ body {
 }
 
 /* ==========================================================================
-   ПАРЯЩИЙ НАВИГАЦИОННЫЙ БАР С ПОДСВЕТКОЙ
+   ПАРЯЩИЙ НАВИГАЦИОННЫЙ БАР
    ========================================================================== */
 .floating-nav-container {
     position: fixed;
@@ -1507,7 +1573,7 @@ body {
 }
 
 /* ==========================================================================
-   УВЕДОМЛЕНИЯ НАД ПАРЯЩЕЙ ПАНЕЛЬЮ
+   ОБЩИЙ КОНТЕЙНЕР УВЕДОМЛЕНИЙ НАД ПАРЯЩЕЙ ПАНЕЛЬЮ
    ========================================================================== */
 .toast-container {
     position: fixed;
@@ -1643,4 +1709,4 @@ body {
 .modal-btn-secondary {
     background: #241c44;
     color: #ffffff;
-                                }
+}
