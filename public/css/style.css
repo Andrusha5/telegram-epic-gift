@@ -788,7 +788,12 @@ body {
     font-weight: 700;
     color: #ffffff;
     text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    width: 100%; /* Убедитесь, что ширина задана для ellipsis */
 }
+
 
 .case-card.locked {
     opacity: 0.55;
@@ -1638,4 +1643,4 @@ body {
 .modal-btn-secondary {
     background: #241c44;
     color: #ffffff;
-   }
+                                }
