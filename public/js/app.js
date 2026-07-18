@@ -10,14 +10,13 @@ const tg = (window.Telegram && window.Telegram.WebApp) ? window.Telegram.WebApp 
 tg.expand();
 tg.ready();
 
-// УНИКАЛЬНЫЙ FALLBACK ДЛЯ ТЕСТОВ (Позволяет играть в разных браузерах/вкладках вне Telegram)
+// FALLBACK ДЛЯ ТЕСТОВ
 let localGuestId = localStorage.getItem('mock_guest_id');
 if (!localGuestId) {
     localGuestId = 'guest_' + Math.random().toString(36).substring(2, 9);
     localStorage.setItem('mock_guest_id', localGuestId);
 }
 
-// Генерируем InitData для заголовков при локальном тестировании вне Telegram
 let initDataHeader = tg.initData || "";
 if (!initDataHeader) {
     const mockUser = {
@@ -106,6 +105,27 @@ async function fetchWithTimeout(resource, options = {}) {
     }
 }
 
+// ФУНКЦИЯ ДЛЯ ВЫЗОВА КРАСИВЫХ ВСПЛЫВАЮЩИХ ПИЛЮЛЬ ПОД БАЛАНСОМ
+function triggerBalanceBadge(amount) {
+    const container = document.getElementById('balance-badge-container');
+    if (!container) return;
+
+    const badge = document.createElement('div');
+    const isNegative = amount < 0;
+    badge.className = `balance-popup-badge ${isNegative ? 'negative' : 'positive'}`;
+    
+    // Форматируем текст (добавляем знак плюса для положительных чисел)
+    const formattedAmount = (isNegative ? '' : '+') + amount.toFixed(3);
+    badge.innerText = formattedAmount;
+
+    container.appendChild(badge);
+
+    // Удаляем пилюлю после завершения анимации
+    setTimeout(() => {
+        badge.remove();
+    }, 2500);
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
     try {
         const API_BASE_URL = window.location.origin;
@@ -137,7 +157,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         const initialName = tg.initDataUnsafe?.user?.username || tg.initDataUnsafe?.user?.first_name || "Пользователь";
         safeSetText(document.getElementById('user-username'), formatUsername(initialName));
 
-        // Вычисляем ID пользователя
         let userId = tg.initDataUnsafe?.user?.id;
         if (!userId) {
             try {
@@ -528,7 +547,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                                         const verifyData = await verifyRes.json();
                                         if (verifyData.success) {
                                             clearInterval(checkInterval);
-                                            showNotification(`Баланс пополнен на +${amount.toFixed(2)} GRAM!`, "💎");
+                                            // Отображаем стильную зеленую пилюлю пополнения TON
+                                            triggerBalanceBadge(amount);
                                             fetchUserData();
                                             return;
                                         }
@@ -888,7 +908,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         function renderBetButtons() {
             const balance = parseFloat(currentUser.balance || 0);
-            // Ставки разрешены во время ожидания (waiting) и отсчета (countdown)! Блокируются только в финале.
             const blockBets = isBallAnimating || (arenaStatusStr === 'finished');
 
             for (let i = 0; i < 3; i++) {
@@ -910,16 +929,23 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         }
 
+        // ДВИЖОК ДЕТЕРМИНИРОВАННОЙ СКОРОСТИ (Уникальная скорость для каждого раунда)
         function simulateBallPathDeterministic(targetX, targetY, seedSignature, boardWidth = 320, boardHeight = 320, ballRadius = 8) {
             const friction = 0.981; 
             const rng = createPRNG(seedSignature);
+
+            // Создаем отдельный генератор для вычисления случайной скорости этого раунда
+            const rngSpeed = createPRNG(seedSignature + "_speed_determinator");
+            // Базовая скорость раунда варьируется от 38 (умеренно быстрая) до 95 (экстремально быстрая)
+            const baseRoundSpeed = 38 + rngSpeed() * 57; 
 
             for (let trial = 0; trial < 3000; trial++) {
                 const startX = boardWidth / 2;
                 const startY = boardHeight / 2;
 
                 const angle = rng() * Math.PI * 2;
-                const speed = 48 + rng() * 16; 
+                // Задаем скорость с небольшим разбросом внутри самого заезда
+                const speed = baseRoundSpeed + rng() * 10; 
 
                 let vx = Math.cos(angle) * speed;
                 let vy = Math.sin(angle) * speed;
@@ -1214,9 +1240,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                                         message: `🎉 Поздравляем! Белый шарик остановился на вашем секторе! Вы получили весь банк: +${parseFloat(tPool).toFixed(3)} GRAM!`,
                                         buttons: [{ text: 'Забрать!', primary: true }]
                                     });
-                                    showNotification(`Зачислено: +${parseFloat(tPool).toFixed(3)} GRAM!`, "💎");
-                                } else {
-                                    showNotification(`Игрок ${winName} выиграл ${parseFloat(tPool).toFixed(3)} GRAM!`, "🏆");
+                                    // Стильная зеленая пилюля у баланса вместо тоста снизу!
+                                    triggerBalanceBadge(parseFloat(tPool));
                                 }
                                 
                                 const ballCanvas = document.getElementById('arena-ball-svg');
@@ -1231,7 +1256,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                             const ballCanvas = document.getElementById('arena-ball-svg');
                             if (ballCanvas) ballCanvas.innerHTML = '';
                             
-                            showNotification(`Раунд #${correctRoundNumber} завершен. Победитель: ${winName} (${parseFloat(tPool).toFixed(3)} GRAM)`, "🏆");
                             fetchUserData();
                         }
                     } else {
@@ -1307,13 +1331,16 @@ document.addEventListener('DOMContentLoaded', async () => {
             const betValue = parseFloat(btn.getAttribute('data-bet'));
             if (isNaN(betValue) || betValue < 0.1) return; 
 
-            // Кнопка остается активной, позволяя кликать сколько угодно раз!
             localExpectedBetAmount = parseFloat((localExpectedBetAmount + betValue).toFixed(3));
             arenaPlayers = getMergedPlayers(arenaPlayers, lastObservedRoundNumber || 1);
             
             drawArenaSegments();
             updatePlayersListUI();
             updateBalanceUI();
+
+            // ПОЛНОСТЬЮ УБРАЛИ раздражающие тосты снизу! 
+            // Запускаем красивое красное списание у баланса прямо в момент совершения ставки!
+            triggerBalanceBadge(-betValue);
 
             try {
                 const res = await fetchWithTimeout(`${API_BASE_URL}/api/place_bet`, {
@@ -1328,15 +1355,16 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const data = await res.json();
                 
                 if (res.ok && data.success) {
-                    showNotification(`Ставка добавлена: -${betValue} GRAM`, "🎮");
                     currentUser.balance = data.newBalance;
                 } else {
-                    showNotification(data.error || "Ошибка ставки", "⚠️");
+                    // Возвращаем баланс обратно в случае ошибки на сервере
+                    triggerBalanceBadge(betValue);
                     localExpectedBetAmount = parseFloat(Math.max(0, localExpectedBetAmount - betValue).toFixed(3));
                     fetchUserData();
                 }
             } catch (err) {
-                showNotification("Ошибка сети", "⚠️");
+                // Возвращаем баланс обратно в случае ошибки сети
+                triggerBalanceBadge(betValue);
                 localExpectedBetAmount = parseFloat(Math.max(0, localExpectedBetAmount - betValue).toFixed(3));
                 fetchUserData();
             }
@@ -1846,7 +1874,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                                             if (sellRes.ok) {
                                                 const sellData = await sellRes.json();
                                                 currentUser.balance = sellData.newBalance;
-                                                showNotification(`Подарок успешно продан!`, '💰');
+                                                // Красивая анимация начисления баланса у шапки вместо тоста снизу!
+                                                triggerBalanceBadge(item.value);
                                                 fetchUserData();
                                                 fetchInventory();
                                             }
@@ -1920,6 +1949,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                     message: `🎉 Вы выиграли пополнение счета на +${winningGift.price}!`,
                     buttons: [{ text: 'Отлично!', primary: true }]
                 });
+                // Запускаем стильную зеленую пилюлю для кейса!
+                triggerBalanceBadge(winningGift.rawPrice);
                 fetchUserData();
                 if (!isNewbieCaseMode && elements.spinBtn) elements.spinBtn.disabled = false;
             } else { 
@@ -1942,7 +1973,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                                     if (sellRes.ok) {
                                         const sellData = await sellRes.json();
                                         currentUser.balance = sellData.newBalance;
-                                        showNotification("Продано!", "💰");
+                                        // Стильная зеленая пилюля у баланса вместо тоста!
+                                        triggerBalanceBadge(winningGift.rawPrice);
                                         fetchUserData();
                                     }
                                 } catch (e) {}
@@ -1971,6 +2003,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
                 elements.spinBtn.disabled = true;
                 if (isNewbieCaseMode) {
+                    // Анимируем списание за платный кейс красивой пилюлей
+                    triggerBalanceBadge(-spinCost);
                     updateBalanceUI(Math.max(0, parseFloat(currentUser.balance || 0) - spinCost));
                 }
                 initRouletteTrack();
@@ -1992,6 +2026,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                             
                             spinRoulette(winningGift, () => { processWinning(winningGift, data.newBalance); });
                         } else {
+                            if (isNewbieCaseMode) {
+                                // Возвращаем списанный баланс в случае ошибки
+                                triggerBalanceBadge(spinCost);
+                            }
                             fetchUserData(); 
                             if (data.error && data.error.includes('подписчиком канала')) {
                                 const infoRes = await fetchWithTimeout(`${API_BASE_URL}/api/daily_case_info`, { 
@@ -2025,6 +2063,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                             }
                         }
                     } catch (error) {
+                        if (isNewbieCaseMode) {
+                            // Возвращаем списанный баланс в случае ошибки
+                            triggerBalanceBadge(spinCost);
+                        }
                         fetchUserData(); elements.spinBtn.disabled = false;
                         showNotification('Ошибка сети при открытии.', '⚠️');
                     }
