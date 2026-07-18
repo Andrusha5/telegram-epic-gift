@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>BestGifts</title>
-    <!-- Задаем новую версию v=2.8.1 для безусловного сброса кэша Telegram -->
-    <link rel="stylesheet" href="css/style.css?v=2.8.1">
+    <!-- Принудительный сброс кэша Telegram новой версией v=2.9.2 -->
+    <link rel="stylesheet" href="css/style.css?v=2.9.2">
 </head>
 <body>
 
@@ -21,9 +21,14 @@
                 <span id="user-username" class="header-username">Пользователь</span>
             </div>
         </div>
-        <div class="balance-pill" id="balance-pill">
-            <span id="user-balance-pill-value">0.000</span>
-            <img src="/Images/Items/gram_popolnenie.png" alt="GRAM" class="balance-icon">
+        <!-- Инновационный контейнер с поддержкой стильных всплывающих пилюль изменения баланса -->
+        <div class="balance-area-wrapper">
+            <div class="balance-pill" id="balance-pill">
+                <span id="user-balance-pill-value">0.000</span>
+                <img src="/Images/Items/gram_popolnenie.png" alt="GRAM" class="balance-icon">
+            </div>
+            <!-- Сюда динамически добавляются красивые красные и зеленые пилюли -->
+            <div id="balance-badge-container" class="balance-badge-container"></div>
         </div>
     </header>
 
@@ -338,11 +343,12 @@
         </div>
     </div>
 
+    <!-- Общий контейнер уведомлений для кейсов/подписок -->
     <div id="toast-container" class="toast-container"></div>
 
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>
-    <!-- Принудительно подключаем скрипт версии v=2.8.1 -->
-    <script src="js/app.js?v=2.8.1" defer></script>
+    <!-- Подключаем новый скрипт -->
+    <script src="js/app.js?v=2.9.2" defer></script>
 </body>
-                </html>
+    </html>
