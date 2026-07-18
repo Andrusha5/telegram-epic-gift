@@ -57,12 +57,12 @@ function createPRNG(seedString) {
     }
 }
 
-// Стабильные цвета на клиенте
+// Стабильная палитра цветов
 const defaultColors = ['#8d3df5', '#00e676', '#0088cc', '#ff9500', '#ff3b30', '#c25dff'];
 
-// Детерминированный цвет на основе Telegram ID (тот же алгоритм, что на сервере)
-function getUserColor(userId) {
-    const idStr = String(userId || 'guest');
+// Идеально сбалансированный генератор: цвет стабилен внутри раунда, но меняется при новом раунде
+function getUserColor(userId, roundNumber) {
+    const idStr = String(userId || 'guest') + "_" + String(roundNumber || 1);
     let hash = 0;
     for (let i = 0; i < idStr.length; i++) {
         hash = idStr.charCodeAt(i) + ((hash << 5) - hash);
@@ -649,7 +649,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const avatarsContainer = document.getElementById('arena-avatars-container');
                 if (!svg || !avatarsContainer) return;
 
-                // Если раунд в статусе ожидания ставок, принудительно снимаем флаг анимации, чтобы разблокировать перерисовку
+                // Сброс блокировки анимации, если игра ждет ставки
                 if (arenaStatusStr === 'waiting') {
                     isBallAnimating = false;
                 }
@@ -677,7 +677,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                     rect.setAttribute("height", "100%");
                     rect.setAttribute("fill", arenaPlayers[0].color);
                     svg.appendChild(rect);
-                    createAvatarElement(CX, CY, arenaPlayers[0].avatar, 56); 
+                    
+                    // Позиционируем на Y=240 вместо 160, чтобы аватарка не перекрывала цифру таймера в центре
+                    createAvatarElement(CX, 240, arenaPlayers[0].avatar, 56); 
                     return; 
                 }
 
@@ -1004,9 +1006,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                     textElement.setAttribute("y", textY.toFixed(1));
 
                     const activePlayer = getPlayerAtCoords(currentX, currentY) || lastMatchedPlayer || arenaPlayers[0];
-                    if (activePlayer) {
+                    if (activePlayer && activePlayer.username) {
                         lastMatchedPlayer = activePlayer;
                         textElement.textContent = activePlayer.username;
+                    } else {
+                        textElement.textContent = "Игрок";
                     }
 
                     frame++;
@@ -1038,9 +1042,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                 textElement.setAttribute("y", textY.toFixed(1));
 
                 const activePlayer = getPlayerAtCoords(pos.x, pos.y) || lastMatchedPlayer || arenaPlayers[0];
-                if (activePlayer) {
+                if (activePlayer && activePlayer.username) {
                     lastMatchedPlayer = activePlayer;
                     textElement.textContent = activePlayer.username;
+                } else {
+                    textElement.textContent = "Игрок";
                 }
 
                 frameIndex++;
@@ -1051,7 +1057,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         // КЛИЕНТСКИЙ МИКСЕР ОЖИДАЕМЫХ СТАВОК (RECONCILIATION ENGINE)
-        function getMergedPlayers(serverPlayers) {
+        function getMergedPlayers(serverPlayers, roundNumber) {
             const myIdStr = String(userId);
             const serverMe = serverPlayers.find(p => String(p.userId) === myIdStr);
             const serverMyBet = serverMe ? parseFloat(serverMe.bet) : 0;
@@ -1071,8 +1077,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                     const myAvatar = currentUser.avatar_url || "https://img.icons8.com/color/96/user.png";
                     const myName = currentUser.username || currentUser.first_name || "Я";
                     
-                    // ЦВЕТ БЕРЕТСЯ СТРОГО СТАБИЛЬНЫЙ
-                    const chosenColor = getUserColor(userId);
+                    // ЦВЕТ БЕРЕТСЯ СТРОГО СТАБИЛЬНЫЙ ДЛЯ ДАННОГО РАУНДА
+                    const chosenColor = getUserColor(userId, roundNumber);
 
                     merged.push({
                         userId: userId,
@@ -1103,6 +1109,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                 });
                 if (res.ok) {
                     const state = await res.json();
+                    
+                    // Мгновенное обновление раунда на клиенте (исправляет баг Игры #0)
+                    const correctRoundNumber = state.roundNumber || state.round_number || 1;
+                    safeSetText(elements.arenaRoundNumber, correctRoundNumber);
+
                     arenaStatusStr = state.status || state.state || "waiting";
 
                     const rawBets = state.bets || state.players || state.activeBets || [];
@@ -1111,24 +1122,21 @@ document.addEventListener('DOMContentLoaded', async () => {
                         username: bet.username || bet.user_name || bet.name || "Игрок",
                         avatar: bet.avatar || bet.avatar_url || "https://img.icons8.com/color/96/user.png",
                         bet: parseFloat(bet.amount || bet.bet || 0),
-                        color: bet.color || getUserColor(bet.userId || bet.user_id || bet.id) // Назначаем стабильный цвет
+                        color: bet.color || getUserColor(bet.userId || bet.user_id || bet.id, correctRoundNumber)
                     }));
 
-                    // Исключаем баг Игра #0 считыванием любого типа ключа раунда
-                    const correctRoundNumber = state.roundNumber !== undefined ? state.roundNumber : (state.round_number !== undefined ? state.round_number : 0);
-                    
                     // Полный сброс буферов локальных ставок при переходе на следующий раунд
                     if (correctRoundNumber !== lastObservedRoundNumber) {
                         localExpectedBetAmount = 0;
                         lastObservedRoundNumber = correctRoundNumber;
                     }
 
-                    // Предохранительный сброс: если раунд ждет ставок, а на сервере игроков нет — зануляем ожидания локальной ставки
+                    // Предохранительный сброс, если раунд ждет ставок, а на сервере игроков нет
                     if (arenaStatusStr === 'waiting' && serverPlayers.length === 0) {
                         localExpectedBetAmount = 0;
                     }
 
-                    arenaPlayers = getMergedPlayers(serverPlayers);
+                    arenaPlayers = getMergedPlayers(serverPlayers, correctRoundNumber);
 
                     drawArenaSegments();
                     updatePlayersListUI();
@@ -1139,8 +1147,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                     const stateTimeLeft = state.timeLeft !== undefined ? state.timeLeft : (state.time_left !== undefined ? state.time_left : (state.timer !== undefined ? state.timer : ""));
                     const serverTime = state.serverTime || Date.now(); 
                     const resolvedAt = state.resolvedAt || 0; 
-
-                    safeSetText(elements.arenaRoundNumber, correctRoundNumber);
 
                     if (arenaStatusStr === 'countdown') {
                         if (statusText) statusText.classList.add('hidden');
@@ -1179,7 +1185,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                         const signature = winId + "_" + tPool + "_" + winX + "_" + winY + "_" + correctRoundNumber;
                         const age = serverTime - resolvedAt; 
 
-                        // АНИМАЦИЯ ИГРАЕТ ТОЛЬКО ЕСЛИ КЛИЕНТ БЫЛ В СЕТИ И РАУНД СВЕЖИЙ (< 7 сек)
                         if (correctRoundNumber !== lastAnimatedRound && age < 7000) {
                             lastAnimatedRound = correctRoundNumber;
                             currentRoundSignature = signature;
@@ -1206,7 +1211,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                                 fetchUserData();
                             });
                         } else if (correctRoundNumber !== lastAnimatedRound && age >= 7000) {
-                            // FAST-FORWARD ENGINE: Пропускаем анимацию, если зашли поздно
                             lastAnimatedRound = correctRoundNumber;
                             currentRoundSignature = signature;
                             
@@ -1276,7 +1280,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             safeSetText(elements.arenaPlayersTotal, '0');
             arenaPlayers = []; 
             localExpectedBetAmount = 0; 
-            isBallAnimating = false; // Сбрасываем флаг анимации шарика
+            isBallAnimating = false;
             updatePlayersListUI(); 
 
             renderBetButtons();
@@ -1293,7 +1297,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             btn.disabled = true;
 
             localExpectedBetAmount += betValue;
-            arenaPlayers = getMergedPlayers(arenaPlayers);
+            arenaPlayers = getMergedPlayers(arenaPlayers, lastObservedRoundNumber || 1);
             
             drawArenaSegments();
             updatePlayersListUI();
