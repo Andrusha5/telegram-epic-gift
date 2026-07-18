@@ -11,13 +11,25 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ==========================================================================
-// ВНУТРЕННЯЯ БД СЕРВЕРА (В оперативной памяти с автоматическим созданием пользователей)
+// ВНУТРЕННЯЯ БД СЕРВЕРА
 // ==========================================================================
 const usersDB = {};
 const depositRequests = [];
+const CHANNEL_USERNAME = "@BestGiftsChannel";
 
-// Дефолтные настройки кейсов и наград
-const CHANNEL_USERNAME = "@BestGiftsChannel"; // Канал для проверки подписки (заглушка)
+// Стабильные цвета для секторов
+const defaultColors = ['#8d3df5', '#00e676', '#0088cc', '#ff9500', '#ff3b30', '#c25dff'];
+
+// Генератор стабильного цвета на основе Telegram ID
+function getUserColor(userId) {
+    const idStr = String(userId || 'guest');
+    let hash = 0;
+    for (let i = 0; i < idStr.length; i++) {
+        hash = idStr.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const index = Math.abs(hash) % defaultColors.length;
+    return defaultColors[index];
+}
 
 // ==========================================================================
 // ИГРОВОЙ ДВИЖОК BEST ARENA (АБСОЛЮТНО АВТОНОМНЫЙ ЦИКЛ НА СЕРВЕРЕ)
@@ -35,7 +47,6 @@ let arenaState = {
     totalPool: 0
 };
 
-// Вспомогательные геометрические расчеты секторов на сервере (для идеального совпадения с клиентом)
 function calculateShares(bets) {
     const N = bets.length;
     if (N === 0) return [];
@@ -143,7 +154,6 @@ function getCornerAnglesRad() {
     ].map(a => (a < 0 ? a + 2 * Math.PI : a));
 }
 
-// Генерация координат шарика строго внутри секторов
 function generateCoordsForWinner(winnerIndex, bets) {
     const N = bets.length;
     if (N === 0) return { x: 160, y: 160 };
@@ -207,7 +217,6 @@ function generateCoordsForWinner(winnerIndex, bets) {
             pathPoints.push(getSquareIntersection(nextAngle));
 
             const centroid = getPolygonCentroid(pathPoints);
-            // Добавляем микро-рандомизацию вокруг геометрического центра сектора
             return {
                 x: Math.max(25, Math.min(295, centroid.x + (Math.random() * 20 - 10))),
                 y: Math.max(25, Math.min(295, centroid.y + (Math.random() * 20 - 10)))
@@ -218,7 +227,7 @@ function generateCoordsForWinner(winnerIndex, bets) {
     return { x: 160, y: 160 };
 }
 
-// Глобальный фоновый таймер сервера (Работает ВСЕГДА независимо от онлайна)
+// Автономный фоновый таймер сервера (Работает ВСЕГДА независимо от онлайна игроков)
 setInterval(() => {
     if (arenaState.status === "waiting") {
         if (arenaState.bets.length >= 1) {
@@ -233,7 +242,6 @@ setInterval(() => {
     } else if (arenaState.status === "finished") {
         arenaState.timeLeft--;
         if (arenaState.timeLeft <= 0) {
-            // Полная очистка состояния перед следующим раундом
             arenaState.bets = [];
             arenaState.status = "waiting";
             arenaState.timeLeft = 15;
@@ -255,7 +263,6 @@ function resolveArenaRound() {
     arenaState.bets.forEach(b => pool += parseFloat(b.amount));
     arenaState.totalPool = pool;
 
-    // Взвешенный рандом выбора победителя
     const rand = Math.random() * pool;
     let sum = 0;
     let winnerBet = arenaState.bets[arenaState.bets.length - 1];
@@ -277,9 +284,8 @@ function resolveArenaRound() {
     arenaState.winnerY = coords.y;
     arenaState.resolvedAt = Date.now();
     arenaState.status = "finished";
-    arenaState.timeLeft = 10; // 10 секунд на показ анимации и отдыха
+    arenaState.timeLeft = 10; 
 
-    // Начисление выигрыша на сервере
     const winnerUser = usersDB[winnerBet.userId];
     if (winnerUser) {
         winnerUser.balance = (parseFloat(winnerUser.balance) + pool);
@@ -298,7 +304,7 @@ function getOrCreateUser(initDataUnsafe) {
             id: id,
             username: tgUser.username || tgUser.first_name || "Пользователь",
             first_name: tgUser.first_name || "",
-            balance: 50.0, // Даем стартовый баланс для тестов
+            balance: 50.0, 
             avatar_url: tgUser.photo_url || "https://img.icons8.com/color/96/user.png",
             last_daily_case_open: null,
             is_admin: id === "guest_user_id"
@@ -345,16 +351,13 @@ app.post('/api/place_bet', parseTelegramInitData, (req, res) => {
         return res.status(400).json({ error: "Недостаточно баланса" });
     }
 
-    // Снимаем баланс
     user.balance = parseFloat((user.balance - amount).toFixed(3));
 
-    // Добавляем или увеличиваем ставку игрока
     const existingBet = arenaState.bets.find(b => String(b.userId) === String(user.id));
     if (existingBet) {
         existingBet.amount += amount;
     } else {
-        const defaultColors = ['#8d3df5', '#00e676', '#0088cc', '#ff9500', '#ff3b30', '#c25dff'];
-        const chosenColor = defaultColors[arenaState.bets.length % defaultColors.length];
+        const chosenColor = getUserColor(user.id);
         arenaState.bets.push({
             userId: user.id,
             username: user.username,
@@ -370,6 +373,7 @@ app.post('/api/place_bet', parseTelegramInitData, (req, res) => {
 app.get('/api/arena/state', parseTelegramInitData, (req, res) => {
     res.json({
         ...arenaState,
+        round_number: arenaState.roundNumber, // Передаем дублирующий ключ для 100% совместимости
         serverTime: Date.now()
     });
 });
@@ -383,7 +387,6 @@ app.post('/api/open_daily_case', parseTelegramInitData, (req, res) => {
         return res.status(400).json({ error: "Кейс еще недоступен" });
     }
 
-    // Выбираем случайную награду
     const rewards = [
         { id: 10, name: "Роза", type: "gift", value: 0.27 },
         { id: 11, name: "Пополнение 0.1 GRAM", type: "balance", value: 0.1 },
