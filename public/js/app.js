@@ -57,7 +57,6 @@ function createPRNG(seedString) {
     }
 }
 
-// УНИВЕРСАЛЬНЫЙ КЛИЕНТСКИЙ FETCH С УВЕЛИЧЕННЫМ ТАЙМАУТОМ (10 секунд для стабильности на 3G/LTE)
 async function fetchWithTimeout(resource, options = {}) {
     const { timeout = 10000 } = options; 
     const controller = new AbortController();
@@ -89,7 +88,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         let currentRoundSignature = null;
         let arenaStatusStr = "waiting";
 
-        // Синхронизатор ставок и баланса для исключения визуальных дублей и прыжков
+        // Ключевой предохранитель повторных анимаций
+        let lastAnimatedRound = null;
         let localExpectedBetAmount = 0;
         let lastObservedRoundNumber = null;
         let lastRenderedBalance = null;
@@ -101,7 +101,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Глобальные переменные для предзагруженных платежных реквизитов
         let preloadedAdminAddress = null;
         let preloadedPayloadBase64 = null;
-        let isPreloadingPayment = false; // Флаг, чтобы избежать одновременных запросов
+        let isPreloadingPayment = false;
 
         const safeSetText = (el, val) => { if (el) el.innerText = val; };
 
@@ -152,10 +152,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             arenaRoundNumber: document.getElementById('arena-round-number'),
             arenaPlayersTotal: document.getElementById('arena-players-total')
         };
-
-        // ----------------------------------------------------------------------------------
-        // УЛУЧШЕННАЯ ЛОГИКА ПРЕДЗАГРУЗКИ И ПРОВЕРКИ РЕКВИЗИТОВ ДЛЯ ПОПОЛНЕНИЯ БАЛАНСА
-        // ----------------------------------------------------------------------------------
 
         async function fetchPaymentParamsInternal() {
             preloadedAdminAddress = null;
@@ -225,10 +221,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         
         fetchPaymentParamsInternal();
-
-        // ----------------------------------------------------------------------------------
-        // ОСНОВНОЙ КОД APP
-        // ----------------------------------------------------------------------------------
 
         function loadSavedBets() {
             try {
@@ -1042,14 +1034,12 @@ document.addEventListener('DOMContentLoaded', async () => {
             requestAnimationFrame(renderFrame);
         }
 
-        // КЛИЕНТСКИЙ МИКСЕР (RECONCILIATION ENGINE):
-        // Объединяет серверный список игроков с нашими оптимистичными ставками в реальном времени.
+        // КЛИЕНТСКИЙ МИКСЕР ОЖИДАЕМЫХ СТАВОК (RECONCILIATION ENGINE)
         function getMergedPlayers(serverPlayers) {
             const myIdStr = String(userId);
             const serverMe = serverPlayers.find(p => String(p.userId) === myIdStr);
             const serverMyBet = serverMe ? parseFloat(serverMe.bet) : 0;
 
-            // Если сервер уже обработал или превысил наши ожидания, синхронизируем локальные данные
             if (serverMyBet >= localExpectedBetAmount) {
                 localExpectedBetAmount = serverMyBet;
             }
@@ -1081,7 +1071,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             return merged;
         }
 
-        // БЕЗОПАСНЫЙ И ВЫСОКОСКОРОСТНОЙ ПОЛЛИНГ ИГРЫ ARENA (БЕЗ НАЛОЖЕНИЙ)
+        // БЕЗОПАСНЫЙ И ВЫСОКОСКОРОСТНОЙ ПОЛЛИНГ ИГРЫ ARENA
         async function pollArenaLoop() {
             if (!isPollingActive) return;
 
@@ -1111,13 +1101,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                     const correctRoundNumber = state.roundNumber || 0;
                     
-                    // Сброс ожидаемых ставок при начале новой игры
                     if (correctRoundNumber !== lastObservedRoundNumber) {
                         localExpectedBetAmount = 0;
                         lastObservedRoundNumber = correctRoundNumber;
                     }
 
-                    // Объединение серверов с нашими транзакциями
                     arenaPlayers = getMergedPlayers(serverPlayers);
 
                     drawArenaSegments();
@@ -1169,7 +1157,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                         const signature = winId + "_" + tPool + "_" + winX + "_" + winY + "_" + correctRoundNumber;
                         const age = serverTime - resolvedAt; 
 
-                        if (currentRoundSignature !== signature && winX !== undefined && winY !== undefined && age < 9500) {
+                        // АНИМАЦИЯ ИГРАЕТ ТОЛЬКО ЕСЛИ КЛИЕНТ РЕАЛЬНО НАХОДИЛСЯ В СЕТИ И РАУНД СВЕЖИЙ (< 7 сек)
+                        if (correctRoundNumber !== lastAnimatedRound && age < 7000) {
+                            lastAnimatedRound = correctRoundNumber;
                             currentRoundSignature = signature;
                             
                             if (statusText) statusText.classList.add('hidden');
@@ -1193,16 +1183,16 @@ document.addEventListener('DOMContentLoaded', async () => {
                                 
                                 fetchUserData();
                             });
-                        } else if (age >= 9500) {
-                             clearInterval(countdownIntervalId);
-                             if (statusText && !isBallAnimating) {
-                                statusText.classList.remove('hidden');
-                                statusText.innerText = "Ждем ставки...";
-                             }
-                             if (countdownTimer) countdownTimer.classList.add('hidden');
+                        } else if (correctRoundNumber !== lastAnimatedRound && age >= 7000) {
+                            // FAST-FORWARD ENGINE: Пропускаем анимацию, если зашли поздно
+                            lastAnimatedRound = correctRoundNumber;
+                            currentRoundSignature = signature;
                             
-                             const ballCanvas = document.getElementById('arena-ball-svg');
-                             if (ballCanvas) ballCanvas.innerHTML = '';
+                            const ballCanvas = document.getElementById('arena-ball-svg');
+                            if (ballCanvas) ballCanvas.innerHTML = '';
+                            
+                            showNotification(`Раунд #${correctRoundNumber} завершен. Победитель: ${winName} (${parseFloat(tPool).toFixed(3)} GRAM)`, "🏆");
+                            fetchUserData();
                         }
                     } else {
                         clearInterval(countdownIntervalId);
@@ -1263,7 +1253,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             safeSetText(elements.arenaRoundNumber, '0');
             safeSetText(elements.arenaPlayersTotal, '0');
             arenaPlayers = []; 
-            localExpectedBetAmount = 0; // Сброс ожидаемых ставок
+            localExpectedBetAmount = 0; 
             updatePlayersListUI(); 
 
             renderBetButtons();
@@ -1276,11 +1266,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             const betValue = parseFloat(btn.getAttribute('data-bet'));
             if (isNaN(betValue) || betValue < 0.1) return; 
 
-            // Сразу блокируем клики, чтобы пользователь не спамил
             btn.classList.add('disabled');
             btn.disabled = true;
 
-            // Мгновенная регистрация ставки локально
             localExpectedBetAmount += betValue;
             arenaPlayers = getMergedPlayers(arenaPlayers);
             
@@ -1306,7 +1294,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                     updateBalanceUI();
                 } else {
                     showNotification(data.error || "Ошибка ставки", "⚠️");
-                    // Откат ставки при отказе сервера
                     localExpectedBetAmount = Math.max(0, localExpectedBetAmount - betValue);
                     fetchUserData();
                 }
@@ -1324,7 +1311,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (betBtn2) betBtn2.addEventListener('click', handleBetClick);
         if (betBtn3) betBtn3.addEventListener('click', handleBetClick);
 
-        // Настройка ставок
         const editBetsModal = document.getElementById('edit-bets-modal');
         const betEditTrigger = document.getElementById('bet-edit-trigger');
         const editBetsClose = document.getElementById('edit-bets-close-btn');
@@ -1667,7 +1653,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             renderBetButtons(); 
         }
 
-        // Обновление баланса со встроенным оптимистичным фильтром наложений
         function updateBalanceUI(forcedValue = null) {
             const baseBalance = (currentUser && currentUser.balance) ? parseFloat(currentUser.balance) : 0;
             const val = forcedValue !== null ? parseFloat(forcedValue) : baseBalance;
@@ -1680,7 +1665,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const finalBalance = Math.max(0, val - diff);
             const balVal = isNaN(finalBalance) ? "0.000" : finalBalance.toFixed(3);
             
-            if (lastRenderedBalance === balVal) return; // Блокировка ложных циклов анимации
+            if (lastRenderedBalance === balVal) return; 
             lastRenderedBalance = balVal;
 
             safeSetText(elements.balanceDisplayPill, balVal);
