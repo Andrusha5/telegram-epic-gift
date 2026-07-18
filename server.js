@@ -14,15 +14,13 @@ app.use(express.static(path.join(__dirname, 'public')));
 // ВНУТРЕННЯЯ БД СЕРВЕРА
 // ==========================================================================
 const usersDB = {};
-const depositRequests = [];
 const CHANNEL_USERNAME = "@BestGiftsChannel";
 
-// Стабильные цвета для секторов
 const defaultColors = ['#8d3df5', '#00e676', '#0088cc', '#ff9500', '#ff3b30', '#c25dff'];
 
-// Генератор стабильного цвета на основе Telegram ID
-function getUserColor(userId) {
-    const idStr = String(userId || 'guest');
+// Стабильный, но динамический цвет: уникальный для каждого раунда
+function getUserColor(userId, roundNumber) {
+    const idStr = String(userId || 'guest') + "_" + String(roundNumber || 1);
     let hash = 0;
     for (let i = 0; i < idStr.length; i++) {
         hash = idStr.charCodeAt(i) + ((hash << 5) - hash);
@@ -357,7 +355,7 @@ app.post('/api/place_bet', parseTelegramInitData, (req, res) => {
     if (existingBet) {
         existingBet.amount += amount;
     } else {
-        const chosenColor = getUserColor(user.id);
+        const chosenColor = getUserColor(user.id, arenaState.roundNumber);
         arenaState.bets.push({
             userId: user.id,
             username: user.username,
@@ -370,10 +368,20 @@ app.post('/api/place_bet', parseTelegramInitData, (req, res) => {
     res.json({ success: true, newBalance: user.balance });
 });
 
+// Безопасная сериализация состояния для исключения багов сжатия/пропуска свойств
 app.get('/api/arena/state', parseTelegramInitData, (req, res) => {
     res.json({
-        ...arenaState,
-        round_number: arenaState.roundNumber, // Передаем дублирующий ключ для 100% совместимости
+        status: arenaState.status,
+        roundNumber: arenaState.roundNumber,
+        round_number: arenaState.roundNumber,
+        bets: arenaState.bets,
+        timeLeft: arenaState.timeLeft,
+        resolvedAt: arenaState.resolvedAt,
+        winnerId: arenaState.winnerId,
+        winnerName: arenaState.winnerName,
+        winnerX: arenaState.winnerX,
+        winnerY: arenaState.winnerY,
+        totalPool: arenaState.totalPool,
         serverTime: Date.now()
     });
 });
