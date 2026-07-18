@@ -57,6 +57,20 @@ function createPRNG(seedString) {
     }
 }
 
+// Стабильные цвета на клиенте
+const defaultColors = ['#8d3df5', '#00e676', '#0088cc', '#ff9500', '#ff3b30', '#c25dff'];
+
+// Детерминированный цвет на основе Telegram ID (тот же алгоритм, что на сервере)
+function getUserColor(userId) {
+    const idStr = String(userId || 'guest');
+    let hash = 0;
+    for (let i = 0; i < idStr.length; i++) {
+        hash = idStr.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const index = Math.abs(hash) % defaultColors.length;
+    return defaultColors[index];
+}
+
 async function fetchWithTimeout(resource, options = {}) {
     const { timeout = 10000 } = options; 
     const controller = new AbortController();
@@ -88,17 +102,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         let currentRoundSignature = null;
         let arenaStatusStr = "waiting";
 
-        // Ключевой предохранитель повторных анимаций
         let lastAnimatedRound = null;
         let localExpectedBetAmount = 0;
         let lastObservedRoundNumber = null;
         let lastRenderedBalance = null;
 
-        // Переменные для плавного плавного локального таймера
         let countdownIntervalId = null;
         let localCountdownValue = 0;
 
-        // Глобальные переменные для предзагруженных платежных реквизитов
         let preloadedAdminAddress = null;
         let preloadedPayloadBase64 = null;
         let isPreloadingPayment = false;
@@ -638,6 +649,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const avatarsContainer = document.getElementById('arena-avatars-container');
                 if (!svg || !avatarsContainer) return;
 
+                // Если раунд в статусе ожидания ставок, принудительно снимаем флаг анимации, чтобы разблокировать перерисовку
+                if (arenaStatusStr === 'waiting') {
+                    isBallAnimating = false;
+                }
+
                 if (isBallAnimating) return;
 
                 svg.innerHTML = '';
@@ -1055,9 +1071,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                     const myAvatar = currentUser.avatar_url || "https://img.icons8.com/color/96/user.png";
                     const myName = currentUser.username || currentUser.first_name || "Я";
                     
-                    const usedColors = merged.map(p => p.color);
-                    const defaultColors = ['#8d3df5', '#00e676', '#0088cc', '#ff9500', '#ff3b30', '#c25dff'];
-                    let chosenColor = defaultColors.find(c => !usedColors.includes(c)) || defaultColors[0];
+                    // ЦВЕТ БЕРЕТСЯ СТРОГО СТАБИЛЬНЫЙ
+                    const chosenColor = getUserColor(userId);
 
                     merged.push({
                         userId: userId,
@@ -1096,14 +1111,21 @@ document.addEventListener('DOMContentLoaded', async () => {
                         username: bet.username || bet.user_name || bet.name || "Игрок",
                         avatar: bet.avatar || bet.avatar_url || "https://img.icons8.com/color/96/user.png",
                         bet: parseFloat(bet.amount || bet.bet || 0),
-                        color: bet.color || "#8d3df5"
+                        color: bet.color || getUserColor(bet.userId || bet.user_id || bet.id) // Назначаем стабильный цвет
                     }));
 
-                    const correctRoundNumber = state.roundNumber || 0;
+                    // Исключаем баг Игра #0 считыванием любого типа ключа раунда
+                    const correctRoundNumber = state.roundNumber !== undefined ? state.roundNumber : (state.round_number !== undefined ? state.round_number : 0);
                     
+                    // Полный сброс буферов локальных ставок при переходе на следующий раунд
                     if (correctRoundNumber !== lastObservedRoundNumber) {
                         localExpectedBetAmount = 0;
                         lastObservedRoundNumber = correctRoundNumber;
+                    }
+
+                    // Предохранительный сброс: если раунд ждет ставок, а на сервере игроков нет — зануляем ожидания локальной ставки
+                    if (arenaStatusStr === 'waiting' && serverPlayers.length === 0) {
+                        localExpectedBetAmount = 0;
                     }
 
                     arenaPlayers = getMergedPlayers(serverPlayers);
@@ -1157,7 +1179,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         const signature = winId + "_" + tPool + "_" + winX + "_" + winY + "_" + correctRoundNumber;
                         const age = serverTime - resolvedAt; 
 
-                        // АНИМАЦИЯ ИГРАЕТ ТОЛЬКО ЕСЛИ КЛИЕНТ РЕАЛЬНО НАХОДИЛСЯ В СЕТИ И РАУНД СВЕЖИЙ (< 7 сек)
+                        // АНИМАЦИЯ ИГРАЕТ ТОЛЬКО ЕСЛИ КЛИЕНТ БЫЛ В СЕТИ И РАУНД СВЕЖИЙ (< 7 сек)
                         if (correctRoundNumber !== lastAnimatedRound && age < 7000) {
                             lastAnimatedRound = correctRoundNumber;
                             currentRoundSignature = signature;
@@ -1254,6 +1276,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             safeSetText(elements.arenaPlayersTotal, '0');
             arenaPlayers = []; 
             localExpectedBetAmount = 0; 
+            isBallAnimating = false; // Сбрасываем флаг анимации шарика
             updatePlayersListUI(); 
 
             renderBetButtons();
