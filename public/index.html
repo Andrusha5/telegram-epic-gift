@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>BestGifts</title>
-    <!-- Версия v=2.7.4 гарантирует сброс кэша во всех версиях Telegram -->
-    <link rel="stylesheet" href="css/style.css?v=2.7.4">
+    <!-- Задаем новую версию v=2.8.1 для безусловного сброса кэша Telegram -->
+    <link rel="stylesheet" href="css/style.css?v=2.8.1">
 </head>
 <body>
 
@@ -137,20 +137,11 @@
 
         <div class="arena-game-container">
             <div class="arena-big-box" id="arena-box-container">
-                <!-- SVG-холст полей секторов -->
                 <svg id="arena-svg-canvas" class="arena-canvas" viewBox="0 0 320 320" width="320" height="320"></svg>
-                
-                <!-- Инженерная защитная сетка -->
                 <div class="arena-grid-overlay"></div>
-                
-                <!-- Статусные слои -->
                 <div class="arena-waiting-text" id="arena-status-text">Ждем ставки...</div>
                 <div class="arena-timer-circle hidden" id="arena-countdown-timer">15</div>
-
-                <!-- Контейнер аватарок -->
                 <div class="arena-avatars-overlay" id="arena-avatars-container"></div>
-
-                <!-- Верхний холст для отрисовки шарика и текста -->
                 <svg id="arena-ball-svg" class="arena-ball-canvas" viewBox="0 0 320 320" width="320" height="320"></svg>
             </div>
 
@@ -159,7 +150,7 @@
                 <span class="arena-game-round">Игра #<span id="arena-round-number">0</span></span>
             </div>
 
-            <!-- ПАНЕЛЬ БЫСТРЫХ СТАВОК -->
+            <!-- ПАНЕЛЬ СТАВОК -->
             <div class="betting-row">
                 <button class="bet-edit-btn" id="bet-edit-trigger">
                     <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
@@ -180,7 +171,7 @@
                 </button>
             </div>
 
-            <!-- ИНТЕРАКТИВНЫЙ СПИСОК УЧАСТНИКОВ -->
+            <!-- СПИСОК УЧАСТНИКОВ -->
             <div class="arena-players-list-box">
                 <div class="players-list-title-row">
                     <h3 class="players-list-title">👥 Список участников</h3>
@@ -230,7 +221,7 @@
         </div>
     </section>
 
-    <!-- ================= 6. ЭКРАН КОШЕЛЬКА (БАЛАНС) ================= -->
+    <!-- ================= 6. ЭКРАН КОШЕЛЬКА ================= -->
     <section id="balance-section" class="app-section hidden">
         <div class="balance-header">
             <button class="back-btn-square" id="back-to-home-from-balance">
@@ -255,7 +246,7 @@
         </div>
     </section>
 
-    <!-- ================= МЕНЮ НАВИГАЦИИ ================= -->
+    <!-- МЕНЮ НАВИГАЦИИ -->
     <div class="floating-nav-container">
         <nav class="bottom-nav">
             <button class="nav-tab" data-target="inventory">
@@ -351,7 +342,7 @@
 
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>
-    <!-- Принудительное обновление скрипта (обновите версию после каждого деплоя) -->
-    <script src="js/app.js?v=2.7.4" defer></script>
+    <!-- Принудительно подключаем скрипт версии v=2.8.1 -->
+    <script src="js/app.js?v=2.8.1" defer></script>
 </body>
-    </html>
+                </html>
