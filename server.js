@@ -224,7 +224,6 @@ function generateCoordsForWinner(winnerIndex, bets) {
 // Игровой цикл бэкенда
 setInterval(() => {
     if (arenaState.status === "waiting") {
-        // ТАЙМЕР ЗАПУСКАЕТСЯ СТРОГО ПРИ 2 И БОЛЕЕ ИГРОКАХ
         if (arenaState.bets.length >= 2) {
             arenaState.status = "countdown";
             arenaState.timeLeft = 15;
@@ -338,7 +337,7 @@ app.post('/api/place_bet', parseTelegramInitData, (req, res) => {
         return res.status(400).json({ error: "Раунд уже завершен, подождите..." });
     }
 
-    const user = req.user; // Получаем ПОЛНОЦЕННОГО уникального юзера!
+    const user = req.user; 
     if (parseFloat(user.balance) < amount) {
         return res.status(400).json({ error: "Недостаточно баланса" });
     }
