@@ -14,21 +14,23 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// 🛡️ ГЛОБАЛЬНЫЙ ЩИТ ОТ ЛЮБЫХ ПАДЕНИЙ СЕРВЕРА (АБСОЛЮТНАЯ ЗАЩИТА)
+// 🛡️ ГЛОБАЛЬНЫЙ ЩИТ ОТ ЛЮБЫХ ПАДЕНИЙ СЕРВЕРА
 process.on('uncaughtException', (err) => {
-    console.error('⛔ СИСТЕМНЫЙ ПЕРЕХВАТ ОШИБКИ (Процесс не упадет):', err.stack || err);
+    console.error('⛔ СИСТЕМНЫЙ ПЕРЕХВАТ ОШИБКИ:', err.stack || err);
 });
 
 process.on('unhandledRejection', (reason, promise) => {
     console.error('⛔ СИСТЕМНЫЙ ПЕРЕХВАТ НЕОБРАБОТАННОГО ПРОМИСА:', reason);
 });
 
-// НАСТРОЙКИ TG-БОТА (Универсальный поиск токена и ID админа на Render)
+// НАСТРОЙКИ TG-БОТА И КОШЕЛЬКА (Интеграция с Render)
 const BOT_TOKEN = String(process.env.TELEGRAM_BOT_TOKEN || process.env.BOT_TOKEN || '').trim().replace(/^["']|["']$/g, '');
 const ADMIN_CHAT_ID = String(process.env.ADMIN_TELEGRAM_ID || process.env.ADMIN_CHAT_ID || '').trim().replace(/^["']|["']$/g, '');
-let bot = null;
 
-// Хранилище состояний ввода админа
+// Валидный формат TON-адреса по умолчанию (чтобы кошельки успешно открывались на подтверждение)
+const DEPOSIT_ADDRESS = String(process.env.DEPOSIT_ADDRESS || 'EQC3481up9_gG98_wK8Jv_Zz1yLp9p0_Y-7Jv7x4b9a9JKe6').trim().replace(/^["']|["']$/g, '');
+
+let bot = null;
 const adminStates = {}; 
 
 if (BOT_TOKEN && BOT_TOKEN !== "undefined" && BOT_TOKEN !== "") {
@@ -36,18 +38,16 @@ if (BOT_TOKEN && BOT_TOKEN !== "undefined" && BOT_TOKEN !== "") {
         bot = new TelegramBot(BOT_TOKEN, { polling: true });
         console.log("SUCCESS: Telegram Bot successfully initialized.");
 
-        // Мягкие обработчики ошибок бота (не дают упасть процессу Node.js)
         bot.on('polling_error', (error) => {
-            console.warn("⚠️ Предупреждение Polling (Бот продолжает работать):", error.message);
+            console.warn("⚠️ Предупреждение Polling:", error.message);
         });
 
         bot.on('error', (error) => {
-            console.error("⚠️ Ошибка бота (Бот продолжает работать):", error.message);
+            console.error("⚠️ Ошибка бота:", error.message);
         });
 
-        // Мгновенная очистка зависшей очереди сообщений и сброс вебхука
         bot.deleteWebHook({ drop_pending_updates: true }).then(() => {
-            console.log("SUCCESS: Telegram Webhook dropped. Bot polling is fully active!");
+            console.log("SUCCESS: Telegram Webhook dropped. Bot polling is active!");
         }).catch(err => {
             console.error("ERROR clearing Webhook:", err.message);
         });
@@ -56,7 +56,7 @@ if (BOT_TOKEN && BOT_TOKEN !== "undefined" && BOT_TOKEN !== "") {
         console.error("CRITICAL: Failed to initialize Telegram Bot:", e.message);
     }
 } else {
-    console.error("CRITICAL ERROR: TELEGRAM_BOT_TOKEN is missing in Render environment! Please check your Render panel.");
+    console.error("CRITICAL ERROR: TELEGRAM_BOT_TOKEN is missing in Render environment!");
 }
 
 // СПИСОК ВСЕХ ДОСТУПНЫХ ПОДАРКОВ
@@ -90,11 +90,12 @@ let pgPool = null;
 const localUsersFile = path.join(__dirname, 'database_users.json');
 const localInvFile = path.join(__dirname, 'database_inventory.json');
 const localDepFile = path.join(__dirname, 'database_deposits.json');
+const localArenaFile = path.join(__dirname, 'database_arena.json');
 
-// Подготовка резервных файлов
 if (!fs.existsSync(localUsersFile)) fs.writeFileSync(localUsersFile, JSON.stringify({}));
 if (!fs.existsSync(localInvFile)) fs.writeFileSync(localInvFile, JSON.stringify([]));
 if (!fs.existsSync(localDepFile)) fs.writeFileSync(localDepFile, JSON.stringify([]));
+if (!fs.existsSync(localArenaFile)) fs.writeFileSync(localArenaFile, JSON.stringify({}));
 
 if (process.env.DATABASE_URL) {
     pgPool = new Pool({
@@ -132,8 +133,6 @@ if (process.env.DATABASE_URL) {
     pgPool.query(initDbQueries)
         .then(() => console.log("PostgreSQL Tables verified/updated successfully."))
         .catch(err => console.error("PostgreSQL Init Database tables error:", err.message));
-} else {
-    console.warn("DATABASE_URL is missing. Using persistent local JSON files instead.");
 }
 
 // УНИВЕРСАЛЬНЫЕ МЕТОДЫ РАБОТЫ С ДАННЫМИ С ЗАЩИТОЙ ОТ СБОЕВ БД
@@ -229,7 +228,7 @@ async function dbRemoveInventoryItem(userId, itemId) {
     }
 }
 
-// ОБРАБОТКА КОМАНД TG-БОТА С ПРОВЕРКОЙ НА АДМИНА
+// ОБРАБОТКА TG КОМАНД С ПРОВЕРКОЙ НА АДМИНА
 if (bot) {
     bot.on('callback_query', async (callbackQuery) => {
         const action = callbackQuery.data; 
@@ -278,8 +277,6 @@ if (bot) {
             const chatId = msg.chat.id;
             const text = msg.text ? msg.text.trim() : '';
             const isAdmin = String(chatId).trim() === String(ADMIN_CHAT_ID).trim();
-
-            console.log("Входящее сообщение: " + text + " | От кого: " + chatId + " | Админ ли: " + isAdmin);
 
             if (text === '/start') {
                 const welcomeMsg = "🎉 **Добро пожаловать в BestGifts!**\n\n" +
@@ -391,7 +388,7 @@ if (bot) {
     });
 }
 
-// СОСТОЯНИЕ ИГРЫ ARENA
+// 🎰 СОСТОЯНИЕ ИГРЫ ARENA (С ПОЛНОЙ ПЕРСИСТЕНТНОСТЬЮ И СТАРТОМ ОТ 2-Х ИГРОКОВ!)
 let arenaState = {
     status: "waiting", // waiting, countdown, finished
     roundNumber: 1,
@@ -405,21 +402,58 @@ let arenaState = {
     totalPool: 0
 };
 
-// Игровой цикл бэкенда
+// Функция загрузки Арены из базы (после перезапуска сервера)
+function loadArenaState() {
+    try {
+        if (fs.existsSync(localArenaFile)) {
+            const data = JSON.parse(fs.readFileSync(localArenaFile, 'utf8'));
+            if (data && Array.isArray(data.bets)) {
+                arenaState = data;
+                // Защита: если сервер упал во время игры, вернем статус в waiting, сохранив ставки
+                if (arenaState.status === "countdown" || arenaState.status === "finished") {
+                    arenaState.status = "waiting";
+                    arenaState.timeLeft = 15;
+                }
+                console.log("SUCCESS: Arena State restored. Active bets count: " + arenaState.bets.length);
+            }
+        }
+    } catch (e) {
+        console.error("Error loading Arena State:", e.message);
+    }
+}
+
+// Функция сохранения Арены в базу
+function saveArenaState() {
+    try {
+        fs.writeFileSync(localArenaFile, JSON.stringify(arenaState, null, 2));
+    } catch (e) {
+        console.error("Error saving Arena State:", e.message);
+    }
+}
+
+loadArenaState(); // Мягко восстанавливаем Арену при старте сервера!
+
+// Игровой цикл бэкенда (ЖЕСТКО: запуск таймера только когда игроков >= 2)
 setInterval(() => {
     try {
+        let stateChanged = false;
+
         if (arenaState.status === "waiting") {
+            // ТРЕБУЕТСЯ МИНИМУМ 2 ИГРОКА ДЛЯ НАЧАЛА ОТСЧЕТА!
             if (arenaState.bets.length >= 2) {
                 arenaState.status = "countdown";
                 arenaState.timeLeft = 15;
+                stateChanged = true;
             }
         } else if (arenaState.status === "countdown") {
             arenaState.timeLeft--;
+            stateChanged = true;
             if (arenaState.timeLeft <= 0) {
                 resolveArenaRound().catch(e => console.error("Error resolving round:", e.message));
             }
         } else if (arenaState.status === "finished") {
             arenaState.timeLeft--;
+            stateChanged = true;
             if (arenaState.timeLeft <= 0) {
                 arenaState.bets = [];
                 arenaState.status = "waiting";
@@ -428,7 +462,12 @@ setInterval(() => {
                 arenaState.winnerName = null;
                 arenaState.totalPool = 0;
                 arenaState.roundNumber++;
+                stateChanged = true;
             }
+        }
+
+        if (stateChanged) {
+            saveArenaState();
         }
     } catch (err) {
         console.error("Arena interval error:", err.message);
@@ -436,8 +475,9 @@ setInterval(() => {
 }, 1000);
 
 async function resolveArenaRound() {
-    if (arenaState.bets.length === 0) {
+    if (arenaState.bets.length < 2) {
         arenaState.status = "waiting";
+        saveArenaState();
         return;
     }
 
@@ -467,6 +507,7 @@ async function resolveArenaRound() {
     arenaState.resolvedAt = Date.now();
     arenaState.status = "finished";
     arenaState.timeLeft = 10; 
+    saveArenaState();
 
     const winnerUser = await dbGetUser(winnerBet.userId);
     if (winnerUser) {
@@ -841,6 +882,7 @@ app.post('/api/place_bet', parseTelegramInitData, async (req, res) => {
         });
     }
 
+    saveArenaState(); // Сохраняем Арену на бэкенде!
     res.json({ success: true, newBalance: user.balance });
 });
 
@@ -866,7 +908,6 @@ app.post('/api/open_daily_case', parseTelegramInitData, async (req, res) => {
     const cooldown = 24 * 60 * 60 * 1000;
     const isAdmin = String(user.id).trim() === String(ADMIN_CHAT_ID).trim();
 
-    // Полный обход таймера для админа на сервере
     if (!isAdmin && user.last_daily_case_open && (now - new Date(user.last_daily_case_open).getTime() < cooldown)) {
         return res.status(400).json({ error: "Кейс еще недоступен" });
     }
@@ -930,8 +971,9 @@ app.get('/api/daily_case_info', (req, res) => {
     res.json({ channel_username: "@BestGiftsChannel" });
 });
 
+// АДРЕС ПОПОЛНЕНИЯ
 app.get('/api/deposit_address', (req, res) => {
-    res.json({ address: "EQAn...your_wallet_address_here..." });
+    res.json({ address: DEPOSIT_ADDRESS });
 });
 
 app.get('/api/generate_payload', (req, res) => {
