@@ -4,10 +4,19 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>BestGifts</title>
-    <!-- Принудительный сброс кэша Telegram новой версией v=2.9.2 -->
-    <link rel="stylesheet" href="css/style.css?v=2.9.2">
+    <!-- v=2.9.5 Принудительный сброс кэша -->
+    <link rel="stylesheet" href="css/style.css?v=2.9.5">
 </head>
 <body>
+
+    <!-- ЭКРАН ПОЛНОЙ БЛОКИРОВКИ ДЛЯ ЗАБАНЕННЫХ -->
+    <div id="banned-screen" class="banned-overlay hidden">
+        <div class="banned-container">
+            <span class="banned-icon">🚫</span>
+            <h1 class="banned-title">ДОСТУП ОГРАНИЧЕН</h1>
+            <p class="banned-text">Ваш аккаунт был временно или навсегда заблокирован администратором системы за нарушение игровых правил.</p>
+        </div>
+    </div>
 
     <!-- ВЕРХНЯЯ ПАНЕЛЬ -->
     <header class="main-header">
@@ -21,13 +30,11 @@
                 <span id="user-username" class="header-username">Пользователь</span>
             </div>
         </div>
-        <!-- Инновационный контейнер с поддержкой стильных всплывающих пилюль изменения баланса -->
         <div class="balance-area-wrapper">
             <div class="balance-pill" id="balance-pill">
                 <span id="user-balance-pill-value">0.000</span>
                 <img src="/Images/Items/gram_popolnenie.png" alt="GRAM" class="balance-icon">
             </div>
-            <!-- Сюда динамически добавляются красивые красные и зеленые пилюли -->
             <div id="balance-badge-container" class="balance-badge-container"></div>
         </div>
     </header>
@@ -39,7 +46,6 @@
             <h2>Добро пожаловать в BestGifts!</h2>
         </div>
 
-        <!-- БАННЕР ИГРЫ BEST ARENA -->
         <div class="game-promo-banner" id="game-arena-trigger">
             <div class="game-info-side">
                 <h2 class="game-title">Best Arena</h2>
@@ -150,12 +156,10 @@
                 <svg id="arena-ball-svg" class="arena-ball-canvas" viewBox="0 0 320 320" width="320" height="320"></svg>
             </div>
 
-            <!-- ИНФОРМАЦИЯ ОБ ИГРЕ -->
             <div class="arena-game-footer">
                 <span class="arena-game-round">Игра #<span id="arena-round-number">0</span></span>
             </div>
 
-            <!-- ПАНЕЛЬ СТАВОК -->
             <div class="betting-row">
                 <button class="bet-edit-btn" id="bet-edit-trigger">
                     <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
@@ -176,7 +180,6 @@
                 </button>
             </div>
 
-            <!-- СПИСОК УЧАСТНИКОВ -->
             <div class="arena-players-list-box">
                 <div class="players-list-title-row">
                     <h3 class="players-list-title">👥 Список участников</h3>
@@ -295,7 +298,7 @@
             <button class="modal-close-x" id="edit-bets-close-btn">&times;</button>
             <div class="modal-icon">✏️</div>
             <h2 class="modal-title">Настройка кнопок</h2>
-            <p class="modal-message">Задайте суммы для быстрых ставок (не менее 0.1, макс. 3 знака после запятой):</p>
+            <p class="modal-message">Задайте суммы для быстрых ставок:</p>
             <div class="modal-input-row">
                 <div class="bet-input-wrapper">
                     <label>Кнопка 1</label>
@@ -322,7 +325,7 @@
             <button class="modal-close-x" id="deposit-modal-close-btn">&times;</button>
             <div class="modal-icon">💎</div>
             <h2 class="modal-title">Пополнение баланса</h2>
-            <p class="modal-message">Введите сумму в TON (минимальная сумма пополнения — 0.1 TON):</p>
+            <p class="modal-message">Введите сумму в TON (мин. 0.1 TON):</p>
             <div class="modal-input-wrapper">
                 <input type="text" id="modal-deposit-input" class="modal-deposit-field" inputmode="decimal" placeholder="0.1">
             </div>
@@ -343,12 +346,10 @@
         </div>
     </div>
 
-    <!-- Общий контейнер уведомлений для кейсов/подписок -->
     <div id="toast-container" class="toast-container"></div>
 
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>
-    <!-- Подключаем новый скрипт -->
-    <script src="js/app.js?v=2.9.2" defer></script>
+    <script src="js/app.js?v=2.9.5" defer></script>
 </body>
-    </html>
+                                                                                                                                                                        </html>
