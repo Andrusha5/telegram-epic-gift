@@ -740,7 +740,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     const c2 = getPolygonCentroid(p2Pts);
 
                     createAvatarElement(c1.x, c1.y, arenaPlayers[0].avatar, 24 + shares[0] * 30);
-                    createAvatarElement(c2.y, c2.y, arenaPlayers[1].avatar, 24 + shares[1] * 30);
+                    createAvatarElement(c2.x, c2.y, arenaPlayers[1].avatar, 24 + shares[1] * 30);
                     return; 
                 }
 
@@ -1753,11 +1753,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         function updateDailyCaseTimer() {
             clearInterval(dailyCaseTimerInterval); 
             
-            // Админу полностью отключаем блокирующий таймер
-            if (currentUser && currentUser.isAdmin) {
+            // ЕСЛИ АДМИНИСТРАТОР — ПОЛНОСТЬЮ ОТКЛЮЧАЕМ БЛОКИРУЮЩИЙ ТАЙМЕР НА КЛИЕНТЕ
+            if (currentUser && (currentUser.isAdmin === true || currentUser.isAdmin === "true")) {
                 if (elements.spinBtn) elements.spinBtn.classList.remove('hidden');
                 if (elements.spinBtn) elements.spinBtn.disabled = false;
-                const t = document.getElementById('timer-container'); if (t) t.classList.add('hidden');
+                const t = document.getElementById('timer-container'); 
+                if (t) t.classList.add('hidden');
                 return;
             }
 
