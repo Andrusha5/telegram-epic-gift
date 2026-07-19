@@ -1,6 +1,11 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const fs = require('fs');
+const { Pool } = require('pg');
+const TelegramBot = require('node-telegram-bot-api');
+
+require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -9,22 +14,323 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// ВНУТРЕННЯЯ БД СЕРВЕРА
-const usersDB = {};
-const CHANNEL_USERNAME = "@BestGiftsChannel";
+// КЛЮЧИ И НАСТРОЙКИ TG-БОТА С ПРОВЕРКОЙ
+const BOT_TOKEN = process.env.BOT_TOKEN;
+const ADMIN_CHAT_ID = process.env.ADMIN_CHAT_ID;
+let bot = null;
 
-// Палитра цветов для секторов игры
-const defaultColors = ['#8d3df5', '#00e676', '#0088cc', '#ff9500', '#ff3b30', '#c25dff'];
+// Временное хранилище состояний ввода админа
+const adminStates = {}; 
 
-// Стабильный цвет: уникальный для каждого раунда
-function getUserColor(userId, roundNumber) {
-    const idStr = String(userId || 'guest') + "_" + String(roundNumber || 1);
-    let hash = 0;
-    for (let i = 0; i < idStr.length; i++) {
-        hash = idStr.charCodeAt(i) + ((hash << 5) - hash);
+if (BOT_TOKEN) {
+    try {
+        bot = new TelegramBot(BOT_TOKEN, { polling: true });
+        console.log("Telegram Bot successfully loaded.");
+
+        // Автоматическая установка меню команд для кнопки "/"
+        bot.setMyCommands([
+            { command: 'start', description: 'Запустить BestGifts' },
+            { command: 'ban', description: 'Заблокировать игрока по ID (Админ)' },
+            { command: 'unban', description: 'Разблокировать игрока по ID (Админ)' },
+            { command: 'status', description: 'Проверить статус игрока по ID (Админ)' }
+        ]).then(() => {
+            console.log("Slash commands menu registered successfully.");
+        }).catch(err => {
+            console.error("Error setting bot commands:", err.message);
+        });
+
+    } catch (e) {
+        console.error("Failed to initialize Telegram Bot:", e.message);
     }
-    const index = Math.abs(hash) % defaultColors.length;
-    return defaultColors[index];
+} else {
+    console.warn("BOT_TOKEN is missing! Admin bot functions are disabled.");
+}
+
+// СПИСОК ВСЕХ ДОСТУПНЫХ ПОДАРКОВ
+const ALL_GIFT_ITEMS = {
+    1: { name: "Статуя птицы серая", value: 20.0, icon: "/Images/Items/rare_bird.jpg" },
+    2: { name: "Тыква", value: 8.0, icon: "/Images/Items/pumpkin.jpg" },
+    3: { name: "Шляпа", value: 7.0, icon: "/Images/Items/hat.jpg" },
+    4: { name: "Собачка Snoop Dogg", value: 4.0, icon: "/Images/Items/snoopdog.jpg" },
+    5: { name: "Рюкзак черный", value: 3.0, icon: "/Images/Items/pack.jpg" },
+    6: { name: "Доширак лапша", value: 2.7, icon: "/Images/Items/ramen.jpg" },
+    7: { name: "Факел", value: 2.5, icon: "/Images/Items/chill_flame.jpg" },
+    8: { name: "Мороженое пломбир", value: 2.5, icon: "/Images/Items/plombir.jpg" },
+    9: { name: "Алмазик", value: 0.9, icon: "/Images/Items/almaz.jpg" },
+    10: { name: "Роза", value: 0.27, icon: "/Images/Items/roza.jpg" },
+    101: { name: "Розовый мишка", value: 29.0, icon: "/Images/Items/bearpink.png" },
+    102: { name: "Шлем Неко", value: 26.8, icon: "/Images/Items/Neko_helmet.png" },
+    103: { name: "Перстень печатка", value: 25.7, icon: "/Images/Items/signet_ring.png" },
+    104: { name: "Папаха", value: 18.5, icon: "/Images/Items/papakha.png" },
+    105: { name: "Амулет Купидона", value: 15.0, icon: "/Images/Items/cupid_charm.png" },
+    106: { name: "Любовное зелье", value: 10.0, icon: "/Images/Items/love_potion.png" },
+    107: { name: "UFC Бокс", value: 9.9, icon: "/Images/Items/UFC_box.png" },
+    108: { name: "Всевидящее око", value: 5.0, icon: "/Images/Items/eye.png" },
+    109: { name: "Холодный огонь", value: 2.2, icon: "/Images/Items/chill_flame.jpg" },
+    110: { name: "Вкусный пломбир", value: 2.2, icon: "/Images/Items/plombir.jpg" },
+    111: { name: "Прекрасная роза", value: 0.2, icon: "/Images/Items/roza.jpg" },
+    112: { name: "Мишка классический", value: 0.11, icon: "/Images/Items/michka.jpg" }
+};
+
+// ИНИЦИАЛИЗАЦИЯ И СВЯЗЬ С БД (PostgreSQL или JSON локальный резерв)
+let pgPool = null;
+const localUsersFile = path.join(__dirname, 'database_users.json');
+const localInvFile = path.join(__dirname, 'database_inventory.json');
+const localDepFile = path.join(__dirname, 'database_deposits.json');
+
+if (process.env.DATABASE_URL) {
+    pgPool = new Pool({
+        connectionString: process.env.DATABASE_URL,
+        ssl: { rejectUnauthorized: false }
+    });
+    
+    const initDbQueries = `
+        CREATE TABLE IF NOT EXISTS users (
+            id VARCHAR(100) PRIMARY KEY,
+            username VARCHAR(100),
+            first_name VARCHAR(100),
+            balance NUMERIC(15, 3) DEFAULT 50.000,
+            avatar_url TEXT,
+            last_daily_case_open TIMESTAMP,
+            is_banned BOOLEAN DEFAULT FALSE
+        );
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS is_banned BOOLEAN DEFAULT FALSE;
+
+        CREATE TABLE IF NOT EXISTS inventory (
+            id SERIAL PRIMARY KEY,
+            user_id VARCHAR(100),
+            item_id INT,
+            name VARCHAR(100),
+            value NUMERIC(15, 3),
+            image_url TEXT
+        );
+        CREATE TABLE IF NOT EXISTS deposits (
+            id SERIAL PRIMARY KEY,
+            user_id VARCHAR(100),
+            item_id INT,
+            status VARCHAR(50) DEFAULT 'pending'
+        );
+    `;
+    pgPool.query(initDbQueries)
+        .then(() => console.log("PostgreSQL Tables verified/updated successfully."))
+        .catch(err => console.error("PostgreSQL Init Database tables error:", err.message));
+} else {
+    console.warn("DATABASE_URL is missing. Using persistent local JSON files instead.");
+    if (!fs.existsSync(localUsersFile)) fs.writeFileSync(localUsersFile, JSON.stringify({}));
+    if (!fs.existsSync(localInvFile)) fs.writeFileSync(localInvFile, JSON.stringify([]));
+    if (!fs.existsSync(localDepFile)) fs.writeFileSync(localDepFile, JSON.stringify([]));
+}
+
+// УНИВЕРСАЛЬНЫЕ МЕТОДЫ РАБОТЫ С ДАННЫМИ
+async function dbGetUser(id) {
+    if (pgPool) {
+        const res = await pgPool.query("SELECT * FROM users WHERE id = $1", [String(id)]);
+        return res.rows[0] || null;
+    } else {
+        const data = JSON.parse(fs.readFileSync(localUsersFile, 'utf8'));
+        return data[String(id)] || null;
+    }
+}
+
+async function dbSaveUser(id, user) {
+    const isBannedValue = (user.is_banned === true || user.is_banned === 'true');
+    if (pgPool) {
+        await pgPool.query(`
+            INSERT INTO users (id, username, first_name, balance, avatar_url, last_daily_case_open, is_banned)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            ON CONFLICT (id) DO UPDATE 
+            SET username = $2, first_name = $3, balance = $4, avatar_url = $5, last_daily_case_open = $6, is_banned = $7
+        `, [String(id), user.username, user.first_name, user.balance, user.avatar_url, user.last_daily_case_open, isBannedValue]);
+    } else {
+        const data = JSON.parse(fs.readFileSync(localUsersFile, 'utf8'));
+        user.is_banned = isBannedValue;
+        data[String(id)] = user;
+        fs.writeFileSync(localUsersFile, JSON.stringify(data, null, 2));
+    }
+}
+
+async function dbGetInventory(userId) {
+    if (pgPool) {
+        const res = await pgPool.query("SELECT * FROM inventory WHERE user_id = $1", [String(userId)]);
+        return res.rows;
+    } else {
+        const items = JSON.parse(fs.readFileSync(localInvFile, 'utf8'));
+        return items.filter(i => String(i.user_id) === String(userId));
+    }
+}
+
+async function dbAddInventoryItem(userId, itemId) {
+    const gift = ALL_GIFT_ITEMS[itemId];
+    if (!gift) return;
+
+    if (pgPool) {
+        await pgPool.query(`
+            INSERT INTO inventory (user_id, item_id, name, value, image_url)
+            VALUES ($1, $2, $3, $4, $5)
+        `, [String(userId), itemId, gift.name, gift.value, gift.icon]);
+    } else {
+        const items = JSON.parse(fs.readFileSync(localInvFile, 'utf8'));
+        const newItem = {
+            id: Date.now() + Math.floor(Math.random() * 1000),
+            user_id: String(userId),
+            item_id: parseInt(itemId),
+            name: gift.name,
+            value: gift.value,
+            image_url: gift.icon
+        };
+        items.push(newItem);
+        fs.writeFileSync(localInvFile, JSON.stringify(items, null, 2));
+    }
+}
+
+async function dbRemoveInventoryItem(userId, itemId) {
+    if (pgPool) {
+        await pgPool.query("DELETE FROM inventory WHERE id = (SELECT id FROM inventory WHERE user_id = $1 AND item_id = $2 LIMIT 1)", [String(userId), parseInt(itemId)]);
+    } else {
+        const items = JSON.parse(fs.readFileSync(localInvFile, 'utf8'));
+        const idx = items.findIndex(i => String(i.user_id) === String(userId) && parseInt(i.item_id) === parseInt(itemId));
+        if (idx !== -1) {
+            items.splice(idx, 1);
+            fs.writeFileSync(localInvFile, JSON.stringify(items, null, 2));
+        }
+    }
+}
+
+// ОБРАБОТКА КОМАНД И ВВОДА ДЛЯ АДМИНИСТРАТОРА В TG-БОТЕ
+if (bot) {
+    // 1. Клиентские кнопки модерации депозитов
+    bot.on('callback_query', async (callbackQuery) => {
+        const action = callbackQuery.data; 
+        const message = callbackQuery.message;
+        const msgId = message.message_id;
+        const chatId = message.chat.id;
+
+        try {
+            if (action.startsWith('approve_dep_') || action.startsWith('reject_dep_')) {
+                const parts = action.split('_');
+                const isApproved = parts[0] === 'approve';
+                const user_id = parts[2];
+                const item_id = parseInt(parts[3]);
+
+                const user = await dbGetUser(user_id);
+                const gift = ALL_GIFT_ITEMS[item_id];
+
+                if (!gift) {
+                    return bot.answerCallbackQuery(callbackQuery.id, { text: "Ошибка: предмет не найден!", show_alert: true });
+                }
+
+                if (isApproved) {
+                    await dbAddInventoryItem(user_id, item_id);
+                    await bot.editMessageText(`✅ **Успешно одобрено!**\nПодарок *${gift.name}* добавлен игроку @${user ? user.username : 'Unknown'} (ID: ${user_id}) в инвентарь.`, {
+                        chat_id: chatId,
+                        message_id: msgId,
+                        parse_mode: 'Markdown'
+                    });
+                } else {
+                    await bot.editMessageText(`❌ **Заявка отклонена!**\nПодарок *${gift.name}* для игрока @${user ? user.username : 'Unknown'} (ID: ${user_id}) отклонен.`, {
+                        chat_id: chatId,
+                        message_id: msgId,
+                        parse_mode: 'Markdown'
+                    });
+                }
+
+                bot.answerCallbackQuery(callbackQuery.id, { text: isApproved ? "Депозит успешно зачислен!" : "Заявка отклонена" });
+            }
+        } catch (err) {
+            console.error("Bot Callback Query processing error:", err.message);
+        }
+    });
+
+    // 2. Обработка текстовых команд /ban, /unban, /status
+    bot.on('message', async (msg) => {
+        const chatId = msg.chat.id;
+        const text = msg.text ? msg.text.trim() : '';
+        const isAdmin = String(chatId) === String(ADMIN_CHAT_ID);
+
+        if (text === '/start') {
+            bot.sendMessage(chatId, `🎉 **Добро пожаловать в BestGifts!**\n\nНажмите на кнопку Web App в меню слева снизу, чтобы открыть игру!`, { parse_mode: "Markdown" });
+            return;
+        }
+
+        // Если пишет администратор
+        if (isAdmin) {
+            if (text === '/ban') {
+                adminStates[chatId] = 'awaiting_ban';
+                bot.sendMessage(chatId, "🚫 **Блокировка пользователя**\n\nПожалуйста, отправьте Telegram ID игрока, которого вы хотите забанить:", { parse_mode: "Markdown" });
+                return;
+            }
+
+            if (text === '/unban') {
+                adminStates[chatId] = 'awaiting_unban';
+                bot.sendMessage(chatId, "✅ **Разблокировка пользователя**\n\nПожалуйста, отправьте Telegram ID игрока, которого хотите разблокировать:", { parse_mode: "Markdown" });
+                return;
+            }
+
+            if (text === '/status') {
+                adminStates[chatId] = 'awaiting_status';
+                bot.sendMessage(chatId, "🔍 **Статус игрока**\n\nПожалуйста, отправьте Telegram ID игрока для детальной проверки его профиля:", { parse_mode: "Markdown" });
+                return;
+            }
+
+            // Обработка текстового ответа на команду блокировки/разблокировки/проверки
+            const state = adminStates[chatId];
+            if (state) {
+                const targetId = text;
+                if (!targetId || isNaN(targetId)) {
+                    bot.sendMessage(chatId, "⚠️ ID должен состоять только из цифр. Пожалуйста, отправьте корректный ID игрока:");
+                    return;
+                }
+
+                let user = await dbGetUser(targetId);
+                
+                if (state === 'awaiting_ban') {
+                    if (!user) {
+                        user = {
+                            id: targetId,
+                            username: "unknown",
+                            first_name: "Неизвестный",
+                            balance: 0.0,
+                            avatar_url: "https://img.icons8.com/color/96/user.png",
+                            last_daily_case_open: null,
+                            is_banned: true
+                        };
+                    } else {
+                        user.is_banned = true;
+                    }
+                    await dbSaveUser(targetId, user);
+                    bot.sendMessage(chatId, `🚫 **Игрок заблокирован!**\n\n**ID:** `${targetId}`\n**Имя:** @${user.username} (${user.first_name})\n\nДанный пользователь мгновенно отключен от игрового веб-приложения и не сможет больше делать ставки.`, { parse_mode: "Markdown" });
+                
+                } else if (state === 'awaiting_unban') {
+                    if (!user) {
+                        bot.sendMessage(chatId, "⚠️ Данный игрок еще не заходил в бота, но мы разблокировали этот ID на будущее.");
+                        user = {
+                            id: targetId,
+                            username: "unknown",
+                            first_name: "Неизвестный",
+                            balance: 50.0,
+                            avatar_url: "https://img.icons8.com/color/96/user.png",
+                            last_daily_case_open: null,
+                            is_banned: false
+                        };
+                    } else {
+                        user.is_banned = false;
+                    }
+                    await dbSaveUser(targetId, user);
+                    bot.sendMessage(chatId, `✅ **Игрок успешно разблокирован!**\n\n**ID:** `${targetId}`\n**Имя:** @${user.username} (${user.first_name})\n\nДоступ к приложению восстановлен.`, { parse_mode: "Markdown" });
+                
+                } else if (state === 'awaiting_status') {
+                    if (!user) {
+                        bot.sendMessage(chatId, `🔍 Пользователь с ID `${targetId}` не найден в базе данных.`, { parse_mode: "Markdown" });
+                    } else {
+                        bot.sendMessage(chatId, `🔍 **Информация о профиле:**\n\n**ID:** `${targetId}`\n**Имя:** @${user.username} (${user.first_name})\n**Баланс:** ${parseFloat(user.balance || 0).toFixed(3)} GRAM\n**Статус блокировки:** ${user.is_banned ? "Забанен 🚫" : "Активен ✅"}\n**Последний бонус:** ${user.last_daily_case_open || "Не открывал"}`, { parse_mode: "Markdown" });
+                    }
+                }
+
+                delete adminStates[chatId]; 
+                return;
+            }
+        }
+    });
 }
 
 // СОСТОЯНИЕ ИГРЫ ARENA
@@ -41,6 +347,147 @@ let arenaState = {
     totalPool: 0
 };
 
+// Игровой цикл бэкенда
+setInterval(() => {
+    if (arenaState.status === "waiting") {
+        if (arenaState.bets.length >= 2) {
+            arenaState.status = "countdown";
+            arenaState.timeLeft = 15;
+        }
+    } else if (arenaState.status === "countdown") {
+        arenaState.timeLeft--;
+        if (arenaState.timeLeft <= 0) {
+            resolveArenaRound();
+        }
+    } else if (arenaState.status === "finished") {
+        arenaState.timeLeft--;
+        if (arenaState.timeLeft <= 0) {
+            arenaState.bets = [];
+            arenaState.status = "waiting";
+            arenaState.timeLeft = 15;
+            arenaState.winnerId = null;
+            arenaState.winnerName = null;
+            arenaState.totalPool = 0;
+            arenaState.roundNumber++;
+        }
+    }
+}, 1000);
+
+async function resolveArenaRound() {
+    if (arenaState.bets.length === 0) {
+        arenaState.status = "waiting";
+        return;
+    }
+
+    let pool = 0;
+    arenaState.bets.forEach(b => pool += parseFloat(b.amount));
+    arenaState.totalPool = pool;
+
+    const rand = Math.random() * pool;
+    let sum = 0;
+    let winnerBet = arenaState.bets[arenaState.bets.length - 1];
+
+    for (let i = 0; i < arenaState.bets.length; i++) {
+        sum += arenaState.bets[i].amount;
+        if (rand <= sum) {
+            winnerBet = arenaState.bets[i];
+            break;
+        }
+    }
+
+    const winnerIndex = arenaState.bets.indexOf(winnerBet);
+    const coords = generateCoordsForWinner(winnerIndex, arenaState.bets);
+
+    arenaState.winnerId = winnerBet.userId;
+    arenaState.winnerName = winnerBet.username;
+    arenaState.winnerX = coords.x;
+    arenaState.winnerY = coords.y;
+    arenaState.resolvedAt = Date.now();
+    arenaState.status = "finished";
+    arenaState.timeLeft = 10; 
+
+    const winnerUser = await dbGetUser(winnerBet.userId);
+    if (winnerUser) {
+        winnerUser.balance = parseFloat((parseFloat(winnerUser.balance) + pool).toFixed(3));
+        await dbSaveUser(winnerBet.userId, winnerUser);
+    }
+}
+
+// Генерация координат победителя в квадрате
+function generateCoordsForWinner(winnerIndex, bets) {
+    const N = bets.length;
+    if (N === 0) return { x: 160, y: 160 };
+    const shares = calculateShares(bets);
+
+    if (N === 1) {
+        return { x: 60 + Math.random() * 200, y: 60 + Math.random() * 200 };
+    }
+
+    if (N === 2) {
+        const s = Math.sqrt(2 * shares[0]);
+        const sizeX = 320 * s;
+        const sizeY = 320 * s;
+        if (winnerIndex === 0) {
+            let u = Math.random();
+            let v = Math.random();
+            if (u + v > 1) { u = 1 - u; v = 1 - v; }
+            return { x: Math.max(20, u * sizeX), y: Math.max(20, v * sizeY) };
+        } else {
+            while (true) {
+                let rx = 20 + Math.random() * 280;
+                let ry = 20 + Math.random() * 280;
+                if (!(rx / sizeX + ry / sizeY <= 1)) {
+                    return { x: rx, y: ry };
+                }
+            }
+        }
+    }
+
+    let currentAngle = -Math.PI / 2;
+    const corners = getCornerAnglesRad();
+
+    for (let i = 0; i < N; i++) {
+        const share = shares[i];
+        let nextAngle = currentAngle + 2 * Math.PI * share;
+
+        if (i === winnerIndex) {
+            const pathPoints = [{ x: 160, y: 160 }];
+            pathPoints.push(getSquareIntersection(currentAngle));
+
+            let normalizedCurrent = (currentAngle % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
+            let normalizedNext = (nextAngle % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
+            if (nextAngle > currentAngle && normalizedNext < normalizedCurrent) {
+                normalizedNext += 2 * Math.PI;
+            }
+
+            const crossedCorners = [];
+            for (let cAngle of corners) {
+                let normalizedCAngle = (cAngle % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
+                if (normalizedCAngle < normalizedCurrent && nextAngle > currentAngle) {
+                    normalizedCAngle += 2 * Math.PI;
+                }
+                if (normalizedCAngle > normalizedCurrent && normalizedCAngle < normalizedNext) {
+                    crossedCorners.push(cAngle);
+                }
+            }
+            crossedCorners.sort((a, b) => a - b);
+            for (let cAngle of crossedCorners) {
+                pathPoints.push(getSquareIntersection(cAngle));
+            }
+            pathPoints.push(getSquareIntersection(nextAngle));
+
+            const centroid = getPolygonCentroid(pathPoints);
+            return {
+                x: Math.max(25, Math.min(295, centroid.x + (Math.random() * 20 - 10))),
+                y: Math.max(25, Math.min(295, centroid.y + (Math.random() * 20 - 10)))
+            };
+        }
+        currentAngle = nextAngle;
+    }
+    return { x: 160, y: 160 };
+}
+
+// Вспомогательные функции геометрии
 function calculateShares(bets) {
     const N = bets.length;
     if (N === 0) return [];
@@ -148,163 +595,29 @@ function getCornerAnglesRad() {
     ].map(a => (a < 0 ? a + 2 * Math.PI : a));
 }
 
-function generateCoordsForWinner(winnerIndex, bets) {
-    const N = bets.length;
-    if (N === 0) return { x: 160, y: 160 };
-    const shares = calculateShares(bets);
-
-    if (N === 1) {
-        return { x: 60 + Math.random() * 200, y: 60 + Math.random() * 200 };
-    }
-
-    if (N === 2) {
-        const s = Math.sqrt(2 * shares[0]);
-        const sizeX = 320 * s;
-        const sizeY = 320 * s;
-        if (winnerIndex === 0) {
-            let u = Math.random();
-            let v = Math.random();
-            if (u + v > 1) { u = 1 - u; v = 1 - v; }
-            return { x: Math.max(20, u * sizeX), y: Math.max(20, v * sizeY) };
-        } else {
-            while (true) {
-                let rx = 20 + Math.random() * 280;
-                let ry = 20 + Math.random() * 280;
-                if (!(rx / sizeX + ry / sizeY <= 1)) {
-                    return { x: rx, y: ry };
-                }
-            }
-        }
-    }
-
-    let currentAngle = -Math.PI / 2;
-    const corners = getCornerAnglesRad();
-
-    for (let i = 0; i < N; i++) {
-        const share = shares[i];
-        let nextAngle = currentAngle + 2 * Math.PI * share;
-
-        if (i === winnerIndex) {
-            const pathPoints = [{ x: 160, y: 160 }];
-            pathPoints.push(getSquareIntersection(currentAngle));
-
-            let normalizedCurrent = (currentAngle % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
-            let normalizedNext = (nextAngle % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
-            if (nextAngle > currentAngle && normalizedNext < normalizedCurrent) {
-                normalizedNext += 2 * Math.PI;
-            }
-
-            const crossedCorners = [];
-            for (let cAngle of corners) {
-                let normalizedCAngle = (cAngle % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
-                if (normalizedCAngle < normalizedCurrent && nextAngle > currentAngle) {
-                    normalizedCAngle += 2 * Math.PI;
-                }
-                if (normalizedCAngle > normalizedCurrent && normalizedCAngle < normalizedNext) {
-                    crossedCorners.push(cAngle);
-                }
-            }
-            crossedCorners.sort((a, b) => a - b);
-            for (let cAngle of crossedCorners) {
-                pathPoints.push(getSquareIntersection(cAngle));
-            }
-            pathPoints.push(getSquareIntersection(nextAngle));
-
-            const centroid = getPolygonCentroid(pathPoints);
-            return {
-                x: Math.max(25, Math.min(295, centroid.x + (Math.random() * 20 - 10))),
-                y: Math.max(25, Math.min(295, centroid.y + (Math.random() * 20 - 10)))
-            };
-        }
-        currentAngle = nextAngle;
-    }
-    return { x: 160, y: 160 };
-}
-
-// Игровой цикл бэкенда
-setInterval(() => {
-    if (arenaState.status === "waiting") {
-        if (arenaState.bets.length >= 2) {
-            arenaState.status = "countdown";
-            arenaState.timeLeft = 15;
-        }
-    } else if (arenaState.status === "countdown") {
-        arenaState.timeLeft--;
-        if (arenaState.timeLeft <= 0) {
-            resolveArenaRound();
-        }
-    } else if (arenaState.status === "finished") {
-        arenaState.timeLeft--;
-        if (arenaState.timeLeft <= 0) {
-            arenaState.bets = [];
-            arenaState.status = "waiting";
-            arenaState.timeLeft = 15;
-            arenaState.winnerId = null;
-            arenaState.winnerName = null;
-            arenaState.totalPool = 0;
-            arenaState.roundNumber++;
-        }
-    }
-}, 1000);
-
-function resolveArenaRound() {
-    if (arenaState.bets.length === 0) {
-        arenaState.status = "waiting";
-        return;
-    }
-
-    let pool = 0;
-    arenaState.bets.forEach(b => pool += parseFloat(b.amount));
-    arenaState.totalPool = pool;
-
-    const rand = Math.random() * pool;
-    let sum = 0;
-    let winnerBet = arenaState.bets[arenaState.bets.length - 1];
-
-    for (let i = 0; i < arenaState.bets.length; i++) {
-        sum += arenaState.bets[i].amount;
-        if (rand <= sum) {
-            winnerBet = arenaState.bets[i];
-            break;
-        }
-    }
-
-    const winnerIndex = arenaState.bets.indexOf(winnerBet);
-    const coords = generateCoordsForWinner(winnerIndex, arenaState.bets);
-
-    arenaState.winnerId = winnerBet.userId;
-    arenaState.winnerName = winnerBet.username;
-    arenaState.winnerX = coords.x;
-    arenaState.winnerY = coords.y;
-    arenaState.resolvedAt = Date.now();
-    arenaState.status = "finished";
-    arenaState.timeLeft = 10; 
-
-    const winnerUser = usersDB[winnerBet.userId];
-    if (winnerUser) {
-        winnerUser.balance = parseFloat((winnerUser.balance + pool).toFixed(3));
-    }
-}
-
-// АВТОРИЗАЦИЯ И ПОЛУЧЕНИЕ ПОЛЬЗОВАТЕЛЯ
-function getOrCreateUser(initDataUnsafe) {
+// АВТОРИЗАЦИЯ И ПОЛУЧЕНИЕ ПОЛЬЗОВАТЕЛЯ ИЗ БД
+async function getOrCreateUser(initDataUnsafe) {
     const tgUser = initDataUnsafe?.user || { id: "guest_user_id", username: "Пользователь", first_name: "Пользователь" };
     const id = String(tgUser.id);
     
-    if (!usersDB[id]) {
-        usersDB[id] = {
+    let user = await dbGetUser(id);
+    if (!user) {
+        user = {
             id: id,
             username: tgUser.username || tgUser.first_name || "Пользователь",
             first_name: tgUser.first_name || "",
             balance: 50.0, 
             avatar_url: tgUser.photo_url || "https://img.icons8.com/color/96/user.png",
-            last_daily_case_open: null
+            last_daily_case_open: null,
+            is_banned: false
         };
+        await dbSaveUser(id, user);
     }
-    return usersDB[id];
+    return user;
 }
 
-function parseTelegramInitData(req, res, next) {
+// MIDDLEWARE С ЖЕСТКОЙ БЛОКИРОВКОЙ ЗАБАНЕННЫХ
+async function parseTelegramInitData(req, res, next) {
     const rawHeader = req.headers['x-telegram-init-data'];
     let initDataUnsafe = {};
     if (rawHeader) {
@@ -318,7 +631,15 @@ function parseTelegramInitData(req, res, next) {
             console.error("InitData parsing error:", e);
         }
     }
-    req.user = getOrCreateUser(initDataUnsafe);
+    
+    const user = await getOrCreateUser(initDataUnsafe);
+    
+    // Мгновенная блокировка на уровне бэкенда
+    if (user.is_banned === true || user.is_banned === 'true') {
+        return res.status(403).json({ banned: true, error: "Ваш аккаунт заблокирован!" });
+    }
+
+    req.user = user;
     next();
 }
 
@@ -327,7 +648,88 @@ app.get('/api/user', parseTelegramInitData, (req, res) => {
     res.json(req.user);
 });
 
-app.post('/api/place_bet', parseTelegramInitData, (req, res) => {
+// МОМЕНТАЛЬНОЕ НАЧИСЛЕНИЕ БАЛАНСА ПОСЛЕ TON ТРАНЗАКЦИИ
+app.post('/api/verify_payment', parseTelegramInitData, async (req, res) => {
+    const { amount } = req.body;
+    const paymentAmount = parseFloat(amount);
+    if (isNaN(paymentAmount) || paymentAmount <= 0) {
+        return res.status(400).json({ error: "Invalid amount" });
+    }
+
+    const user = req.user;
+    user.balance = parseFloat((parseFloat(user.balance) + paymentAmount).toFixed(3));
+    await dbSaveUser(user.id, user);
+
+    if (bot && ADMIN_CHAT_ID) {
+        bot.sendMessage(ADMIN_CHAT_ID, `💎 **Пополнение баланса!**\nИгрок @${user.username} (ID: ${user.id}) успешно зачислил через кошелек **+${paymentAmount.toFixed(3)} TON**!`, { parse_mode: "Markdown" });
+    }
+
+    res.json({ success: true, newBalance: user.balance });
+});
+
+// ДЕПОЗИТ (ЗАЯВКА НА ВВОД NFT С КНОПКАМИ TG ДЛЯ АДМИНА)
+app.post('/api/deposit_gift_request', parseTelegramInitData, async (req, res) => {
+    const { itemId } = req.body;
+    const gift = ALL_GIFT_ITEMS[itemId];
+    const user = req.user;
+
+    if (!gift) {
+        return res.status(400).json({ error: "Item not found" });
+    }
+
+    if (bot && ADMIN_CHAT_ID) {
+        const messageText = `📥 **Заявка на ввод NFT-подарка!**\n\n**Игрок:** @${user.username} (ID: `${user.id}`)\n**Подарок:** *${gift.name}*\n**Номинал:** ${gift.value} GRAM`;
+        
+        const inlineKeyboard = {
+            inline_keyboard: [
+                [
+                    { text: "Одобрить ✅", callback_data: `approve_dep_${user.id}_${itemId}` },
+                    { text: "Отклонить ❌", callback_data: `reject_dep_${user.id}_${itemId}` }
+                ]
+            ]
+        };
+
+        bot.sendMessage(ADMIN_CHAT_ID, messageText, { parse_mode: "Markdown", reply_markup: inlineKeyboard });
+    }
+
+    res.json({ success: true });
+});
+
+app.get('/api/inventory', parseTelegramInitData, async (req, res) => {
+    const userInventory = await dbGetInventory(req.user.id);
+    res.json(userInventory);
+});
+
+app.post('/api/sell_gift', parseTelegramInitData, async (req, res) => {
+    const { itemId, price } = req.body;
+    const user = req.user;
+    const sellPrice = parseFloat(price) || 0.1;
+
+    await dbRemoveInventoryItem(user.id, itemId);
+
+    user.balance = parseFloat((parseFloat(user.balance) + sellPrice).toFixed(3));
+    await dbSaveUser(user.id, user);
+
+    res.json({ success: true, newBalance: user.balance });
+});
+
+app.post('/api/withdraw_gift', parseTelegramInitData, async (req, res) => {
+    const { itemId } = req.body;
+    const user = req.user;
+    const gift = ALL_GIFT_ITEMS[itemId];
+
+    if (!gift) return res.status(400).json({ error: "Item not found" });
+
+    await dbRemoveInventoryItem(user.id, itemId);
+
+    if (bot && ADMIN_CHAT_ID) {
+        bot.sendMessage(ADMIN_CHAT_ID, `📤 **Заявка на вывод подарка!**\n\n**Игрок:** @${user.username} (ID: ${user.id})\n**Предмет на вывод:** *${gift.name}* (${gift.value} GRAM)\n\n_Пожалуйста, отправьте ему этот подарок в Telegram!_`, { parse_mode: "Markdown" });
+    }
+
+    res.json({ success: true });
+});
+
+app.post('/api/place_bet', parseTelegramInitData, async (req, res) => {
     const amount = parseFloat(req.body.amount);
     if (isNaN(amount) || amount < 0.1) {
         return res.status(400).json({ error: "Недопустимая сумма ставки" });
@@ -342,7 +744,8 @@ app.post('/api/place_bet', parseTelegramInitData, (req, res) => {
         return res.status(400).json({ error: "Недостаточно баланса" });
     }
 
-    user.balance = parseFloat((user.balance - amount).toFixed(3));
+    user.balance = parseFloat((parseFloat(user.balance) - amount).toFixed(3));
+    await dbSaveUser(user.id, user);
 
     const existingBet = arenaState.bets.find(b => String(b.userId) === String(user.id));
     if (existingBet) {
@@ -377,7 +780,7 @@ app.get('/api/arena/state', parseTelegramInitData, (req, res) => {
     });
 });
 
-app.post('/api/open_daily_case', parseTelegramInitData, (req, res) => {
+app.post('/api/open_daily_case', parseTelegramInitData, async (req, res) => {
     const user = req.user;
     const now = Date.now();
     const cooldown = 24 * 60 * 60 * 1000;
@@ -395,13 +798,19 @@ app.post('/api/open_daily_case', parseTelegramInitData, (req, res) => {
 
     user.last_daily_case_open = new Date().toISOString();
     if (won.type === "balance") {
-        user.balance = parseFloat((user.balance + won.value).toFixed(3));
+        user.balance = parseFloat((parseFloat(user.balance) + won.value).toFixed(3));
+    } else {
+        await dbAddInventoryItem(user.id, won.id);
+        if (bot && ADMIN_CHAT_ID) {
+            bot.sendMessage(ADMIN_CHAT_ID, `🎉 **Новый выигрыш в Кейсе!**\nИгрок @${user.username} (ID: ${user.id}) только что выиграл *${won.name}* (ценность: ${won.value} GRAM) в **Ежедневном Кейсе**!`, { parse_mode: "Markdown" });
+        }
     }
+    await dbSaveUser(user.id, user);
 
     res.json({ success: true, wonItem: won, newBalance: user.balance });
 });
 
-app.post('/api/open_newbie_case', parseTelegramInitData, (req, res) => {
+app.post('/api/open_newbie_case', parseTelegramInitData, async (req, res) => {
     const user = req.user;
     const price = 0.1;
 
@@ -409,7 +818,7 @@ app.post('/api/open_newbie_case', parseTelegramInitData, (req, res) => {
         return res.status(400).json({ error: "Недостаточно баланса" });
     }
 
-    user.balance = parseFloat((user.balance - price).toFixed(3));
+    user.balance = parseFloat((parseFloat(user.balance) - price).toFixed(3));
 
     const rewards = [
         { id: 109, name: "Холодный огонь", type: "gift", value: 2.2 },
@@ -419,27 +828,20 @@ app.post('/api/open_newbie_case', parseTelegramInitData, (req, res) => {
     const won = rewards[Math.floor(Math.random() * rewards.length)];
 
     if (won.type === "balance") {
-        user.balance = parseFloat((user.balance + won.value).toFixed(3));
+        user.balance = parseFloat((parseFloat(user.balance) + won.value).toFixed(3));
+    } else {
+        await dbAddInventoryItem(user.id, won.id);
+        if (bot && ADMIN_CHAT_ID) {
+            bot.sendMessage(ADMIN_CHAT_ID, `🎉 **Новый выигрыш в Кейсе!**\nИгрок @${user.username} (ID: ${user.id}) выиграл *${won.name}* (${won.value} GRAM) в **Кейсе Новичка**!`, { parse_mode: "Markdown" });
+        }
     }
+    await dbSaveUser(user.id, user);
 
     res.json({ success: true, wonItem: won, newBalance: user.balance });
 });
 
-app.post('/api/sell_gift', parseTelegramInitData, (req, res) => {
-    const { price } = req.body;
-    const user = req.user;
-    const sellPrice = parseFloat(price) || 0.1;
-
-    user.balance = parseFloat((user.balance + sellPrice).toFixed(3));
-    res.json({ success: true, newBalance: user.balance });
-});
-
 app.get('/api/daily_case_info', (req, res) => {
-    res.json({ channel_username: CHANNEL_USERNAME });
-});
-
-app.get('/api/inventory', (req, res) => {
-    res.json([]);
+    res.json({ channel_username: "@BestGiftsChannel" });
 });
 
 app.get('/api/deposit_address', (req, res) => {
