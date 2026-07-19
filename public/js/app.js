@@ -539,9 +539,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                         currentUser.balance = parseFloat((parseFloat(currentUser.balance) + amount).toFixed(3));
                         updateBalanceUI();
                         triggerBalanceBadge(amount);
-                        showNotification(`Баланс моментально пополнен на +${amount.toFixed(3)} TON!`, "💎");
+                        showNotification(`Баланс пополнен на +${amount.toFixed(3)} TON!`, "💎");
 
-                        // Отправляем запрос бэкенду для вечного сохранения в бд
+                        // Отправляем запрос бэкенду для сохранения в бд
                         fetch(`${API_BASE_URL}/api/verify_payment`, {
                             method: 'POST',
                             headers: { 
@@ -1753,7 +1753,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         function updateDailyCaseTimer() {
             clearInterval(dailyCaseTimerInterval); 
             
-            // ЕСЛИ АДМИНИСТРАТОР — ПОЛНОСТЬЮ ОТКЛЮЧАЕМ БЛОКИРУЮЩИЙ ТАЙМЕР НА КЛИЕНТЕ
+            // ЕСЛИ ВЫ АДМИНИСТРАТОР — ПОЛНОСТЬЮ ОТКЛЮЧАЕМ БЛОКИРУЮЩИЙ ТАЙМЕР НА КЛИЕНТЕ
             if (currentUser && (currentUser.isAdmin === true || currentUser.isAdmin === "true")) {
                 if (elements.spinBtn) elements.spinBtn.classList.remove('hidden');
                 if (elements.spinBtn) elements.spinBtn.disabled = false;
