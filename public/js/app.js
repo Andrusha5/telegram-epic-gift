@@ -740,7 +740,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     const c2 = getPolygonCentroid(p2Pts);
 
                     createAvatarElement(c1.x, c1.y, arenaPlayers[0].avatar, 24 + shares[0] * 30);
-                    createAvatarElement(c2.x, c2.y, arenaPlayers[1].avatar, 24 + shares[1] * 30);
+                    createAvatarElement(c2.y, c2.y, arenaPlayers[1].avatar, 24 + shares[1] * 30);
                     return; 
                 }
 
@@ -1236,7 +1236,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                                     showCustomModal({
                                         icon: '🏆',
                                         title: 'Победа!',
-                                        message: `🎉 Вы получили весь банк: +${parseFloat(tPool).toFixed(3)} GRAM!`,
+                                        message: `🎉 Поздравляем! Вы получили весь банк: +${parseFloat(tPool).toFixed(3)} GRAM!`,
                                         buttons: [{ text: 'Забрать!', primary: true }]
                                     });
                                     triggerBalanceBadge(parseFloat(tPool));
@@ -1752,6 +1752,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         let dailyCaseTimerInterval;
         function updateDailyCaseTimer() {
             clearInterval(dailyCaseTimerInterval); 
+            
+            // Админу полностью отключаем блокирующий таймер
+            if (currentUser && currentUser.isAdmin) {
+                if (elements.spinBtn) elements.spinBtn.classList.remove('hidden');
+                if (elements.spinBtn) elements.spinBtn.disabled = false;
+                const t = document.getElementById('timer-container'); if (t) t.classList.add('hidden');
+                return;
+            }
+
             if (isNewbieCaseMode) {
                 if (elements.spinBtn) elements.spinBtn.classList.remove('hidden');
                 if (elements.spinBtn) elements.spinBtn.disabled = false;
