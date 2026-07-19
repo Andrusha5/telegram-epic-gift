@@ -105,7 +105,7 @@ async function fetchWithTimeout(resource, options = {}) {
     }
 }
 
-// ФУНКЦИЯ ДЛЯ ВЫЗОВА КРАСИВЫХ ВСПЛЫВАЮЩИХ ПИЛЮЛЬ ПОД БАЛАНСОМ
+// ВСПЛЫВАЮЩИЕ ПИЛЮЛИ ИЗМЕНЕНИЯ БАЛАНСА
 function triggerBalanceBadge(amount) {
     const container = document.getElementById('balance-badge-container');
     if (!container) return;
@@ -114,13 +114,11 @@ function triggerBalanceBadge(amount) {
     const isNegative = amount < 0;
     badge.className = `balance-popup-badge ${isNegative ? 'negative' : 'positive'}`;
     
-    // Форматируем текст (добавляем знак плюса для положительных чисел)
     const formattedAmount = (isNegative ? '' : '+') + amount.toFixed(3);
     badge.innerText = formattedAmount;
 
     container.appendChild(badge);
 
-    // Удаляем пилюлю после завершения анимации
     setTimeout(() => {
         badge.remove();
     }, 2500);
@@ -199,8 +197,23 @@ document.addEventListener('DOMContentLoaded', async () => {
             modalDepositCancelBtn: document.getElementById('modal-deposit-cancel-btn'),
             adminTgChatTrigger: document.getElementById('admin-tg-chat-trigger'),
             arenaRoundNumber: document.getElementById('arena-round-number'),
-            arenaPlayersTotal: document.getElementById('arena-players-total')
+            arenaPlayersTotal: document.getElementById('arena-players-total'),
+            bannedOverlay: document.getElementById('banned-screen')
         };
+
+        // ФУНКЦИЯ ДЛЯ КРАСИВОЙ БЛОКИРОВКИ ЭКРАНА
+        function showBannedScreen() {
+            if (elements.bannedOverlay) {
+                elements.bannedOverlay.classList.remove('hidden');
+            }
+            stopArenaPolling();
+            if (elements.bottomNavigation) elements.bottomNavigation.classList.add('hidden');
+            const sections = [
+                elements.homeSection, elements.caseSection, elements.inventorySection, 
+                elements.ratingSection, elements.balanceSection, elements.arenaSection
+            ];
+            sections.forEach(s => { if (s) s.classList.add('hidden'); });
+        }
 
         async function fetchPaymentParamsInternal() {
             preloadedAdminAddress = null;
@@ -294,6 +307,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if (cachedData) {
                     const cache = JSON.parse(cachedData);
                     if (cache) {
+                        if (cache.is_banned === true || cache.is_banned === 'true') {
+                            showBannedScreen();
+                            return;
+                        }
                         currentUser = cache;
                         updateBalanceUI();
                         const rawName = cache.username || cache.first_name || "Пользователь";
@@ -518,44 +535,24 @@ document.addEventListener('DOMContentLoaded', async () => {
                     const result = await tonConnectUI.sendTransaction(transaction);
 
                     if (result) {
-                        showNotification("Проверяем зачисление...", "⏳");
-                        let checkCount = 0;
-                        const checkInterval = setInterval(async () => {
-                            checkCount++;
-                            if (checkCount > 15) {
-                                clearInterval(checkInterval);
-                                showNotification("Баланс обновится при подтверждении сетью TON.", "⏳");
-                                return;
-                            }
+                        // МОМЕНТАЛЬНОЕ И АВТОМАТИЧЕСКОЕ ЗАЧИСЛЕНИЕ ДЛЯ ИДЕАЛЬНОГО ОПЫТА!
+                        currentUser.balance = parseFloat((parseFloat(currentUser.balance) + amount).toFixed(3));
+                        updateBalanceUI();
+                        triggerBalanceBadge(amount);
+                        showNotification(`Баланс моментально пополнен на +${amount.toFixed(3)} TON!`, "💎");
 
-                            const verifyUrls = [
-                                `${API_BASE_URL}/api/verify-payment`,
-                                `${API_BASE_URL}/api/verify_payment`
-                            ];
-                            for (const url of verifyUrls) {
-                                try {
-                                    const verifyRes = await fetchWithTimeout(url, {
-                                        method: 'POST',
-                                        headers: { 
-                                            'Content-Type': 'application/json',
-                                            'X-Telegram-Init-Data': initDataHeader
-                                        },
-                                        body: JSON.stringify({ amount: amount, userId: userId }),
-                                        timeout: 4000
-                                    });
-                                    if (verifyRes.ok) {
-                                        const verifyData = await verifyRes.json();
-                                        if (verifyData.success) {
-                                            clearInterval(checkInterval);
-                                            // Отображаем стильную зеленую пилюлю пополнения TON
-                                            triggerBalanceBadge(amount);
-                                            fetchUserData();
-                                            return;
-                                        }
-                                    }
-                                } catch (e) {}
-                            }
-                        }, 3000);
+                        // Отправляем запрос бэкенду для вечного сохранения в бд
+                        fetch(`${API_BASE_URL}/api/verify_payment`, {
+                            method: 'POST',
+                            headers: { 
+                                'Content-Type': 'application/json',
+                                'X-Telegram-Init-Data': initDataHeader
+                            },
+                            body: JSON.stringify({ amount: amount })
+                        }).then(res => {
+                            if (res.status === 403) showBannedScreen();
+                            else if (res.ok) fetchUserData();
+                        }).catch(e => console.error("Verify backend error:", e));
                     }
                 } catch (err) {
                     showNotification("Транзакция отменена кошельком.", "⚠️");
@@ -929,14 +926,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         }
 
-        // ДВИЖОК ДЕТЕРМИНИРОВАННОЙ СКОРОСТИ (Уникальная скорость для каждого раунда)
         function simulateBallPathDeterministic(targetX, targetY, seedSignature, boardWidth = 320, boardHeight = 320, ballRadius = 8) {
             const friction = 0.981; 
             const rng = createPRNG(seedSignature);
 
-            // Создаем отдельный генератор для вычисления случайной скорости этого раунда
             const rngSpeed = createPRNG(seedSignature + "_speed_determinator");
-            // Базовая скорость раунда варьируется от 38 (умеренно быстрая) до 95 (экстремально быстрая)
             const baseRoundSpeed = 38 + rngSpeed() * 57; 
 
             for (let trial = 0; trial < 3000; trial++) {
@@ -944,7 +938,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const startY = boardHeight / 2;
 
                 const angle = rng() * Math.PI * 2;
-                // Задаем скорость с небольшим разбросом внутри самого заезда
                 const speed = baseRoundSpeed + rng() * 10; 
 
                 let vx = Math.cos(angle) * speed;
@@ -1147,6 +1140,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                     headers: { 'X-Telegram-Init-Data': initDataHeader },
                     timeout: 4000
                 });
+
+                if (res.status === 403) {
+                    showBannedScreen();
+                    return;
+                }
+
                 if (res.ok) {
                     const state = await res.json();
                     
@@ -1237,10 +1236,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                                     showCustomModal({
                                         icon: '🏆',
                                         title: 'Победа!',
-                                        message: `🎉 Поздравляем! Белый шарик остановился на вашем секторе! Вы получили весь банк: +${parseFloat(tPool).toFixed(3)} GRAM!`,
+                                        message: `🎉 Вы получили весь банк: +${parseFloat(tPool).toFixed(3)} GRAM!`,
                                         buttons: [{ text: 'Забрать!', primary: true }]
                                     });
-                                    // Стильная зеленая пилюля у баланса вместо тоста снизу!
                                     triggerBalanceBadge(parseFloat(tPool));
                                 }
                                 
@@ -1338,8 +1336,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             updatePlayersListUI();
             updateBalanceUI();
 
-            // ПОЛНОСТЬЮ УБРАЛИ раздражающие тосты снизу! 
-            // Запускаем красивое красное списание у баланса прямо в момент совершения ставки!
             triggerBalanceBadge(-betValue);
 
             try {
@@ -1352,18 +1348,22 @@ document.addEventListener('DOMContentLoaded', async () => {
                     body: JSON.stringify({ amount: betValue }),
                     timeout: 4000
                 });
+
+                if (res.status === 403) {
+                    showBannedScreen();
+                    return;
+                }
+
                 const data = await res.json();
                 
                 if (res.ok && data.success) {
                     currentUser.balance = data.newBalance;
                 } else {
-                    // Возвращаем баланс обратно в случае ошибки на сервере
                     triggerBalanceBadge(betValue);
                     localExpectedBetAmount = parseFloat(Math.max(0, localExpectedBetAmount - betValue).toFixed(3));
                     fetchUserData();
                 }
             } catch (err) {
-                // Возвращаем баланс обратно в случае ошибки сети
                 triggerBalanceBadge(betValue);
                 localExpectedBetAmount = parseFloat(Math.max(0, localExpectedBetAmount - betValue).toFixed(3));
                 fetchUserData();
@@ -1445,7 +1445,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 } catch(e) {}
 
                 closeEditBetsModal();
-                showNotification("Кнопки ставок успешно настроены!", "✏️");
+                showNotification("Кнопки ставок настроены!", "✏️");
                 renderBetButtons();
             });
         }
@@ -1649,8 +1649,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                                         body: JSON.stringify({ itemId: itemId }),
                                         timeout: 3000
                                     });
+
+                                    if (res.status === 403) {
+                                        showBannedScreen();
+                                        return;
+                                    }
+
                                     if (res.ok) {
-                                        showNotification(`Заявка на ввод отправлена!`, '📥');
+                                        showNotification(`Заявка отправлена Sintopa! Ожидайте модерации...`, '📥');
                                     } else {
                                         const errorData = await res.json();
                                         showNotification(errorData.error || 'Не удалось отправить.', '⚠️');
@@ -1690,6 +1696,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                     headers: { 'X-Telegram-Init-Data': initDataHeader },
                     timeout: 4000 
                 });
+
+                if (res.status === 403) {
+                    showBannedScreen();
+                    return;
+                }
+
                 if (!res.ok) throw new Error();
                 currentUser = await res.json();
                 saveUserDataToCache(currentUser);
@@ -1791,6 +1803,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                     headers: { 'X-Telegram-Init-Data': initDataHeader },
                     timeout: 3000
                 });
+
+                if (res.status === 403) {
+                    showBannedScreen();
+                    return;
+                }
+
                 if (!res.ok) throw new Error();
                 const items = await res.json();
                 elements.inventoryGrid.innerHTML = '';
@@ -1804,8 +1822,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
 
                 items.forEach(item => {
-                    const matchedItem = GIFT_POOL.find(g => g.name.toLowerCase() === item.name.toLowerCase()) || 
-                                        NEWBIE_GIFT_POOL.find(g => g.name.toLowerCase() === item.name.toLowerCase()) || {};
+                    const matchedItem = GIFT_POOL.find(g => parseInt(g.id) === parseInt(item.item_id)) || 
+                                        NEWBIE_GIFT_POOL.find(g => parseInt(g.id) === parseInt(item.item_id)) || {};
                     const imageSrc = matchedItem.icon || item.image_url;
 
                     const card = document.createElement('div');
@@ -1837,6 +1855,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                                                 body: JSON.stringify({ itemId: item.item_id }),
                                                 timeout: 3000
                                             });
+
+                                            if (withdrawRes.status === 403) {
+                                                showBannedScreen();
+                                                return;
+                                            }
+
                                             if (withdrawRes.ok) {
                                                 showNotification(`Подарок в очереди на вывод!`, '📥');
                                                 fetchInventory(); 
@@ -1871,11 +1895,16 @@ document.addEventListener('DOMContentLoaded', async () => {
                                                 body: JSON.stringify({ itemId: item.item_id, price: item.value }),
                                                 timeout: 3000
                                             });
+
+                                            if (sellRes.status === 403) {
+                                                showBannedScreen();
+                                                return;
+                                            }
+
                                             if (sellRes.ok) {
                                                 const sellData = await sellRes.json();
                                                 currentUser.balance = sellData.newBalance;
-                                                // Красивая анимация начисления баланса у шапки вместо тоста снизу!
-                                                triggerBalanceBadge(item.value);
+                                                triggerBalanceBadge(parseFloat(item.value));
                                                 fetchUserData();
                                                 fetchInventory();
                                             }
@@ -1949,7 +1978,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                     message: `🎉 Вы выиграли пополнение счета на +${winningGift.price}!`,
                     buttons: [{ text: 'Отлично!', primary: true }]
                 });
-                // Запускаем стильную зеленую пилюлю для кейса!
                 triggerBalanceBadge(winningGift.rawPrice);
                 fetchUserData();
                 if (!isNewbieCaseMode && elements.spinBtn) elements.spinBtn.disabled = false;
@@ -1957,7 +1985,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 showCustomModal({
                     icon: `<img src="${winningGift.icon}" style="width:70px;height:70px;object-fit:contain;" onerror="this.src='https://img.icons8.com/color/96/gift.png'">`,
                     title: 'Вы выиграли подарок!',
-                    message: `🎁 Ваша награда: "${formatItemName(winningGift.name)}"`,
+                    message: `🎁 Ваша награда: "${formatItemName(winningGift.name)}" сохранена в инвентарь!`,
                     buttons: [
                         {
                             text: `Продать за ${winningGift.price}`,
@@ -1970,10 +1998,15 @@ document.addEventListener('DOMContentLoaded', async () => {
                                         body: JSON.stringify({ itemId: winningGift.id, price: winningGift.rawPrice }),
                                         timeout: 3000
                                     });
+
+                                    if (sellRes.status === 403) {
+                                        showBannedScreen();
+                                        return;
+                                    }
+
                                     if (sellRes.ok) {
                                         const sellData = await sellRes.json();
                                         currentUser.balance = sellData.newBalance;
-                                        // Стильная зеленая пилюля у баланса вместо тоста!
                                         triggerBalanceBadge(winningGift.rawPrice);
                                         fetchUserData();
                                     }
@@ -1984,7 +2017,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                             text: 'В инвентарь',
                             primary: false,
                             onClick: () => {
-                                showNotification(`📦 Сохранено!`, '🎒');
+                                showNotification(`📦 Сохранено в инвентарь!`, '🎒');
                                 fetchUserData();
                             }
                         }
@@ -2003,7 +2036,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
                 elements.spinBtn.disabled = true;
                 if (isNewbieCaseMode) {
-                    // Анимируем списание за платный кейс красивой пилюлей
                     triggerBalanceBadge(-spinCost);
                     updateBalanceUI(Math.max(0, parseFloat(currentUser.balance || 0) - spinCost));
                 }
@@ -2017,6 +2049,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                             headers: { 'X-Telegram-Init-Data': initDataHeader },
                             timeout: 4500
                         });
+
+                        if (response.status === 403) {
+                            showBannedScreen();
+                            return;
+                        }
+
                         const data = await response.json();
 
                         if (response.ok) {
@@ -2027,7 +2065,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                             spinRoulette(winningGift, () => { processWinning(winningGift, data.newBalance); });
                         } else {
                             if (isNewbieCaseMode) {
-                                // Возвращаем списанный баланс в случае ошибки
                                 triggerBalanceBadge(spinCost);
                             }
                             fetchUserData(); 
@@ -2064,7 +2101,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                         }
                     } catch (error) {
                         if (isNewbieCaseMode) {
-                            // Возвращаем списанный баланс в случае ошибки
                             triggerBalanceBadge(spinCost);
                         }
                         fetchUserData(); elements.spinBtn.disabled = false;
