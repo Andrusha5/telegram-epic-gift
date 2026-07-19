@@ -1710,3 +1710,55 @@ body {
     background: #241c44;
     color: #ffffff;
 }
+
+/* ==========================================================================
+   ЭКРАН ПОЛНОЙ БЛОКИРОВКИ (BANNED SCREEN)
+   ========================================================================== */
+.banned-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: #0b0914;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 999999;
+}
+
+.banned-container {
+    text-align: center;
+    padding: 30px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+}
+
+.banned-icon {
+    font-size: 84px;
+    filter: drop-shadow(0 0 20px rgba(255, 59, 48, 0.4));
+    animation: pulseBanned 2s infinite alternate;
+}
+
+.banned-title {
+    color: #ff3b30;
+    font-size: 26px;
+    font-weight: 900;
+    letter-spacing: 1px;
+    margin: 0;
+}
+
+.banned-text {
+    color: #a5a1b8;
+    font-size: 14px;
+    line-height: 1.6;
+    max-width: 290px;
+    margin: 0;
+}
+
+@keyframes pulseBanned {
+    0% { transform: scale(0.95); }
+    100% { transform: scale(1.05); }
+}
