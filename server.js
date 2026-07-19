@@ -72,7 +72,6 @@ if (BOT_TOKEN && BOT_TOKEN !== "undefined" && BOT_TOKEN !== "") {
             console.error("⚠️ Ошибка бота:", error.message);
         });
 
-        // АВТОМАТИЧЕСКАЯ РЕГИСТРАЦИЯ МЕНЮ КОМАНД ПРИ ВВОДЕ СИМВОЛА "/"
         bot.setMyCommands([
             { command: 'start', description: 'Запустить BestGifts 🚀' },
             { command: 'addbalance', description: 'Пополнить баланс игрока (Админ) 💎' },
@@ -293,7 +292,7 @@ if (bot) {
             }
 
             if (isAdmin) {
-                // 💎 КОМАНДА ВОЗВРАТА И ПОПОЛНЕНИЯ БАЛАНСА С МГНОВЕННЫМ ОПОВЕЩЕНИЕМ ИГРОКА!
+                // 💎 КОМАНДА ПОПОЛНЕНИЯ БАЛАНСА С МГНОВЕННЫМ УВЕДОМЛЕНИЕМ ИГРОКА
                 if (text.startsWith('/addbalance')) {
                     const parts = text.split(' ');
                     if (parts.length < 3) {
@@ -315,7 +314,6 @@ if (bot) {
                     await dbSaveUser(targetId, user);
                     bot.sendMessage(chatId, `✅ Игроку @${user.username} успешно начислено *+${amount} GRAM*.\nНовый баланс: *${user.balance} GRAM*`, { parse_mode: "Markdown" });
                     
-                    // Мгновенная отправка сообщения пользователю!
                     try {
                         await bot.sendMessage(targetId, `💎 **Баланс пополнен!**\n\nАдминистратор пополнил ваш баланс на *+${amount.toFixed(3)} GRAM*!`, { parse_mode: "Markdown" });
                     } catch (err) {
@@ -541,7 +539,9 @@ async function resolveArenaRound() {
     arenaState.winnerY = coords.y;
     arenaState.resolvedAt = Date.now();
     arenaState.status = "finished";
-    arenaState.timeLeft = 10; 
+    
+    // ⚡ ТАЙМАУТ ЗАВЕРШЕННОГО СТАТУСА НА СЕРВЕРЕ СОКРАЩЕН С 10 ДО 3 СЕКУНД (ПОЛНОЕ ОТСУТСТВИЕ ЗАДЕРЖЕК!)
+    arenaState.timeLeft = 3; 
     saveArenaState();
 
     const winnerUser = await dbGetUser(winnerBet.userId);
@@ -568,11 +568,11 @@ function generateCoordsForWinner(winnerIndex, bets) {
             let u = Math.random();
             let v = Math.random();
             if (u + v > 1) { u = 1 - u; v = 1 - v; }
-            return { x: Math.max(20, u * sizeX), y: Math.max(20, v * sizeY) };
+            return { x: Math.max(30, u * sizeX), y: Math.max(30, v * sizeY) };
         } else {
             while (true) {
-                let rx = 20 + Math.random() * 280;
-                let ry = 20 + Math.random() * 280;
+                let rx = 30 + Math.random() * 260;
+                let ry = 30 + Math.random() * 260;
                 if (!(rx / sizeX + ry / sizeY <= 1)) {
                     return { x: rx, y: ry };
                 }
@@ -615,8 +615,8 @@ function generateCoordsForWinner(winnerIndex, bets) {
 
             const centroid = getPolygonCentroid(pathPoints);
             return {
-                x: Math.max(25, Math.min(295, centroid.x + (Math.random() * 20 - 10))),
-                y: Math.max(25, Math.min(295, centroid.y + (Math.random() * 20 - 10)))
+                x: Math.max(35, Math.min(285, centroid.x + (Math.random() * 15 - 7.5))),
+                y: Math.max(35, Math.min(285, centroid.y + (Math.random() * 15 - 7.5)))
             };
         }
         currentAngle = nextAngle;
