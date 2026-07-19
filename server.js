@@ -23,7 +23,19 @@ process.on('unhandledRejection', (reason, promise) => {
     console.error('⛔ СИСТЕМНЫЙ ПЕРЕХВАТ НЕОБРАБОТАННОГО ПРОМИСА:', reason);
 });
 
-// ⚡ ОЧЕРЕДЬ ОПЕРАЦИЙ ДЛЯ ИСКЛЮЧЕНИЯ БАГОВ КОНКУРЕНТНОЙ ЗАПИСИ (Anti Race-Condition)
+// СТАБИЛЬНАЯ ПАЛИТРА ЦВЕТОВ НА БЭКЕНДЕ (ИСПРАВЛЕНО!)
+const defaultColors = ['#8d3df5', '#00e676', '#0088cc', '#ff9500', '#ff3b30', '#c25dff'];
+function getUserColor(userId, roundNumber) {
+    const idStr = String(userId || 'guest') + "_" + String(roundNumber || 1);
+    let hash = 0;
+    for (let i = 0; i < idStr.length; i++) {
+        hash = idStr.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const index = Math.abs(hash) % defaultColors.length;
+    return defaultColors[index];
+}
+
+// ⚡ ОЧЕРЕДЬ ОПЕРАЦИЙ ДЛЯ ИСКЛЮЧЕНИЯ БАГОВ КОНКУРЕНТНОЙ ЗАПИСИ
 const userQueues = {};
 function enqueueUserAction(userId, actionFn) {
     const idStr = String(userId);
@@ -268,6 +280,30 @@ if (bot) {
             }
 
             if (isAdmin) {
+                // 🎁 КОМАНДА ВОЗВРАТА СРЕДСТВ ИГРОКАМ (Например: /addbalance 510575553 80)
+                if (text.startsWith('/addbalance')) {
+                    const parts = text.split(' ');
+                    if (parts.length < 3) {
+                        bot.sendMessage(chatId, "⚠️ Формат команды:\n`/addbalance <ID_Пользователя> <Сумма>`", { parse_mode: "Markdown" });
+                        return;
+                    }
+                    const targetId = parts[1];
+                    const amount = parseFloat(parts[2]);
+                    if (isNaN(amount)) {
+                        bot.sendMessage(chatId, "⚠️ Сумма должна быть числом.");
+                        return;
+                    }
+                    let user = await dbGetUser(targetId);
+                    if (!user) {
+                        bot.sendMessage(chatId, `⚠️ Игрок с ID ${targetId} не найден в базе.`);
+                        return;
+                    }
+                    user.balance = parseFloat((parseFloat(user.balance) + amount).toFixed(3));
+                    await dbSaveUser(targetId, user);
+                    bot.sendMessage(chatId, `✅ Игроку @${user.username} успешно начислено *+${amount} GRAM*.\nНовый баланс: *${user.balance} GRAM*`, { parse_mode: "Markdown" });
+                    return;
+                }
+
                 if (text === '/ban') {
                     adminStates[chatId] = 'awaiting_ban';
                     bot.sendMessage(chatId, "🚫 **Блокировка игрока**\n\nПожалуйста, введите Telegram ID игрока, которого нужно забанить:", { parse_mode: "Markdown" });
@@ -419,7 +455,6 @@ setInterval(() => {
         let stateChanged = false;
 
         if (arenaState.status === "waiting") {
-            // ТРЕБУЕТСЯ МИНИМУМ 2 ИГРОКА ДЛЯ НАЧАЛА ОТСЧЕТА!
             if (arenaState.bets.length >= 2) {
                 arenaState.status = "countdown";
                 arenaState.timeLeft = 15;
@@ -841,7 +876,7 @@ app.post('/api/withdraw_gift', parseTelegramInitData, async (req, res) => {
     res.json({ success: true });
 });
 
-// СТАВКА В АРЕНУ (С ОЧЕРЕДЬЮ!)
+// СТАВКА В АРЕНУ (ТЕПЕРЬ 100% БЕЗОПАСНАЯ И БЕЗ БАГОВ!)
 app.post('/api/place_bet', parseTelegramInitData, async (req, res) => {
     const userId = req.user.id;
 
@@ -855,7 +890,7 @@ app.post('/api/place_bet', parseTelegramInitData, async (req, res) => {
             return res.status(400).json({ error: "Раунд уже завершен, подождите..." });
         }
 
-        // Запрашиваем из базы Самый Свежий Баланс игрока внутри Очереди!
+        // Запрашиваем самый свежий баланс в базе
         const user = await dbGetUser(userId);
         if (!user) {
             return res.status(404).json({ error: "Пользователь не найден" });
@@ -865,7 +900,15 @@ app.post('/api/place_bet', parseTelegramInitData, async (req, res) => {
             return res.status(400).json({ error: "Недостаточно баланса" });
         }
 
-        // Списываем и записываем
+        // ВЫЧИСЛЯЕМ ВСЕ ПАРАМЕТРЫ СТАВКИ ДО ИЗМЕНЕНИЯ БАЛАНСА В БАЗЕ ДАННЫХ (Защита от сбоев)
+        let chosenColor;
+        try {
+            chosenColor = getUserColor(user.id, arenaState.roundNumber);
+        } catch (e) {
+            chosenColor = '#8d3df5';
+        }
+
+        // Списываем средства только когда уверены, что всё отработает без ошибок
         user.balance = parseFloat((parseFloat(user.balance) - amount).toFixed(3));
         await dbSaveUser(user.id, user);
 
@@ -873,7 +916,6 @@ app.post('/api/place_bet', parseTelegramInitData, async (req, res) => {
         if (existingBet) {
             existingBet.amount = parseFloat((existingBet.amount + amount).toFixed(3));
         } else {
-            const chosenColor = getUserColor(user.id, arenaState.roundNumber);
             arenaState.bets.push({
                 userId: user.id,
                 username: user.username,
@@ -907,7 +949,7 @@ app.get('/api/arena/state', parseTelegramInitData, (req, res) => {
     });
 });
 
-// ОТКРЫТИЕ ЕЖЕДНЕВНОГО КЕЙСА (С ОЧЕРЕДЬЮ!)
+// ОТКРЫТИЕ ЕЖЕДНЕВНОГО КЕЙСА
 app.post('/api/open_daily_case', parseTelegramInitData, async (req, res) => {
     const userId = req.user.id;
 
@@ -947,7 +989,7 @@ app.post('/api/open_daily_case', parseTelegramInitData, async (req, res) => {
     });
 });
 
-// ОТКРЫТИЕ КЕЙСА НОВИЧКА (С ОЧЕРЕДЬЮ!)
+// ОТКРЫТИЕ КЕЙСА НОВИЧКА
 app.post('/api/open_newbie_case', parseTelegramInitData, async (req, res) => {
     const userId = req.user.id;
 
