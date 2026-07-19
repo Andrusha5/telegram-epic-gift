@@ -531,6 +531,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                     };
 
                     showNotification("Подтвердите транзакцию...", "⏳");
+                    
+                    // Мгновенно открывает окно подтверждения в кошельке
                     const result = await tonConnectUI.sendTransaction(transaction);
 
                     if (result) {
@@ -1123,8 +1125,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             return merged;
         }
 
-        async function pollArenaLoop() {
-            if (!isPollingActive) return;
+        async function pollArenaLoop(forceInstant = false) {
+            if (!isPollingActive && !forceInstant) return;
 
             const arenaSection = document.getElementById('arena-section');
             if (!arenaSection || arenaSection.classList.contains('hidden')) {
@@ -1200,6 +1202,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                                 if (localCountdownValue <= 0) {
                                     clearInterval(countdownIntervalId);
                                     if (countdownTimer) countdownTimer.classList.add('hidden');
+                                    // МГНОВЕННЫЙ ЭКСТРЕННЫЙ ОПРОС БЕЗ СЕКУНДНЫХ ЗАДЕРЖЕК
+                                    setTimeout(() => { pollArenaLoop(true); }, 50);
                                 } else {
                                     if (countdownTimer) {
                                         countdownTimer.classList.remove('hidden');
@@ -1221,12 +1225,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                         const signature = winId + "_" + tPool + "_" + winX + "_" + winY + "_" + correctRoundNumber;
                         const age = serverTime - resolvedAt; 
 
-                        if (correctRoundNumber !== lastAnimatedRound && age < 7000) {
+                        if (correctRoundNumber !== lastAnimatedRound && age < 9000) {
                             lastAnimatedRound = correctRoundNumber;
                             currentRoundSignature = signature;
                             
                             if (statusText) statusText.classList.add('hidden');
 
+                            // Моментальный старт шарика
                             animateBouncingBall(winX, winY, signature, () => {
                                 const isWeWinner = (String(winId) === String(userId));
                                 if (isWeWinner) {
@@ -1244,7 +1249,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                                 
                                 fetchUserData();
                             });
-                        } else if (correctRoundNumber !== lastAnimatedRound && age >= 7000) {
+                        } else if (correctRoundNumber !== lastAnimatedRound && age >= 9000) {
                             lastAnimatedRound = correctRoundNumber;
                             currentRoundSignature = signature;
                             
@@ -1275,7 +1280,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             } catch (err) {
                 console.error("Error polling arena state:", err);
             } finally {
-                if (isPollingActive) {
+                if (isPollingActive && !forceInstant) {
                     setTimeout(pollArenaLoop, 1500); 
                 }
             }
@@ -1319,7 +1324,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             renderBetButtons();
         }
 
-        // КЛИК СТАВКИ (С ЗАЩИТНЫМ ТАЙМ-АУТОМ ДО 8 СЕКУНД И АНТИ-СПАМ БЛОКИРОВКОЙ 250мс)
+        // КЛИК СТАВКИ (ЖЕЛЕЗНАЯ СТАБИЛЬНОСТЬ БЕЗ ВОЗВРАТОВ!)
         let localBetThrottle = false;
         const handleBetClick = async (e) => {
             const btn = e.currentTarget;
@@ -1328,15 +1333,16 @@ document.addEventListener('DOMContentLoaded', async () => {
             const betValue = parseFloat(btn.getAttribute('data-bet'));
             if (isNaN(betValue) || betValue < 0.1) return; 
 
-            // Кратковременный визуальный анти-спам блок на 250мс
+            // Блокируем кнопку на 200мс для исключения случайных двойных кликов
             localBetThrottle = true;
             btn.style.opacity = '0.5';
             setTimeout(() => {
                 localBetThrottle = false;
                 btn.style.opacity = '1';
                 renderBetButtons();
-            }, 250);
+            }, 200);
 
+            // Оптимистичное локальное списание баланса
             localExpectedBetAmount = parseFloat((localExpectedBetAmount + betValue).toFixed(3));
             arenaPlayers = getMergedPlayers(arenaPlayers, lastObservedRoundNumber || 1);
             
@@ -1347,7 +1353,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             triggerBalanceBadge(-betValue);
 
             try {
-                // Тайм-аут увеличен до 8000мс (8 секунд) для стабильности при сетевых лагах
+                // Запрос с длительным таймаутом на случай задержек сети
                 const res = await fetchWithTimeout(`${API_BASE_URL}/api/place_bet`, {
                     method: 'POST',
                     headers: { 
@@ -1355,7 +1361,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         'X-Telegram-Init-Data': initDataHeader
                     },
                     body: JSON.stringify({ amount: betValue }),
-                    timeout: 8000 
+                    timeout: 10000 
                 });
 
                 if (res.status === 403) {
@@ -1368,14 +1374,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if (res.ok && data.success) {
                     currentUser.balance = data.newBalance;
                 } else {
+                    // Возвращаем средства на экран ТОЛЬКО если сервер действительно отклонил ставку (например, кончился баланс)
                     triggerBalanceBadge(betValue);
                     localExpectedBetAmount = parseFloat(Math.max(0, localExpectedBetAmount - betValue).toFixed(3));
                     fetchUserData();
                 }
             } catch (err) {
-                triggerBalanceBadge(betValue);
-                localExpectedBetAmount = parseFloat(Math.max(0, localExpectedBetAmount - betValue).toFixed(3));
-                fetchUserData();
+                // Даже при обрыве сети не откатываем ставку сразу. Пусть бэкенд сделает синхронизацию на следующем пулинге.
+                console.warn("Сетевой лаг. Ставка ожидает синхронизации...");
             }
         };
 
