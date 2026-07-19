@@ -14,6 +14,15 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
+// 🛡️ ГЛОБАЛЬНЫЙ ЩИТ ОТ ЛЮБЫХ ПАДЕНИЙ СЕРВЕРА (АБСОЛЮТНАЯ ЗАЩИТА)
+process.on('uncaughtException', (err) => {
+    console.error('⛔ СИСТЕМНЫЙ ПЕРЕХВАТ ОШИБКИ (Процесс не упадет):', err.stack || err);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('⛔ СИСТЕМНЫЙ ПЕРЕХВАТ НЕОБРАБОТАННОГО ПРОМИСА:', reason);
+});
+
 // НАСТРОЙКИ TG-БОТА (Универсальный поиск токена и ID админа на Render)
 const BOT_TOKEN = String(process.env.TELEGRAM_BOT_TOKEN || process.env.BOT_TOKEN || '').trim().replace(/^["']|["']$/g, '');
 const ADMIN_CHAT_ID = String(process.env.ADMIN_TELEGRAM_ID || process.env.ADMIN_CHAT_ID || '').trim().replace(/^["']|["']$/g, '');
@@ -25,11 +34,20 @@ const adminStates = {};
 if (BOT_TOKEN && BOT_TOKEN !== "undefined" && BOT_TOKEN !== "") {
     try {
         bot = new TelegramBot(BOT_TOKEN, { polling: true });
-        console.log("SUCCESS: Telegram Bot successfully initialized with TELEGRAM_BOT_TOKEN.");
+        console.log("SUCCESS: Telegram Bot successfully initialized.");
+
+        // Мягкие обработчики ошибок бота (не дают упасть процессу Node.js)
+        bot.on('polling_error', (error) => {
+            console.warn("⚠️ Предупреждение Polling (Бот продолжает работать):", error.message);
+        });
+
+        bot.on('error', (error) => {
+            console.error("⚠️ Ошибка бота (Бот продолжает работать):", error.message);
+        });
 
         // Мгновенная очистка зависшей очереди сообщений и сброс вебхука
         bot.deleteWebHook({ drop_pending_updates: true }).then(() => {
-            console.log("SUCCESS: Telegram Webhook dropped. Bot polling is fully running and ready!");
+            console.log("SUCCESS: Telegram Webhook dropped. Bot polling is fully active!");
         }).catch(err => {
             console.error("ERROR clearing Webhook:", err.message);
         });
@@ -73,6 +91,11 @@ const localUsersFile = path.join(__dirname, 'database_users.json');
 const localInvFile = path.join(__dirname, 'database_inventory.json');
 const localDepFile = path.join(__dirname, 'database_deposits.json');
 
+// Подготовка резервных файлов
+if (!fs.existsSync(localUsersFile)) fs.writeFileSync(localUsersFile, JSON.stringify({}));
+if (!fs.existsSync(localInvFile)) fs.writeFileSync(localInvFile, JSON.stringify([]));
+if (!fs.existsSync(localDepFile)) fs.writeFileSync(localDepFile, JSON.stringify([]));
+
 if (process.env.DATABASE_URL) {
     pgPool = new Pool({
         connectionString: process.env.DATABASE_URL,
@@ -111,83 +134,98 @@ if (process.env.DATABASE_URL) {
         .catch(err => console.error("PostgreSQL Init Database tables error:", err.message));
 } else {
     console.warn("DATABASE_URL is missing. Using persistent local JSON files instead.");
-    if (!fs.existsSync(localUsersFile)) fs.writeFileSync(localUsersFile, JSON.stringify({}));
-    if (!fs.existsSync(localInvFile)) fs.writeFileSync(localInvFile, JSON.stringify([]));
-    if (!fs.existsSync(localDepFile)) fs.writeFileSync(localDepFile, JSON.stringify([]));
 }
 
-// УНИВЕРСАЛЬНЫЕ МЕТОДЫ РАБОТЫ С ДАННЫМИ
+// УНИВЕРСАЛЬНЫЕ МЕТОДЫ РАБОТЫ С ДАННЫМИ С ЗАЩИТОЙ ОТ СБОЕВ БД
 async function dbGetUser(id) {
-    if (pgPool) {
-        const res = await pgPool.query("SELECT * FROM users WHERE id = $1", [String(id)]);
-        return res.rows[0] || null;
-    } else {
-        const data = JSON.parse(fs.readFileSync(localUsersFile, 'utf8'));
-        return data[String(id)] || null;
+    try {
+        if (pgPool) {
+            const res = await pgPool.query("SELECT * FROM users WHERE id = $1", [String(id)]);
+            return res.rows[0] || null;
+        }
+    } catch (e) {
+        console.error("DB GetUser fallback to local storage:", e.message);
     }
+    const data = JSON.parse(fs.readFileSync(localUsersFile, 'utf8'));
+    return data[String(id)] || null;
 }
 
 async function dbSaveUser(id, user) {
     const isBannedValue = (user.is_banned === true || user.is_banned === 'true');
-    if (pgPool) {
-        await pgPool.query(`
-            INSERT INTO users (id, username, first_name, balance, avatar_url, last_daily_case_open, is_banned)
-            VALUES ($1, $2, $3, $4, $5, $6, $7)
-            ON CONFLICT (id) DO UPDATE 
-            SET username = $2, first_name = $3, balance = $4, avatar_url = $5, last_daily_case_open = $6, is_banned = $7
-        `, [String(id), user.username, user.first_name, user.balance, user.avatar_url, user.last_daily_case_open, isBannedValue]);
-    } else {
-        const data = JSON.parse(fs.readFileSync(localUsersFile, 'utf8'));
-        user.is_banned = isBannedValue;
-        data[String(id)] = user;
-        fs.writeFileSync(localUsersFile, JSON.stringify(data, null, 2));
+    try {
+        if (pgPool) {
+            await pgPool.query(`
+                INSERT INTO users (id, username, first_name, balance, avatar_url, last_daily_case_open, is_banned)
+                VALUES ($1, $2, $3, $4, $5, $6, $7)
+                ON CONFLICT (id) DO UPDATE 
+                SET username = $2, first_name = $3, balance = $4, avatar_url = $5, last_daily_case_open = $6, is_banned = $7
+            `, [String(id), user.username, user.first_name, user.balance, user.avatar_url, user.last_daily_case_open, isBannedValue]);
+            return;
+        }
+    } catch (e) {
+        console.error("DB SaveUser fallback to local storage:", e.message);
     }
+    const data = JSON.parse(fs.readFileSync(localUsersFile, 'utf8'));
+    user.is_banned = isBannedValue;
+    data[String(id)] = user;
+    fs.writeFileSync(localUsersFile, JSON.stringify(data, null, 2));
 }
 
 async function dbGetInventory(userId) {
-    if (pgPool) {
-        const res = await pgPool.query("SELECT * FROM inventory WHERE user_id = $1", [String(userId)]);
-        return res.rows;
-    } else {
-        const items = JSON.parse(fs.readFileSync(localInvFile, 'utf8'));
-        return items.filter(i => String(i.user_id) === String(userId));
+    try {
+        if (pgPool) {
+            const res = await pgPool.query("SELECT * FROM inventory WHERE user_id = $1", [String(userId)]);
+            return res.rows;
+        }
+    } catch (e) {
+        console.error("DB GetInventory fallback to local storage:", e.message);
     }
+    const items = JSON.parse(fs.readFileSync(localInvFile, 'utf8'));
+    return items.filter(i => String(i.user_id) === String(userId));
 }
 
 async function dbAddInventoryItem(userId, itemId) {
     const gift = ALL_GIFT_ITEMS[itemId];
     if (!gift) return;
 
-    if (pgPool) {
-        await pgPool.query(`
-            INSERT INTO inventory (user_id, item_id, name, value, image_url)
-            VALUES ($1, $2, $3, $4, $5)
-        `, [String(userId), itemId, gift.name, gift.value, gift.icon]);
-    } else {
-        const items = JSON.parse(fs.readFileSync(localInvFile, 'utf8'));
-        const newItem = {
-            id: Date.now() + Math.floor(Math.random() * 1000),
-            user_id: String(userId),
-            item_id: parseInt(itemId),
-            name: gift.name,
-            value: gift.value,
-            image_url: gift.icon
-        };
-        items.push(newItem);
-        fs.writeFileSync(localInvFile, JSON.stringify(items, null, 2));
+    try {
+        if (pgPool) {
+            await pgPool.query(`
+                INSERT INTO inventory (user_id, item_id, name, value, image_url)
+                VALUES ($1, $2, $3, $4, $5)
+            `, [String(userId), itemId, gift.name, gift.value, gift.icon]);
+            return;
+        }
+    } catch (e) {
+        console.error("DB AddInventoryItem fallback to local storage:", e.message);
     }
+    const items = JSON.parse(fs.readFileSync(localInvFile, 'utf8'));
+    const newItem = {
+        id: Date.now() + Math.floor(Math.random() * 1000),
+        user_id: String(userId),
+        item_id: parseInt(itemId),
+        name: gift.name,
+        value: gift.value,
+        image_url: gift.icon
+    };
+    items.push(newItem);
+    fs.writeFileSync(localInvFile, JSON.stringify(items, null, 2));
 }
 
 async function dbRemoveInventoryItem(userId, itemId) {
-    if (pgPool) {
-        await pgPool.query("DELETE FROM inventory WHERE id = (SELECT id FROM inventory WHERE user_id = $1 AND item_id = $2 LIMIT 1)", [String(userId), parseInt(itemId)]);
-    } else {
-        const items = JSON.parse(fs.readFileSync(localInvFile, 'utf8'));
-        const idx = items.findIndex(i => String(i.user_id) === String(userId) && parseInt(i.item_id) === parseInt(itemId));
-        if (idx !== -1) {
-            items.splice(idx, 1);
-            fs.writeFileSync(localInvFile, JSON.stringify(items, null, 2));
+    try {
+        if (pgPool) {
+            await pgPool.query("DELETE FROM inventory WHERE id = (SELECT id FROM inventory WHERE user_id = $1 AND item_id = $2 LIMIT 1)", [String(userId), parseInt(itemId)]);
+            return;
         }
+    } catch (e) {
+        console.error("DB RemoveInventoryItem fallback to local storage:", e.message);
+    }
+    const items = JSON.parse(fs.readFileSync(localInvFile, 'utf8'));
+    const idx = items.findIndex(i => String(i.user_id) === String(userId) && parseInt(i.item_id) === parseInt(itemId));
+    if (idx !== -1) {
+        items.splice(idx, 1);
+        fs.writeFileSync(localInvFile, JSON.stringify(items, null, 2));
     }
 }
 
@@ -236,115 +274,119 @@ if (bot) {
     });
 
     bot.on('message', async (msg) => {
-        const chatId = msg.chat.id;
-        const text = msg.text ? msg.text.trim() : '';
-        const isAdmin = String(chatId).trim() === String(ADMIN_CHAT_ID).trim();
+        try {
+            const chatId = msg.chat.id;
+            const text = msg.text ? msg.text.trim() : '';
+            const isAdmin = String(chatId).trim() === String(ADMIN_CHAT_ID).trim();
 
-        console.log("Входящее сообщение: " + text + " | От кого: " + chatId + " | Админ ли: " + isAdmin);
+            console.log("Входящее сообщение: " + text + " | От кого: " + chatId + " | Админ ли: " + isAdmin);
 
-        if (text === '/start') {
-            const welcomeMsg = "🎉 **Добро пожаловать в BestGifts!**\n\n" +
-                               "Нажмите на кнопку **Open** (меню слева снизу), чтобы запустить игру!\n\n" +
-                               "ℹ️ Ваш Chat ID: `" + chatId + "`" + (isAdmin ? " (Администратор ⭐)" : "");
-            bot.sendMessage(chatId, welcomeMsg, { parse_mode: "Markdown" });
-            return;
-        }
-
-        if (isAdmin) {
-            if (text === '/ban') {
-                adminStates[chatId] = 'awaiting_ban';
-                bot.sendMessage(chatId, "🚫 **Блокировка игрока**\n\nПожалуйста, введите Telegram ID игрока, которого нужно забанить:", { parse_mode: "Markdown" });
+            if (text === '/start') {
+                const welcomeMsg = "🎉 **Добро пожаловать в BestGifts!**\n\n" +
+                                   "Нажмите на кнопку **Open** (меню слева снизу), чтобы запустить игру!\n\n" +
+                                   "ℹ️ Ваш Chat ID: `" + chatId + "`" + (isAdmin ? " (Администратор ⭐)" : "");
+                bot.sendMessage(chatId, welcomeMsg, { parse_mode: "Markdown" });
                 return;
             }
 
-            if (text === '/unban') {
-                adminStates[chatId] = 'awaiting_unban';
-                bot.sendMessage(chatId, "✅ **Разблокировка игрока**\n\nПожалуйста, введите Telegram ID игрока, которого нужно разблокировать:", { parse_mode: "Markdown" });
-                return;
-            }
-
-            if (text === '/status') {
-                adminStates[chatId] = 'awaiting_status';
-                bot.sendMessage(chatId, "🔍 **Статус игрока**\n\nПожалуйста, введите Telegram ID игрока для проверки его профиля:", { parse_mode: "Markdown" });
-                return;
-            }
-
-            const state = adminStates[chatId];
-            if (state) {
-                const targetId = text;
-                if (!targetId || isNaN(targetId)) {
-                    bot.sendMessage(chatId, "⚠️ ID должен состоять только из цифр. Повторите ввод корректного ID:");
+            if (isAdmin) {
+                if (text === '/ban') {
+                    adminStates[chatId] = 'awaiting_ban';
+                    bot.sendMessage(chatId, "🚫 **Блокировка игрока**\n\nПожалуйста, введите Telegram ID игрока, которого нужно забанить:", { parse_mode: "Markdown" });
                     return;
                 }
 
-                let user = await dbGetUser(targetId);
-                
-                if (state === 'awaiting_ban') {
-                    if (!user) {
-                        user = {
-                            id: targetId,
-                            username: "unknown",
-                            first_name: "Неизвестный",
-                            balance: 0.0,
-                            avatar_url: "https://img.icons8.com/color/96/user.png",
-                            last_daily_case_open: null,
-                            is_banned: true
-                        };
-                    } else {
-                        user.is_banned = true;
-                    }
-                    await dbSaveUser(targetId, user);
-                    
-                    const banMsg = "🚫 **Игрок заблокирован!**\n\n" +
-                                   "**ID:** `" + targetId + "`\n" +
-                                   "**Имя:** @" + user.username + " (" + user.first_name + ")\n\n" +
-                                   "Доступ к Web App для него мгновенно закрыт.";
-                    bot.sendMessage(chatId, banMsg, { parse_mode: "Markdown" });
-                
-                } else if (state === 'awaiting_unban') {
-                    if (!user) {
-                        user = {
-                            id: targetId,
-                            username: "unknown",
-                            first_name: "Неизвестный",
-                            balance: 50.0,
-                            avatar_url: "https://img.icons8.com/color/96/user.png",
-                            last_daily_case_open: null,
-                            is_banned: false
-                        };
-                    } else {
-                        user.is_banned = false;
-                    }
-                    await dbSaveUser(targetId, user);
-                    
-                    const unbanMsg = "✅ **Игрок успешно разблокирован!**\n\n" +
-                                     "**ID:** `" + targetId + "`\n" +
-                                     "**Имя:** @" + user.username + " (" + user.first_name + ")\n\n" +
-                                     "Доступ к приложению восстановлен.";
-                    bot.sendMessage(chatId, unbanMsg, { parse_mode: "Markdown" });
-                
-                } else if (state === 'awaiting_status') {
-                    if (!user) {
-                        bot.sendMessage(chatId, "🔍 Пользователь с ID `" + targetId + "` не найден в базе данных.", { parse_mode: "Markdown" });
-                    } else {
-                        const bannedStatus = user.is_banned ? "Забанен 🚫" : "Активен ✅";
-                        const statusMsg = "🔍 **Информация о профиле:**\n\n" +
-                                          "**ID:** `" + targetId + "`\n" +
-                                          "**Имя:** @" + user.username + " (" + user.first_name + ")\n" +
-                                          "**Баланс:** " + parseFloat(user.balance || 0).toFixed(3) + " GRAM\n" +
-                                          "**Статус блокировки:** " + bannedStatus + "\n" +
-                                          "**Последний бонус:** " + (user.last_daily_case_open || "Не открывал");
-                        bot.sendMessage(chatId, statusMsg, { parse_mode: "Markdown" });
-                    }
+                if (text === '/unban') {
+                    adminStates[chatId] = 'awaiting_unban';
+                    bot.sendMessage(chatId, "✅ **Разблокировка игрока**\n\nПожалуйста, введите Telegram ID игрока, которого нужно разблокировать:", { parse_mode: "Markdown" });
+                    return;
                 }
 
-                delete adminStates[chatId]; 
-                return;
+                if (text === '/status') {
+                    adminStates[chatId] = 'awaiting_status';
+                    bot.sendMessage(chatId, "🔍 **Статус игрока**\n\nПожалуйста, введите Telegram ID игрока для проверки его профиля:", { parse_mode: "Markdown" });
+                    return;
+                }
+
+                const state = adminStates[chatId];
+                if (state) {
+                    const targetId = text;
+                    if (!targetId || isNaN(targetId)) {
+                        bot.sendMessage(chatId, "⚠️ ID должен состоять только из цифр. Повторите ввод корректного ID:");
+                        return;
+                    }
+
+                    let user = await dbGetUser(targetId);
+                    
+                    if (state === 'awaiting_ban') {
+                        if (!user) {
+                            user = {
+                                id: targetId,
+                                username: "unknown",
+                                first_name: "Неизвестный",
+                                balance: 0.0,
+                                avatar_url: "https://img.icons8.com/color/96/user.png",
+                                last_daily_case_open: null,
+                                is_banned: true
+                            };
+                        } else {
+                            user.is_banned = true;
+                        }
+                        await dbSaveUser(targetId, user);
+                        
+                        const banMsg = "🚫 **Игрок заблокирован!**\n\n" +
+                                       "**ID:** `" + targetId + "`\n" +
+                                       "**Имя:** @" + user.username + " (" + user.first_name + ")\n\n" +
+                                       "Доступ к Web App для него мгновенно закрыт.";
+                        bot.sendMessage(chatId, banMsg, { parse_mode: "Markdown" });
+                    
+                    } else if (state === 'awaiting_unban') {
+                        if (!user) {
+                            user = {
+                                id: targetId,
+                                username: "unknown",
+                                first_name: "Неизвестный",
+                                balance: 50.0,
+                                avatar_url: "https://img.icons8.com/color/96/user.png",
+                                last_daily_case_open: null,
+                                is_banned: false
+                            };
+                        } else {
+                            user.is_banned = false;
+                        }
+                        await dbSaveUser(targetId, user);
+                        
+                        const unbanMsg = "✅ **Игрок успешно разблокирован!**\n\n" +
+                                         "**ID:** `" + targetId + "`\n" +
+                                         "**Имя:** @" + user.username + " (" + user.first_name + ")\n\n" +
+                                         "Доступ к приложению восстановлен.";
+                        bot.sendMessage(chatId, unbanMsg, { parse_mode: "Markdown" });
+                    
+                    } else if (state === 'awaiting_status') {
+                        if (!user) {
+                            bot.sendMessage(chatId, "🔍 Пользователь с ID `" + targetId + "` не найден в базе данных.", { parse_mode: "Markdown" });
+                        } else {
+                            const bannedStatus = user.is_banned ? "Забанен 🚫" : "Активен ✅";
+                            const statusMsg = "🔍 **Информация о профиле:**\n\n" +
+                                              "**ID:** `" + targetId + "`\n" +
+                                              "**Имя:** @" + user.username + " (" + user.first_name + ")\n" +
+                                              "**Баланс:** " + parseFloat(user.balance || 0).toFixed(3) + " GRAM\n" +
+                                              "**Статус блокировки:** " + bannedStatus + "\n" +
+                                              "**Последний бонус:** " + (user.last_daily_case_open || "Не открывал");
+                            bot.sendMessage(chatId, statusMsg, { parse_mode: "Markdown" });
+                        }
+                    }
+
+                    delete adminStates[chatId]; 
+                    return;
+                }
+            } else {
+                if (text === '/ban' || text === '/unban' || text === '/status') {
+                    bot.sendMessage(chatId, "⚠️ У вас нет прав администратора для выполнения этой команды.");
+                }
             }
-        } else {
-            if (text === '/ban' || text === '/unban' || text === '/status') {
-                bot.sendMessage(chatId, "⚠️ У вас нет прав администратора для выполнения этой команды.");
-            }
+        } catch (err) {
+            console.error("Error processing message event:", err.message);
         }
     });
 }
@@ -365,27 +407,31 @@ let arenaState = {
 
 // Игровой цикл бэкенда
 setInterval(() => {
-    if (arenaState.status === "waiting") {
-        if (arenaState.bets.length >= 2) {
-            arenaState.status = "countdown";
-            arenaState.timeLeft = 15;
+    try {
+        if (arenaState.status === "waiting") {
+            if (arenaState.bets.length >= 2) {
+                arenaState.status = "countdown";
+                arenaState.timeLeft = 15;
+            }
+        } else if (arenaState.status === "countdown") {
+            arenaState.timeLeft--;
+            if (arenaState.timeLeft <= 0) {
+                resolveArenaRound().catch(e => console.error("Error resolving round:", e.message));
+            }
+        } else if (arenaState.status === "finished") {
+            arenaState.timeLeft--;
+            if (arenaState.timeLeft <= 0) {
+                arenaState.bets = [];
+                arenaState.status = "waiting";
+                arenaState.timeLeft = 15;
+                arenaState.winnerId = null;
+                arenaState.winnerName = null;
+                arenaState.totalPool = 0;
+                arenaState.roundNumber++;
+            }
         }
-    } else if (arenaState.status === "countdown") {
-        arenaState.timeLeft--;
-        if (arenaState.timeLeft <= 0) {
-            resolveArenaRound();
-        }
-    } else if (arenaState.status === "finished") {
-        arenaState.timeLeft--;
-        if (arenaState.timeLeft <= 0) {
-            arenaState.bets = [];
-            arenaState.status = "waiting";
-            arenaState.timeLeft = 15;
-            arenaState.winnerId = null;
-            arenaState.winnerName = null;
-            arenaState.totalPool = 0;
-            arenaState.roundNumber++;
-        }
+    } catch (err) {
+        console.error("Arena interval error:", err.message);
     }
 }, 1000);
 
