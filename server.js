@@ -14,12 +14,12 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// КЛЮЧИ И НАСТРОЙКИ TG-БОТА С ПРОВЕРКОЙ
+// НАСТРОЙКИ TG-БОТА (Приоритет на вашу переменную ADMIN_TELEGRAM_ID из Render)
 const BOT_TOKEN = process.env.BOT_TOKEN;
-const ADMIN_CHAT_ID = String(process.env.ADMIN_CHAT_ID || '').trim();
+const ADMIN_CHAT_ID = String(process.env.ADMIN_TELEGRAM_ID || process.env.ADMIN_CHAT_ID || '').trim();
 let bot = null;
 
-// Временное хранилище состояний ввода админа
+// Хранилище состояний ввода админа
 const adminStates = {}; 
 
 if (BOT_TOKEN) {
@@ -27,30 +27,18 @@ if (BOT_TOKEN) {
         bot = new TelegramBot(BOT_TOKEN, { polling: true });
         console.log("Telegram Bot successfully loaded.");
 
-        // Принудительное удаление старых вебхуков для активации polling
+        // Принудительное удаление старых вебхуков для активации polling сообщений
         bot.deleteWebHook().then(() => {
-            console.log("Telegram Webhook successfully cleared. Polling is fully active.");
+            console.log("Telegram Webhook successfully cleared. Polling is active.");
         }).catch(err => {
             console.error("Error clearing Webhook:", err.message);
-        });
-
-        // Автоматическая установка меню команд для кнопки "/"
-        bot.setMyCommands([
-            { command: 'start', description: 'Запустить BestGifts' },
-            { command: 'ban', description: 'Заблокировать игрока по ID (Админ)' },
-            { command: 'unban', description: 'Разблокировать игрока по ID (Админ)' },
-            { command: 'status', description: 'Проверить статус игрока по ID (Админ)' }
-        ]).then(() => {
-            console.log("Slash commands menu registered successfully.");
-        }).catch(err => {
-            console.error("Error setting bot commands:", err.message);
         });
 
     } catch (e) {
         console.error("Failed to initialize Telegram Bot:", e.message);
     }
 } else {
-    console.warn("BOT_TOKEN is missing! Admin bot functions are disabled.");
+    console.warn("CRITICAL: BOT_TOKEN is missing! Please add BOT_TOKEN to Render Environment Variables.");
 }
 
 // СПИСОК ВСЕХ ДОСТУПНЫХ ПОДАРКОВ
@@ -79,7 +67,7 @@ const ALL_GIFT_ITEMS = {
     112: { name: "Мишка классический", value: 0.11, icon: "/Images/Items/michka.jpg" }
 };
 
-// ИНИЦИАЛИЗАЦИЯ И СВЯЗЬ С БД
+// ИНИЦИАЛИЗАЦИЯ И СВЯЗЬ С БД (PostgreSQL или JSON локальный резерв)
 let pgPool = null;
 const localUsersFile = path.join(__dirname, 'database_users.json');
 const localInvFile = path.join(__dirname, 'database_inventory.json');
@@ -203,9 +191,8 @@ async function dbRemoveInventoryItem(userId, itemId) {
     }
 }
 
-// ОБРАБОТКА КОМАНД И ВВОДА ДЛЯ АДМИНИСТРАТОРА В TG-БОТЕ
+// ОБРАБОТКА КОМАНД TG-БОТА С ПРОВЕРКОЙ НА АДМИНА
 if (bot) {
-    // 1. Клиентские кнопки модерации депозитов
     bot.on('callback_query', async (callbackQuery) => {
         const action = callbackQuery.data; 
         const message = callbackQuery.message;
@@ -248,49 +235,40 @@ if (bot) {
         }
     });
 
-    // 2. Обработка текстовых команд (Абсолютно безопасно от SyntaxError V8)
     bot.on('message', async (msg) => {
         const chatId = msg.chat.id;
         const text = msg.text ? msg.text.trim() : '';
         const isAdmin = String(chatId).trim() === String(ADMIN_CHAT_ID).trim();
 
-        console.log("TG Bot Message: ChatID=" + chatId + " | Msg='" + text + "' | IsAdmin=" + isAdmin);
-
         if (text === '/start') {
-            const welcomeText = "🎉 **Добро пожаловать в BestGifts!**\n\n" +
-                                "Нажмите на кнопку Web App в меню слева снизу, чтобы открыть игру!\n\n" +
-                                "ℹ️ Ваш Telegram Chat ID: `" + chatId + "`\n" +
-                                "*(Если вы администратор, укажите этот ID в настройках Render в переменной ADMIN_CHAT_ID)*";
-            bot.sendMessage(chatId, welcomeText, { parse_mode: "Markdown" });
+            bot.sendMessage(chatId, "🎉 **Добро пожаловать в BestGifts!**\n\nНажмите на кнопку Web App в меню слева снизу, чтобы открыть приложение!", { parse_mode: "Markdown" });
             return;
         }
 
-        // Если пишет администратор
         if (isAdmin) {
             if (text === '/ban') {
                 adminStates[chatId] = 'awaiting_ban';
-                bot.sendMessage(chatId, "🚫 **Блокировка пользователя**\n\nПожалуйста, отправьте Telegram ID игрока, которого вы хотите забанить:", { parse_mode: "Markdown" });
+                bot.sendMessage(chatId, "🚫 **Блокировка игрока**\n\nПожалуйста, отправьте Telegram ID пользователя, которого вы хотите забанить:", { parse_mode: "Markdown" });
                 return;
             }
 
             if (text === '/unban') {
                 adminStates[chatId] = 'awaiting_unban';
-                bot.sendMessage(chatId, "✅ **Разблокировка пользователя**\n\nПожалуйста, отправьте Telegram ID игрока, которого хотите разблокировать:", { parse_mode: "Markdown" });
+                bot.sendMessage(chatId, "✅ **Разблокировка игрока**\n\nПожалуйста, отправьте Telegram ID пользователя, которого хотите разблокировать:", { parse_mode: "Markdown" });
                 return;
             }
 
             if (text === '/status') {
                 adminStates[chatId] = 'awaiting_status';
-                bot.sendMessage(chatId, "🔍 **Статус игрока**\n\nПожалуйста, отправьте Telegram ID игрока для детальной проверки его профиля:", { parse_mode: "Markdown" });
+                bot.sendMessage(chatId, "🔍 **Статус игрока**\n\nПожалуйста, отправьте Telegram ID пользователя для проверки его профиля:", { parse_mode: "Markdown" });
                 return;
             }
 
-            // Обработка ввода ID на команды
             const state = adminStates[chatId];
             if (state) {
                 const targetId = text;
                 if (!targetId || isNaN(targetId)) {
-                    bot.sendMessage(chatId, "⚠️ ID должен состоять только из цифр. Пожалуйста, отправьте корректный ID игрока:");
+                    bot.sendMessage(chatId, "⚠️ ID должен состоять только из цифр. Отправьте корректный ID игрока заново:");
                     return;
                 }
 
@@ -315,12 +293,11 @@ if (bot) {
                     const banMsg = "🚫 **Игрок заблокирован!**\n\n" +
                                    "**ID:** `" + targetId + "`\n" +
                                    "**Имя:** @" + user.username + " (" + user.first_name + ")\n\n" +
-                                   "Данный пользователь мгновенно отключен от игрового веб-приложения и не сможет больше войти.";
+                                   "Пользователь мгновенно заблокирован на сервере и в Web App.";
                     bot.sendMessage(chatId, banMsg, { parse_mode: "Markdown" });
                 
                 } else if (state === 'awaiting_unban') {
                     if (!user) {
-                        bot.sendMessage(chatId, "⚠️ Данный игрок еще не заходил в бота, но мы разблокировали этот ID на будущее.");
                         user = {
                             id: targetId,
                             username: "unknown",
@@ -338,7 +315,7 @@ if (bot) {
                     const unbanMsg = "✅ **Игрок успешно разблокирован!**\n\n" +
                                      "**ID:** `" + targetId + "`\n" +
                                      "**Имя:** @" + user.username + " (" + user.first_name + ")\n\n" +
-                                     "Доступ к приложению восстановлен.";
+                                     "Доступ к приложению полностью восстановлен.";
                     bot.sendMessage(chatId, unbanMsg, { parse_mode: "Markdown" });
                 
                 } else if (state === 'awaiting_status') {
@@ -360,9 +337,8 @@ if (bot) {
                 return;
             }
         } else {
-            // Если обычный игрок пытается запустить админ-команды
             if (text === '/ban' || text === '/unban' || text === '/status') {
-                bot.sendMessage(chatId, "⚠️ У вас нет прав администратора для совершения этого действия.");
+                bot.sendMessage(chatId, "⚠️ У вас нет прав администратора для совершения этой команды.");
             }
         }
     });
@@ -448,7 +424,6 @@ async function resolveArenaRound() {
     }
 }
 
-// Генерация координат победителя в квадрате
 function generateCoordsForWinner(winnerIndex, bets) {
     const N = bets.length;
     if (N === 0) return { x: 160, y: 160 };
@@ -492,7 +467,7 @@ function generateCoordsForWinner(winnerIndex, bets) {
             let normalizedCurrent = (currentAngle % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
             let normalizedNext = (nextAngle % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
             if (nextAngle > currentAngle && normalizedNext < normalizedCurrent) {
-                normalizedNext += 2 * Math.PI;
+                nextAngle += 2 * Math.PI;
             }
 
             const crossedCorners = [];
@@ -522,7 +497,6 @@ function generateCoordsForWinner(winnerIndex, bets) {
     return { x: 160, y: 160 };
 }
 
-// Вспомогательные функции геометрии
 function calculateShares(bets) {
     const N = bets.length;
     if (N === 0) return [];
@@ -669,7 +643,6 @@ async function parseTelegramInitData(req, res, next) {
     
     const user = await getOrCreateUser(initDataUnsafe);
     
-    // Мгновенная блокировка на уровне бэкенда
     if (user.is_banned === true || user.is_banned === 'true') {
         return res.status(403).json({ banned: true, error: "Ваш аккаунт заблокирован!" });
     }
@@ -683,7 +656,6 @@ app.get('/api/user', parseTelegramInitData, (req, res) => {
     const user = req.user;
     const isAdmin = String(user.id).trim() === String(ADMIN_CHAT_ID).trim();
     
-    // Возвращаем чистый, гарантированный plain-объект с флагом isAdmin
     res.json({
         id: user.id,
         username: user.username,
@@ -717,7 +689,7 @@ app.post('/api/verify_payment', parseTelegramInitData, async (req, res) => {
     res.json({ success: true, newBalance: user.balance });
 });
 
-// ДЕПОЗИТ (ЗАЯВКА НА ВВОД NFT С КНОПКАМИ TG ДЛЯ АДМИНА)
+// ДЕПОЗИТ
 app.post('/api/deposit_gift_request', parseTelegramInitData, async (req, res) => {
     const { itemId } = req.body;
     const gift = ALL_GIFT_ITEMS[itemId];
@@ -843,7 +815,7 @@ app.post('/api/open_daily_case', parseTelegramInitData, async (req, res) => {
     const cooldown = 24 * 60 * 60 * 1000;
     const isAdmin = String(user.id).trim() === String(ADMIN_CHAT_ID).trim();
 
-    // Если админ — полностью пропускаем проверку таймера блокировки!
+    // Если вы — админ, то проверка cooldown полностью отключается!
     if (!isAdmin && user.last_daily_case_open && (now - new Date(user.last_daily_case_open).getTime() < cooldown)) {
         return res.status(400).json({ error: "Кейс еще недоступен" });
     }
