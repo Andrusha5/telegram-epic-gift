@@ -10,6 +10,43 @@ const tg = (window.Telegram && window.Telegram.WebApp) ? window.Telegram.WebApp 
 tg.expand();
 tg.ready();
 
+// Динамическое внедрение стилей для отображения аватарок по центру, неонового свечения и белого шарика
+(function injectStyles() {
+    const style = document.createElement('style');
+    style.innerHTML = `
+        /* Настоящее центрирование аватарок внутри игровых секторов */
+        .arena-player-avatar-node {
+            position: absolute !important;
+            transform: translate(-50%, -50%) !important;
+            border-radius: 50% !important;
+            border: 2px solid #ffffff !important;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4) !important;
+            object-fit: cover !important;
+            pointer-events: none !important;
+            z-index: 5 !important;
+        }
+        /* Белый цветящийся шарик на превью главного экрана */
+        .arena-preview-ball, [class*="preview-ball"], .best-arena-preview .ball {
+            background-color: #ffffff !important;
+            box-shadow: 0 0 10px #ffffff, 0 0 20px #ffffff, 0 0 30px #ffffff !important;
+        }
+        /* Красивая неоновая обводка победившего поля */
+        @keyframes winningSectorPulse {
+            0% { filter: drop-shadow(0 0 5px var(--glow-color)) brightness(1.2); }
+            50% { filter: drop-shadow(0 0 20px var(--glow-color)) brightness(1.5); }
+            100% { filter: drop-shadow(0 0 5px var(--glow-color)) brightness(1.2); }
+        }
+        .winning-segment-glow {
+            stroke: #ffffff !important;
+            stroke-width: 4px !important;
+            stroke-linejoin: round !important;
+            animation: winningSectorPulse 0.4s infinite alternate !important;
+            z-index: 10 !important;
+        }
+    `;
+    document.head.appendChild(style);
+})();
+
 // FALLBACK ДЛЯ ТЕСТОВ
 let localGuestId = localStorage.getItem('mock_guest_id');
 if (!localGuestId) {
@@ -532,7 +569,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                     showNotification("Подтвердите транзакцию...", "⏳");
                     
-                    // Мгновенно открывает окно подтверждения в кошельке
                     const result = await tonConnectUI.sendTransaction(transaction);
 
                     if (result) {
@@ -709,6 +745,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     rect.setAttribute("width", "100%");
                     rect.setAttribute("height", "100%");
                     rect.setAttribute("fill", arenaPlayers[0].color);
+                    rect.setAttribute("data-user-id", arenaPlayers[0].userId);
                     svg.appendChild(rect);
                     
                     createAvatarElement(CX, 240, arenaPlayers[0].avatar, 56); 
@@ -724,12 +761,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                     bg.setAttribute("width", "100%");
                     bg.setAttribute("height", "100%");
                     bg.setAttribute("fill", arenaPlayers[1].color); 
+                    bg.setAttribute("data-user-id", arenaPlayers[1].userId);
                     svg.appendChild(bg);
 
                     const poly = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
                     const p1Pts = [{x:0, y:0}, {x:sizeX, y:0}, {x:0, y:sizeY}];
                     poly.setAttribute("points", p1Pts.map(p => `${p.x},${p.y}`).join(' '));
                     poly.setAttribute("fill", arenaPlayers[0].color); 
+                    poly.setAttribute("data-user-id", arenaPlayers[0].userId);
                     svg.appendChild(poly);
 
                     const c1 = getPolygonCentroid(p1Pts);
@@ -738,8 +777,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                     ];
                     const c2 = getPolygonCentroid(p2Pts);
 
-                    createAvatarElement(c1.x, c1.y, arenaPlayers[0].avatar, 24 + shares[0] * 30);
-                    createAvatarElement(c2.x, c2.y, arenaPlayers[1].avatar, 24 + shares[1] * 30);
+                    // С зажатыми границами по 35 пикселей для идеального центрирования
+                    const safeC1X = Math.max(35, Math.min(285, c1.x));
+                    const safeC1Y = Math.max(35, Math.min(285, c1.y));
+                    const safeC2X = Math.max(35, Math.min(285, c2.x));
+                    const safeC2Y = Math.max(35, Math.min(285, c2.y));
+
+                    createAvatarElement(safeC1X, safeC1Y, arenaPlayers[0].avatar, 42);
+                    createAvatarElement(safeC2X, safeC2Y, arenaPlayers[1].avatar, 42);
                     return; 
                 }
 
@@ -786,10 +831,15 @@ document.addEventListener('DOMContentLoaded', async () => {
                     const poly = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
                     poly.setAttribute("points", pathPoints.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' '));
                     poly.setAttribute("fill", player.color);
+                    poly.setAttribute("data-user-id", player.userId);
                     svg.appendChild(poly);
 
                     const c = getPolygonCentroid(pathPoints);
-                    createAvatarElement(c.x, c.y, player.avatar, 24 + share * 24);
+                    // Зажим в безопасные границы
+                    const safeCX = Math.max(35, Math.min(285, c.x));
+                    const safeCY = Math.max(35, Math.min(285, c.y));
+                    
+                    createAvatarElement(safeCX, safeCY, player.avatar, 38);
 
                     currentAngle = nextAngle;
                 }
@@ -1225,29 +1275,50 @@ document.addEventListener('DOMContentLoaded', async () => {
                         const signature = winId + "_" + tPool + "_" + winX + "_" + winY + "_" + correctRoundNumber;
                         const age = serverTime - resolvedAt; 
 
+                        // РАЗРЕШЕНИЕ РАУНДА (БЕЗ ЗАДЕРЖЕК И С КРАСИВОЙ НЕОНОВОЙ ОБВОДКОЙ)
                         if (correctRoundNumber !== lastAnimatedRound && age < 9000) {
                             lastAnimatedRound = correctRoundNumber;
                             currentRoundSignature = signature;
                             
                             if (statusText) statusText.classList.add('hidden');
 
-                            // Моментальный старт шарика
                             animateBouncingBall(winX, winY, signature, () => {
-                                const isWeWinner = (String(winId) === String(userId));
-                                if (isWeWinner) {
-                                    showCustomModal({
-                                        icon: '🏆',
-                                        title: 'Победа!',
-                                        message: `🎉 Поздравляем! Вы получили весь банк: +${parseFloat(tPool).toFixed(3)} GRAM!`,
-                                        buttons: [{ text: 'Забрать!', primary: true }]
-                                    });
-                                    triggerBalanceBadge(parseFloat(tPool));
+                                // 🌟 ПАТЧ ПОДСВЕТКИ ПОБЕДИТЕЛЯ (100% ТОЧНОСТЬ):
+                                const svgCanvas = document.getElementById('arena-svg-canvas');
+                                if (svgCanvas) {
+                                    const winningPolygon = svgCanvas.querySelector(`[data-user-id="${winId}"]`);
+                                    if (winningPolygon) {
+                                        const winnerColor = winningPolygon.getAttribute('fill') || '#00e676';
+                                        winningPolygon.style.setProperty('--glow-color', winnerColor);
+                                        winningPolygon.classList.add('winning-segment-glow');
+                                        
+                                        // Перемещаем элемент на передний план SVG, чтобы границы не перекрывались другими полями
+                                        svgCanvas.appendChild(winningPolygon);
+                                    }
                                 }
-                                
-                                const ballCanvas = document.getElementById('arena-ball-svg');
-                                if (ballCanvas) ballCanvas.innerHTML = '';
-                                
-                                fetchUserData();
+
+                                // Держим свечение ровно 1 секунду до выдачи уведомлений и сброса шарика
+                                setTimeout(() => {
+                                    const isWeWinner = (String(winId) === String(userId));
+                                    if (isWeWinner) {
+                                        showCustomModal({
+                                            icon: '🏆',
+                                            title: 'Победа!',
+                                            message: `🎉 Поздравляем! Вы получили весь банк: +${parseFloat(tPool).toFixed(3)} GRAM!`,
+                                            buttons: [{ text: 'Забрать!', primary: true }]
+                                        });
+                                        triggerBalanceBadge(parseFloat(tPool));
+                                    }
+                                    
+                                    const ballCanvas = document.getElementById('arena-ball-svg');
+                                    if (ballCanvas) ballCanvas.innerHTML = '';
+                                    
+                                    // Очистка анимации полей
+                                    const glowingPoly = svgCanvas?.querySelector('.winning-segment-glow');
+                                    if (glowingPoly) glowingPoly.classList.remove('winning-segment-glow');
+
+                                    fetchUserData();
+                                }, 1000); 
                             });
                         } else if (correctRoundNumber !== lastAnimatedRound && age >= 9000) {
                             lastAnimatedRound = correctRoundNumber;
