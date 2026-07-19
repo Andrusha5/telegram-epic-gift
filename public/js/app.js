@@ -201,7 +201,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             bannedOverlay: document.getElementById('banned-screen')
         };
 
-        // ФУНКЦИЯ ДЛЯ КРАСИВОЙ БЛОКИРОВКИ ЭКРАНА
         function showBannedScreen() {
             if (elements.bannedOverlay) {
                 elements.bannedOverlay.classList.remove('hidden');
@@ -420,7 +419,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                             }
                             if (elements.depositBalanceBtn) elements.depositBalanceBtn.removeAttribute('disabled');
                             if (elements.depositNoticeText) {
-                                elements.depositNoticeText.innerText = "Кошелек успешно подключен к системе!";
+                                elements.depositNoticeText.innerText = "Кошелек подключен!";
                                 elements.depositNoticeText.style.color = '#00e676';
                             }
                         } else {
@@ -479,7 +478,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     elements.depositAmountModal.classList.remove('hidden');
                     if (elements.modalDepositInput) elements.modalDepositInput.value = "0.1";
                 } else {
-                    showNotification("Не удалось получить адрес пополнения. Пожалуйста, проверьте подключение или повторите попытку позже.", "⚠️");
+                    showNotification("Не удалось получить адрес пополнения. Повторите попытку.", "⚠️");
                 }
                 elements.depositBalanceBtn.disabled = false; 
             });
@@ -509,7 +508,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     showNotification("Реквизиты потеряны, повторная попытка...", "⏳");
                     const success = await ensurePaymentParamsForUserAction();
                     if (!success) {
-                        showNotification("Не удалось получить адрес пополнения. Попробуйте еще раз.", "⚠️");
+                        showNotification("Не удалось получить адрес. Попробуйте еще раз.", "⚠️");
                         closeDepositModal();
                         return;
                     }
@@ -535,13 +534,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                     const result = await tonConnectUI.sendTransaction(transaction);
 
                     if (result) {
-                        // МОМЕНТАЛЬНОЕ И АВТОМАТИЧЕСКОЕ ЗАЧИСЛЕНИЕ ДЛЯ ИДЕАЛЬНОГО ОПЫТА!
                         currentUser.balance = parseFloat((parseFloat(currentUser.balance) + amount).toFixed(3));
                         updateBalanceUI();
                         triggerBalanceBadge(amount);
                         showNotification(`Баланс пополнен на +${amount.toFixed(3)} TON!`, "💎");
 
-                        // Отправляем запрос бэкенду для сохранения в бд
                         fetch(`${API_BASE_URL}/api/verify_payment`, {
                             method: 'POST',
                             headers: { 
@@ -1656,7 +1653,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                                     }
 
                                     if (res.ok) {
-                                        showNotification(`Заявка отправлена Sintopa! Ожидайте модерации...`, '📥');
+                                        showNotification(`Заявка отправлена Sintopa! Ожидайте...`, '📥');
                                     } else {
                                         const errorData = await res.json();
                                         showNotification(errorData.error || 'Не удалось отправить.', '⚠️');
@@ -1753,7 +1750,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         function updateDailyCaseTimer() {
             clearInterval(dailyCaseTimerInterval); 
             
-            // ЕСЛИ ВЫ АДМИНИСТРАТОР — ПОЛНОСТЬЮ ОТКЛЮЧАЕМ БЛОКИРУЮЩИЙ ТАЙМЕР НА КЛИЕНТЕ
+            // ЕСЛИ АДМИНИСТРАТОР — ПОЛНОСТЬЮ ОТКЛЮЧАЕМ БЛОКИРУЮЩИЙ ТАЙМЕР НА КЛИЕНТЕ
             if (currentUser && (currentUser.isAdmin === true || currentUser.isAdmin === "true")) {
                 if (elements.spinBtn) elements.spinBtn.classList.remove('hidden');
                 if (elements.spinBtn) elements.spinBtn.disabled = false;
