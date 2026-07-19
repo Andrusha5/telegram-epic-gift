@@ -221,13 +221,13 @@ if (bot) {
 
                 if (isApproved) {
                     await dbAddInventoryItem(user_id, item_id);
-                    await bot.editMessageText(`✅ **Успешно одобрено!**\nПодарок *${gift.name}* добавлен игроку @${user ? user.username : 'Unknown'} (ID: ${user_id}) в инвентарь.`, {
+                    await bot.editMessageText("✅ **Успешно одобрено!**\nПодарок *" + gift.name + "* добавлен игроку @" + (user ? user.username : 'Unknown') + " (ID: " + user_id + ") в инвентарь.", {
                         chat_id: chatId,
                         message_id: msgId,
                         parse_mode: 'Markdown'
                     });
                 } else {
-                    await bot.editMessageText(`❌ **Заявка отклонена!**\nПодарок *${gift.name}* для игрока @${user ? user.username : 'Unknown'} (ID: ${user_id}) отклонен.`, {
+                    await bot.editMessageText("❌ **Заявка отклонена!**\nПодарок *" + gift.name + "* для игрока @" + (user ? user.username : 'Unknown') + " (ID: " + user_id + ") отклонен.", {
                         chat_id: chatId,
                         message_id: msgId,
                         parse_mode: 'Markdown'
@@ -241,14 +241,14 @@ if (bot) {
         }
     });
 
-    // 2. Обработка текстовых команд /ban, /unban, /status
+    // 2. Обработка текстовых команд /ban, /unban, /status (Без синтаксических ошибок V8)
     bot.on('message', async (msg) => {
         const chatId = msg.chat.id;
         const text = msg.text ? msg.text.trim() : '';
         const isAdmin = String(chatId) === String(ADMIN_CHAT_ID);
 
         if (text === '/start') {
-            bot.sendMessage(chatId, `🎉 **Добро пожаловать в BestGifts!**\n\nНажмите на кнопку Web App в меню слева снизу, чтобы открыть игру!`, { parse_mode: "Markdown" });
+            bot.sendMessage(chatId, "🎉 **Добро пожаловать в BestGifts!**\n\nНажмите на кнопку Web App в меню слева снизу, чтобы открыть игру!", { parse_mode: "Markdown" });
             return;
         }
 
@@ -298,7 +298,12 @@ if (bot) {
                         user.is_banned = true;
                     }
                     await dbSaveUser(targetId, user);
-                    bot.sendMessage(chatId, `🚫 **Игрок заблокирован!**\n\n**ID:** `${targetId}`\n**Имя:** @${user.username} (${user.first_name})\n\nДанный пользователь мгновенно отключен от игрового веб-приложения и не сможет больше делать ставки.`, { parse_mode: "Markdown" });
+                    
+                    const banMsg = "🚫 **Игрок заблокирован!**\n\n" +
+                                   "**ID:** `" + targetId + "`\n" +
+                                   "**Имя:** @" + user.username + " (" + user.first_name + ")\n\n" +
+                                   "Данный пользователь мгновенно отключен от игрового веб-приложения и не сможет больше войти.";
+                    bot.sendMessage(chatId, banMsg, { parse_mode: "Markdown" });
                 
                 } else if (state === 'awaiting_unban') {
                     if (!user) {
@@ -316,13 +321,25 @@ if (bot) {
                         user.is_banned = false;
                     }
                     await dbSaveUser(targetId, user);
-                    bot.sendMessage(chatId, `✅ **Игрок успешно разблокирован!**\n\n**ID:** `${targetId}`\n**Имя:** @${user.username} (${user.first_name})\n\nДоступ к приложению восстановлен.`, { parse_mode: "Markdown" });
+                    
+                    const unbanMsg = "✅ **Игрок успешно разблокирован!**\n\n" +
+                                     "**ID:** `" + targetId + "`\n" +
+                                     "**Имя:** @" + user.username + " (" + user.first_name + ")\n\n" +
+                                     "Доступ к приложению восстановлен.";
+                    bot.sendMessage(chatId, unbanMsg, { parse_mode: "Markdown" });
                 
                 } else if (state === 'awaiting_status') {
                     if (!user) {
-                        bot.sendMessage(chatId, `🔍 Пользователь с ID `${targetId}` не найден в базе данных.`, { parse_mode: "Markdown" });
+                        bot.sendMessage(chatId, "🔍 Пользователь с ID `" + targetId + "` не найден в базе данных.", { parse_mode: "Markdown" });
                     } else {
-                        bot.sendMessage(chatId, `🔍 **Информация о профиле:**\n\n**ID:** `${targetId}`\n**Имя:** @${user.username} (${user.first_name})\n**Баланс:** ${parseFloat(user.balance || 0).toFixed(3)} GRAM\n**Статус блокировки:** ${user.is_banned ? "Забанен 🚫" : "Активен ✅"}\n**Последний бонус:** ${user.last_daily_case_open || "Не открывал"}`, { parse_mode: "Markdown" });
+                        const bannedStatus = user.is_banned ? "Забанен 🚫" : "Активен ✅";
+                        const statusMsg = "🔍 **Информация о профиле:**\n\n" +
+                                          "**ID:** `" + targetId + "`\n" +
+                                          "**Имя:** @" + user.username + " (" + user.first_name + ")\n" +
+                                          "**Баланс:** " + parseFloat(user.balance || 0).toFixed(3) + " GRAM\n" +
+                                          "**Статус блокировки:** " + bannedStatus + "\n" +
+                                          "**Последний бонус:** " + (user.last_daily_case_open || "Не открывал");
+                        bot.sendMessage(chatId, statusMsg, { parse_mode: "Markdown" });
                     }
                 }
 
@@ -645,7 +662,10 @@ async function parseTelegramInitData(req, res, next) {
 
 // API РОУТЫ
 app.get('/api/user', parseTelegramInitData, (req, res) => {
-    res.json(req.user);
+    // Добавляем флаг isAdmin для фронтенда
+    const userCopy = { ...req.user };
+    userCopy.isAdmin = String(userCopy.id) === String(ADMIN_CHAT_ID);
+    res.json(userCopy);
 });
 
 // МОМЕНТАЛЬНОЕ НАЧИСЛЕНИЕ БАЛАНСА ПОСЛЕ TON ТРАНЗАКЦИИ
@@ -661,7 +681,9 @@ app.post('/api/verify_payment', parseTelegramInitData, async (req, res) => {
     await dbSaveUser(user.id, user);
 
     if (bot && ADMIN_CHAT_ID) {
-        bot.sendMessage(ADMIN_CHAT_ID, `💎 **Пополнение баланса!**\nИгрок @${user.username} (ID: ${user.id}) успешно зачислил через кошелек **+${paymentAmount.toFixed(3)} TON**!`, { parse_mode: "Markdown" });
+        const textMsg = "💎 **Пополнение баланса!**\n" +
+                        "Игрок @" + user.username + " (ID: " + user.id + ") успешно зачислил через кошелек **+" + paymentAmount.toFixed(3) + " TON**!";
+        bot.sendMessage(ADMIN_CHAT_ID, textMsg, { parse_mode: "Markdown" });
     }
 
     res.json({ success: true, newBalance: user.balance });
@@ -678,13 +700,16 @@ app.post('/api/deposit_gift_request', parseTelegramInitData, async (req, res) =>
     }
 
     if (bot && ADMIN_CHAT_ID) {
-        const messageText = `📥 **Заявка на ввод NFT-подарка!**\n\n**Игрок:** @${user.username} (ID: `${user.id}`)\n**Подарок:** *${gift.name}*\n**Номинал:** ${gift.value} GRAM`;
+        const messageText = "📥 **Заявка на ввод NFT-подарка!**\n\n" +
+                            "**Игрок:** @" + user.username + " (ID: `" + user.id + "`)\n" +
+                            "**Подарок:** *" + gift.name + "*\n" +
+                            "**Номинал:** " + gift.value + " GRAM";
         
         const inlineKeyboard = {
             inline_keyboard: [
                 [
-                    { text: "Одобрить ✅", callback_data: `approve_dep_${user.id}_${itemId}` },
-                    { text: "Отклонить ❌", callback_data: `reject_dep_${user.id}_${itemId}` }
+                    { text: "Одобрить ✅", callback_data: "approve_dep_" + user.id + "_" + itemId },
+                    { text: "Отклонить ❌", callback_data: "reject_dep_" + user.id + "_" + itemId }
                 ]
             ]
         };
@@ -723,7 +748,11 @@ app.post('/api/withdraw_gift', parseTelegramInitData, async (req, res) => {
     await dbRemoveInventoryItem(user.id, itemId);
 
     if (bot && ADMIN_CHAT_ID) {
-        bot.sendMessage(ADMIN_CHAT_ID, `📤 **Заявка на вывод подарка!**\n\n**Игрок:** @${user.username} (ID: ${user.id})\n**Предмет на вывод:** *${gift.name}* (${gift.value} GRAM)\n\n_Пожалуйста, отправьте ему этот подарок в Telegram!_`, { parse_mode: "Markdown" });
+        const textMsg = "📤 **Заявка на вывод подарка!**\n\n" +
+                        "**Игрок:** @" + user.username + " (ID: " + user.id + ")\n" +
+                        "**Предмет на вывод:** *" + gift.name + "* (" + gift.value + " GRAM)\n\n" +
+                        "_Пожалуйста, отправьте ему этот подарок в Telegram!_";
+        bot.sendMessage(ADMIN_CHAT_ID, textMsg, { parse_mode: "Markdown" });
     }
 
     res.json({ success: true });
@@ -784,8 +813,10 @@ app.post('/api/open_daily_case', parseTelegramInitData, async (req, res) => {
     const user = req.user;
     const now = Date.now();
     const cooldown = 24 * 60 * 60 * 1000;
+    const isAdmin = String(user.id) === String(ADMIN_CHAT_ID);
 
-    if (user.last_daily_case_open && (now - new Date(user.last_daily_case_open).getTime() < cooldown)) {
+    // Админ может открывать без cooldown
+    if (!isAdmin && user.last_daily_case_open && (now - new Date(user.last_daily_case_open).getTime() < cooldown)) {
         return res.status(400).json({ error: "Кейс еще недоступен" });
     }
 
@@ -802,7 +833,9 @@ app.post('/api/open_daily_case', parseTelegramInitData, async (req, res) => {
     } else {
         await dbAddInventoryItem(user.id, won.id);
         if (bot && ADMIN_CHAT_ID) {
-            bot.sendMessage(ADMIN_CHAT_ID, `🎉 **Новый выигрыш в Кейсе!**\nИгрок @${user.username} (ID: ${user.id}) только что выиграл *${won.name}* (ценность: ${won.value} GRAM) в **Ежедневном Кейсе**!`, { parse_mode: "Markdown" });
+            const winNotify = "🎉 **Новый выигрыш в Кейсе!**\n" +
+                              "Игрок @" + user.username + " (ID: " + user.id + ") выиграл *" + won.name + "* (ценность: " + won.value + " GRAM) в **Ежедневном Кейсе**!";
+            bot.sendMessage(ADMIN_CHAT_ID, winNotify, { parse_mode: "Markdown" });
         }
     }
     await dbSaveUser(user.id, user);
@@ -832,7 +865,9 @@ app.post('/api/open_newbie_case', parseTelegramInitData, async (req, res) => {
     } else {
         await dbAddInventoryItem(user.id, won.id);
         if (bot && ADMIN_CHAT_ID) {
-            bot.sendMessage(ADMIN_CHAT_ID, `🎉 **Новый выигрыш в Кейсе!**\nИгрок @${user.username} (ID: ${user.id}) выиграл *${won.name}* (${won.value} GRAM) в **Кейсе Новичка**!`, { parse_mode: "Markdown" });
+            const winNotify = "🎉 **Новый выигрыш в Кейсе!**\n" +
+                              "Игрок @" + user.username + " (ID: " + user.id + ") выиграл *" + won.name + "* (" + won.value + " GRAM) в **Кейсе Новичка**!";
+            bot.sendMessage(ADMIN_CHAT_ID, winNotify, { parse_mode: "Markdown" });
         }
     }
     await dbSaveUser(user.id, user);
