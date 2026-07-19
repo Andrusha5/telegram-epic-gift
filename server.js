@@ -23,7 +23,7 @@ process.on('unhandledRejection', (reason, promise) => {
     console.error('⛔ СИСТЕМНЫЙ ПЕРЕХВАТ НЕОБРАБОТАННОГО ПРОМИСА:', reason);
 });
 
-// СТАБИЛЬНАЯ ПАЛИТРА ЦВЕТОВ НА БЭКЕНДЕ (ИСПРАВЛЕНО!)
+// СТАБИЛЬНАЯ ПАЛИТРА ЦВЕТОВ НА БЭКЕНДЕ
 const defaultColors = ['#8d3df5', '#00e676', '#0088cc', '#ff9500', '#ff3b30', '#c25dff'];
 function getUserColor(userId, roundNumber) {
     const idStr = String(userId || 'guest') + "_" + String(roundNumber || 1);
@@ -70,6 +70,19 @@ if (BOT_TOKEN && BOT_TOKEN !== "undefined" && BOT_TOKEN !== "") {
 
         bot.on('error', (error) => {
             console.error("⚠️ Ошибка бота:", error.message);
+        });
+
+        // АВТОМАТИЧЕСКАЯ РЕГИСТРАЦИЯ МЕНЮ КОМАНД ПРИ ВВОДЕ СИМВОЛА "/"
+        bot.setMyCommands([
+            { command: 'start', description: 'Запустить BestGifts 🚀' },
+            { command: 'addbalance', description: 'Пополнить баланс игрока (Админ) 💎' },
+            { command: 'ban', description: 'Заблокировать игрока (Админ) 🚫' },
+            { command: 'unban', description: 'Разблокировать игрока (Админ) ✅' },
+            { command: 'status', description: 'Статус игрока (Админ) 🔍' }
+        ]).then(() => {
+            console.log("SUCCESS: Bot commands menu registered successfully.");
+        }).catch(err => {
+            console.error("ERROR registering bot commands:", err.message);
         });
 
         bot.deleteWebHook({ drop_pending_updates: true }).then(() => {
@@ -280,17 +293,17 @@ if (bot) {
             }
 
             if (isAdmin) {
-                // 🎁 КОМАНДА ВОЗВРАТА СРЕДСТВ ИГРОКАМ (Например: /addbalance 510575553 80)
+                // 💎 КОМАНДА ВОЗВРАТА И ПОПОЛНЕНИЯ БАЛАНСА С МГНОВЕННЫМ ОПОВЕЩЕНИЕМ ИГРОКА!
                 if (text.startsWith('/addbalance')) {
                     const parts = text.split(' ');
                     if (parts.length < 3) {
                         bot.sendMessage(chatId, "⚠️ Формат команды:\n`/addbalance <ID_Пользователя> <Сумма>`", { parse_mode: "Markdown" });
                         return;
                     }
-                    const targetId = parts[1];
+                    const targetId = parts[1].trim();
                     const amount = parseFloat(parts[2]);
-                    if (isNaN(amount)) {
-                        bot.sendMessage(chatId, "⚠️ Сумма должна быть числом.");
+                    if (isNaN(amount) || amount <= 0) {
+                        bot.sendMessage(chatId, "⚠️ Сумма должна быть положительным числом.");
                         return;
                     }
                     let user = await dbGetUser(targetId);
@@ -301,6 +314,13 @@ if (bot) {
                     user.balance = parseFloat((parseFloat(user.balance) + amount).toFixed(3));
                     await dbSaveUser(targetId, user);
                     bot.sendMessage(chatId, `✅ Игроку @${user.username} успешно начислено *+${amount} GRAM*.\nНовый баланс: *${user.balance} GRAM*`, { parse_mode: "Markdown" });
+                    
+                    // Мгновенная отправка сообщения пользователю!
+                    try {
+                        await bot.sendMessage(targetId, `💎 **Баланс пополнен!**\n\nАдминистратор пополнил ваш баланс на *+${amount.toFixed(3)} GRAM*!`, { parse_mode: "Markdown" });
+                    } catch (err) {
+                        console.error("Не удалось отправить сообщение игроку через бота:", err.message);
+                    }
                     return;
                 }
 
@@ -395,7 +415,7 @@ if (bot) {
                     return;
                 }
             } else {
-                if (text === '/ban' || text === '/unban' || text === '/status') {
+                if (text === '/ban' || text === '/unban' || text === '/status' || text.startsWith('/addbalance')) {
                     bot.sendMessage(chatId, "⚠️ У вас нет прав администратора для выполнения этой команды.");
                 }
             }
@@ -876,7 +896,7 @@ app.post('/api/withdraw_gift', parseTelegramInitData, async (req, res) => {
     res.json({ success: true });
 });
 
-// СТАВКА В АРЕНУ (ТЕПЕРЬ 100% БЕЗОПАСНАЯ И БЕЗ БАГОВ!)
+// СТАВКА В АРЕНУ (100% ГАРАНТИЯ И ПРЕДОТВРАЩЕНИЕ ОШИБОК)
 app.post('/api/place_bet', parseTelegramInitData, async (req, res) => {
     const userId = req.user.id;
 
@@ -890,7 +910,6 @@ app.post('/api/place_bet', parseTelegramInitData, async (req, res) => {
             return res.status(400).json({ error: "Раунд уже завершен, подождите..." });
         }
 
-        // Запрашиваем самый свежий баланс в базе
         const user = await dbGetUser(userId);
         if (!user) {
             return res.status(404).json({ error: "Пользователь не найден" });
@@ -900,7 +919,6 @@ app.post('/api/place_bet', parseTelegramInitData, async (req, res) => {
             return res.status(400).json({ error: "Недостаточно баланса" });
         }
 
-        // ВЫЧИСЛЯЕМ ВСЕ ПАРАМЕТРЫ СТАВКИ ДО ИЗМЕНЕНИЯ БАЛАНСА В БАЗЕ ДАННЫХ (Защита от сбоев)
         let chosenColor;
         try {
             chosenColor = getUserColor(user.id, arenaState.roundNumber);
@@ -908,7 +926,7 @@ app.post('/api/place_bet', parseTelegramInitData, async (req, res) => {
             chosenColor = '#8d3df5';
         }
 
-        // Списываем средства только когда уверены, что всё отработает без ошибок
+        // Списываем средства
         user.balance = parseFloat((parseFloat(user.balance) - amount).toFixed(3));
         await dbSaveUser(user.id, user);
 
