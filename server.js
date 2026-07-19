@@ -16,7 +16,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // КЛЮЧИ И НАСТРОЙКИ TG-БОТА С ПРОВЕРКОЙ
 const BOT_TOKEN = process.env.BOT_TOKEN;
-const ADMIN_CHAT_ID = process.env.ADMIN_CHAT_ID;
+const ADMIN_CHAT_ID = String(process.env.ADMIN_CHAT_ID || '').trim();
 let bot = null;
 
 // Временное хранилище состояний ввода админа
@@ -26,6 +26,13 @@ if (BOT_TOKEN) {
     try {
         bot = new TelegramBot(BOT_TOKEN, { polling: true });
         console.log("Telegram Bot successfully loaded.");
+
+        // Принудительное удаление старых вебхуков для активации polling
+        bot.deleteWebHook().then(() => {
+            console.log("Telegram Webhook successfully cleared. Polling is fully active.");
+        }).catch(err => {
+            console.error("Error clearing Webhook:", err.message);
+        });
 
         // Автоматическая установка меню команд для кнопки "/"
         bot.setMyCommands([
@@ -72,7 +79,7 @@ const ALL_GIFT_ITEMS = {
     112: { name: "Мишка классический", value: 0.11, icon: "/Images/Items/michka.jpg" }
 };
 
-// ИНИЦИАЛИЗАЦИЯ И СВЯЗЬ С БД (PostgreSQL или JSON локальный резерв)
+// ИНИЦИАЛИЗАЦИЯ И СВЯЗЬ С БД
 let pgPool = null;
 const localUsersFile = path.join(__dirname, 'database_users.json');
 const localInvFile = path.join(__dirname, 'database_inventory.json');
@@ -241,14 +248,20 @@ if (bot) {
         }
     });
 
-    // 2. Обработка текстовых команд /ban, /unban, /status (Без синтаксических ошибок V8)
+    // 2. Обработка текстовых команд (Абсолютно безопасно от SyntaxError V8)
     bot.on('message', async (msg) => {
         const chatId = msg.chat.id;
         const text = msg.text ? msg.text.trim() : '';
-        const isAdmin = String(chatId) === String(ADMIN_CHAT_ID);
+        const isAdmin = String(chatId).trim() === String(ADMIN_CHAT_ID).trim();
+
+        console.log("TG Bot Message: ChatID=" + chatId + " | Msg='" + text + "' | IsAdmin=" + isAdmin);
 
         if (text === '/start') {
-            bot.sendMessage(chatId, "🎉 **Добро пожаловать в BestGifts!**\n\nНажмите на кнопку Web App в меню слева снизу, чтобы открыть игру!", { parse_mode: "Markdown" });
+            const welcomeText = "🎉 **Добро пожаловать в BestGifts!**\n\n" +
+                                "Нажмите на кнопку Web App в меню слева снизу, чтобы открыть игру!\n\n" +
+                                "ℹ️ Ваш Telegram Chat ID: `" + chatId + "`\n" +
+                                "*(Если вы администратор, укажите этот ID в настройках Render в переменной ADMIN_CHAT_ID)*";
+            bot.sendMessage(chatId, welcomeText, { parse_mode: "Markdown" });
             return;
         }
 
@@ -272,7 +285,7 @@ if (bot) {
                 return;
             }
 
-            // Обработка текстового ответа на команду блокировки/разблокировки/проверки
+            // Обработка ввода ID на команды
             const state = adminStates[chatId];
             if (state) {
                 const targetId = text;
@@ -345,6 +358,11 @@ if (bot) {
 
                 delete adminStates[chatId]; 
                 return;
+            }
+        } else {
+            // Если обычный игрок пытается запустить админ-команды
+            if (text === '/ban' || text === '/unban' || text === '/status') {
+                bot.sendMessage(chatId, "⚠️ У вас нет прав администратора для совершения этого действия.");
             }
         }
     });
@@ -662,10 +680,20 @@ async function parseTelegramInitData(req, res, next) {
 
 // API РОУТЫ
 app.get('/api/user', parseTelegramInitData, (req, res) => {
-    // Добавляем флаг isAdmin для фронтенда
-    const userCopy = { ...req.user };
-    userCopy.isAdmin = String(userCopy.id) === String(ADMIN_CHAT_ID);
-    res.json(userCopy);
+    const user = req.user;
+    const isAdmin = String(user.id).trim() === String(ADMIN_CHAT_ID).trim();
+    
+    // Возвращаем чистый, гарантированный plain-объект с флагом isAdmin
+    res.json({
+        id: user.id,
+        username: user.username,
+        first_name: user.first_name,
+        balance: user.balance,
+        avatar_url: user.avatar_url,
+        last_daily_case_open: user.last_daily_case_open,
+        is_banned: user.is_banned,
+        isAdmin: isAdmin
+    });
 });
 
 // МОМЕНТАЛЬНОЕ НАЧИСЛЕНИЕ БАЛАНСА ПОСЛЕ TON ТРАНЗАКЦИИ
@@ -813,9 +841,9 @@ app.post('/api/open_daily_case', parseTelegramInitData, async (req, res) => {
     const user = req.user;
     const now = Date.now();
     const cooldown = 24 * 60 * 60 * 1000;
-    const isAdmin = String(user.id) === String(ADMIN_CHAT_ID);
+    const isAdmin = String(user.id).trim() === String(ADMIN_CHAT_ID).trim();
 
-    // Админ может открывать без cooldown
+    // Если админ — полностью пропускаем проверку таймера блокировки!
     if (!isAdmin && user.last_daily_case_open && (now - new Date(user.last_daily_case_open).getTime() < cooldown)) {
         return res.status(400).json({ error: "Кейс еще недоступен" });
     }
