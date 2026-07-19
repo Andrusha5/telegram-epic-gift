@@ -1319,12 +1319,23 @@ document.addEventListener('DOMContentLoaded', async () => {
             renderBetButtons();
         }
 
+        // КЛИК СТАВКИ (С ЗАЩИТНЫМ ТАЙМ-АУТОМ ДО 8 СЕКУНД И АНТИ-СПАМ БЛОКИРОВКОЙ 250мс)
+        let localBetThrottle = false;
         const handleBetClick = async (e) => {
             const btn = e.currentTarget;
-            if (btn.classList.contains('disabled')) return;
+            if (btn.classList.contains('disabled') || localBetThrottle) return;
 
             const betValue = parseFloat(btn.getAttribute('data-bet'));
             if (isNaN(betValue) || betValue < 0.1) return; 
+
+            // Кратковременный визуальный анти-спам блок на 250мс
+            localBetThrottle = true;
+            btn.style.opacity = '0.5';
+            setTimeout(() => {
+                localBetThrottle = false;
+                btn.style.opacity = '1';
+                renderBetButtons();
+            }, 250);
 
             localExpectedBetAmount = parseFloat((localExpectedBetAmount + betValue).toFixed(3));
             arenaPlayers = getMergedPlayers(arenaPlayers, lastObservedRoundNumber || 1);
@@ -1336,6 +1347,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             triggerBalanceBadge(-betValue);
 
             try {
+                // Тайм-аут увеличен до 8000мс (8 секунд) для стабильности при сетевых лагах
                 const res = await fetchWithTimeout(`${API_BASE_URL}/api/place_bet`, {
                     method: 'POST',
                     headers: { 
@@ -1343,7 +1355,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         'X-Telegram-Init-Data': initDataHeader
                     },
                     body: JSON.stringify({ amount: betValue }),
-                    timeout: 4000
+                    timeout: 8000 
                 });
 
                 if (res.status === 403) {
@@ -1750,7 +1762,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         function updateDailyCaseTimer() {
             clearInterval(dailyCaseTimerInterval); 
             
-            // ЕСЛИ АДМИНИСТРАТОР — ПОЛНОСТЬЮ ОТКЛЮЧАЕМ БЛОКИРУЮЩИЙ ТАЙМЕР НА КЛИЕНТЕ
             if (currentUser && (currentUser.isAdmin === true || currentUser.isAdmin === "true")) {
                 if (elements.spinBtn) elements.spinBtn.classList.remove('hidden');
                 if (elements.spinBtn) elements.spinBtn.disabled = false;
