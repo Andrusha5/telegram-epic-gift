@@ -14,13 +14,15 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Логирование запросов в консоль
 app.use((req, res, next) => {
     if (req.path.startsWith('/api/')) {
-        console.log(`[API] ${req.method} ${req.path}`);
+        console.log(`[API REQUEST] ${req.method} ${req.path}`);
     }
     next();
 });
 
+// Глобальный перехват ошибок для стабильности сервера
 process.on('uncaughtException', (err) => {
     console.error('⛔ СИСТЕМНЫЙ ПЕРЕХВАТ ОШИБКИ:', err.stack || err);
 });
@@ -29,6 +31,7 @@ process.on('unhandledRejection', (reason, promise) => {
     console.error('⛔ СИСТЕМНЫЙ ПЕРЕХВАТ НЕОБРАБОТАННОГО ПРОМИСА:', reason);
 });
 
+// Цветовая палитра
 const defaultColors = ['#8d3df5', '#00e676', '#0088cc', '#ff9500', '#ff3b30', '#c25dff'];
 function getUserColor(userId, roundNumber) {
     const idStr = String(userId || 'guest') + "_" + String(roundNumber || 1);
@@ -40,6 +43,7 @@ function getUserColor(userId, roundNumber) {
     return defaultColors[index];
 }
 
+// Очередь для транзакций пользователя
 const userQueues = {};
 function enqueueUserAction(userId, actionFn) {
     const idStr = String(userId);
@@ -405,6 +409,7 @@ if (bot) {
     });
 }
 
+// 🎰 Состояние раундов арены
 let arenaState = {
     status: "waiting", 
     roundNumber: 1,
@@ -446,6 +451,7 @@ function saveArenaState() {
 
 loadArenaState();
 
+// Главный бесконечный цикл Арены
 setInterval(() => {
     try {
         let stateChanged = false;
@@ -455,20 +461,20 @@ setInterval(() => {
                 arenaState.status = "countdown";
                 arenaState.timeLeft = 15;
                 stateChanged = true;
-                console.log(`[ARENA] 🟢 Достаточно игроков (${arenaState.bets.length}). Отсчет раунда №${arenaState.roundNumber} запущен: 15 сек.`);
+                console.log(`[ARENA] 🟢 Начат отсчет раунда №${arenaState.roundNumber}: 15 сек.`);
             }
         } else if (arenaState.status === "countdown") {
             arenaState.timeLeft--;
             stateChanged = true;
             if (arenaState.timeLeft <= 0) {
-                console.log(`[ARENA] ⏳ Отсчет завершен. Разыгрываем раунд...`);
+                console.log(`[ARENA] ⏳ Время отсчета истекло. Запускаем розыгрыш...`);
                 resolveArenaRound().catch(e => console.error("Error resolving round:", e.message));
             }
         } else if (arenaState.status === "finished") {
             arenaState.timeLeft--;
             stateChanged = true;
             if (arenaState.timeLeft <= 0) {
-                console.log(`[ARENA] 🔄 Раунд №${arenaState.roundNumber} полностью завершен. Сброс состояния.`);
+                console.log(`[ARENA] 🔄 Сброс раунда. Новый раунд №${arenaState.roundNumber + 1}`);
                 arenaState.bets = [];
                 arenaState.status = "waiting";
                 arenaState.timeLeft = 15;
@@ -522,18 +528,18 @@ async function resolveArenaRound() {
         arenaState.resolvedAt = Date.now();
         arenaState.status = "finished";
         
+        // 8 секунд на красивую анимацию + поздравление на клиенте
         arenaState.timeLeft = 8; 
         saveArenaState();
-        console.log(`[ARENA] 🏆 Победитель определен: @${winnerBet.username} (ID: ${winnerBet.userId}) с банком ${pool} GRAM! Координаты шара: x=${coords.x}, y=${coords.y}`);
+        console.log(`[ARENA] 🏆 Победитель: @${winnerBet.username} (ID: ${winnerBet.userId}) Банк: ${pool} GRAM! x=${coords.x}, y=${coords.y}`);
 
         const winnerUser = await dbGetUser(winnerBet.userId);
         if (winnerUser) {
             winnerUser.balance = parseFloat((parseFloat(winnerUser.balance) + pool).toFixed(3));
             await dbSaveUser(winnerBet.userId, winnerUser);
-            console.log(`[ARENA] 💰 Баланс победителя @${winnerUser.username} изменен до ${winnerUser.balance} GRAM.`);
         }
     } catch (err) {
-        console.error("[ARENA] ❌ Критическая ошибка розыгрыша раунда:", err);
+        console.error("[ARENA] ❌ Ошибка розыгрыша раунда:", err);
         arenaState.status = "waiting";
         arenaState.timeLeft = 15;
         saveArenaState();
