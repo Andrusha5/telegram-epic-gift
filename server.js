@@ -37,7 +37,7 @@ function getUserColor(userId, roundNumber) {
     const idStr = String(userId || 'guest') + "_" + String(roundNumber || 1);
     let hash = 0;
     for (let i = 0; i < idStr.length; i++) {
-        h = idStr.charCodeAt(i) + ((h << 5) - h);
+        hash = idStr.charCodeAt(i) + ((hash << 5) - hash);
     }
     const index = Math.abs(hash) % defaultColors.length;
     return defaultColors[index];
@@ -100,6 +100,313 @@ if (BOT_TOKEN && BOT_TOKEN !== "undefined" && BOT_TOKEN !== "") {
     } catch (e) {
         console.error("CRITICAL: Failed to initialize Telegram Bot:", e.message);
     }
+}
+
+const ALL_GIFT_ITEMS = {
+    1: { name: "Статуя птицы серая", value: 20.0, icon: "/Images/Items/rare_bird.jpg" },
+    2: { name: "Тыква", value: 8.0, icon: "/Images/Items/pumpkin.jpg" },
+    3: { name: "Шляпа", value: 7.0, icon: "/Images/Items/hat.jpg" },
+    4: { name: "Собачка Snoop Dogg", value: 4.0, icon: "/Images/Items/snoopdog.jpg" },
+    5: { name: "Рюкзак черный", value: 3.0, icon: "/Images/Items/pack.jpg" },
+    6: { name: "Доширак лапша", value: 2.7, icon: "/Images/Items/ramen.jpg" },
+    7: { name: "Факел", value: 2.5, icon: "/Images/Items/chill_flame.jpg" },
+    8: { name: "Мороженое пломбир", value: 2.5, icon: "/Images/Items/plombir.jpg" },
+    9: { name: "Алмазик", value: 0.9, icon: "/Images/Items/almaz.jpg" },
+    10: { name: "Роза", value: 0.27, icon: "/Images/Items/roza.jpg" },
+    101: { name: "Розовый мишка", value: 29.0, icon: "/Images/Items/bearpink.png" },
+    102: { name: "Шлем Неко", value: 26.8, icon: "/Images/Items/Neko_helmet.png" },
+    103: { name: "Перстень печатка", value: 25.7, icon: "/Images/Items/signet_ring.png" },
+    104: { name: "Папаха", value: 18.5, icon: "/Images/Items/papakha.png" },
+    105: { name: "Амулет Купидона", value: 15.0, icon: "/Images/Items/cupid_charm.png" },
+    106: { name: "Любовное зелье", value: 10.0, icon: "/Images/Items/love_potion.png" },
+    107: { name: "UFC Бокс", value: 9.9, icon: "/Images/Items/UFC_box.png" },
+    108: { name: "Всевидящее око", value: 5.0, icon: "/Images/Items/eye.png" },
+    109: { name: "Холодный огонь", value: 2.2, icon: "/Images/Items/chill_flame.jpg" },
+    110: { name: "Вкусный пломбир", value: 2.2, icon: "/Images/Items/plombir.jpg" },
+    111: { name: "Прекрасная роза", value: 0.2, icon: "/Images/Items/roza.jpg" },
+    112: { name: "Мишка классический", value: 0.11, icon: "/Images/Items/michka.jpg" }
+};
+
+let pgPool = null;
+const localUsersFile = path.join(__dirname, 'database_users.json');
+const localInvFile = path.join(__dirname, 'database_inventory.json');
+const localDepFile = path.join(__dirname, 'database_deposits.json');
+const localArenaFile = path.join(__dirname, 'database_arena.json');
+
+if (!fs.existsSync(localUsersFile)) fs.writeFileSync(localUsersFile, JSON.stringify({}));
+if (!fs.existsSync(localInvFile)) fs.writeFileSync(localInvFile, JSON.stringify([]));
+if (!fs.existsSync(localDepFile)) fs.writeFileSync(localDepFile, JSON.stringify([]));
+if (!fs.existsSync(localArenaFile)) fs.writeFileSync(localArenaFile, JSON.stringify({}));
+
+if (process.env.DATABASE_URL) {
+    pgPool = new Pool({
+        connectionString: process.env.DATABASE_URL,
+        ssl: { rejectUnauthorized: false }
+    });
+}
+
+async function dbGetUser(id) {
+    try {
+        if (pgPool) {
+            const res = await pgPool.query("SELECT * FROM users WHERE id = $1", [String(id)]);
+            return res.rows[0] || null;
+        }
+    } catch (e) {
+        console.error("DB Fallback GetUser:", e.message);
+    }
+    const data = JSON.parse(fs.readFileSync(localUsersFile, 'utf8'));
+    return data[String(id)] || null;
+}
+
+async function dbSaveUser(id, user) {
+    const isBannedValue = (user.is_banned === true || user.is_banned === 'true');
+    try {
+        if (pgPool) {
+            await pgPool.query(`
+                INSERT INTO users (id, username, first_name, balance, avatar_url, last_daily_case_open, is_banned)
+                VALUES ($1, $2, $3, $4, $5, $6, $7)
+                ON CONFLICT (id) DO UPDATE 
+                SET username = $2, first_name = $3, balance = $4, avatar_url = $5, last_daily_case_open = $6, is_banned = $7
+            `, [String(id), user.username, user.first_name, user.balance, user.avatar_url, user.last_daily_case_open, isBannedValue]);
+            return;
+        }
+    } catch (e) {
+        console.error("DB Fallback SaveUser:", e.message);
+    }
+    const data = JSON.parse(fs.readFileSync(localUsersFile, 'utf8'));
+    user.is_banned = isBannedValue;
+    data[String(id)] = user;
+    fs.writeFileSync(localUsersFile, JSON.stringify(data, null, 2));
+}
+
+async function dbGetInventory(userId) {
+    try {
+        if (pgPool) {
+            const res = await pgPool.query("SELECT * FROM inventory WHERE user_id = $1", [String(userId)]);
+            return res.rows;
+        }
+    } catch (e) {
+        console.error("DB Fallback GetInventory:", e.message);
+    }
+    const items = JSON.parse(fs.readFileSync(localInvFile, 'utf8'));
+    return items.filter(i => String(i.user_id) === String(userId));
+}
+
+async function dbAddInventoryItem(userId, itemId) {
+    const gift = ALL_GIFT_ITEMS[itemId];
+    if (!gift) return;
+
+    try {
+        if (pgPool) {
+            await pgPool.query(`
+                INSERT INTO inventory (user_id, item_id, name, value, image_url)
+                VALUES ($1, $2, $3, $4, $5)
+            `, [String(userId), itemId, gift.name, gift.value, gift.icon]);
+            return;
+        }
+    } catch (e) {
+        console.error("DB Fallback AddInventory:", e.message);
+    }
+    const items = JSON.parse(fs.readFileSync(localInvFile, 'utf8'));
+    const newItem = {
+        id: Date.now() + Math.floor(Math.random() * 1000),
+        user_id: String(userId),
+        item_id: parseInt(itemId),
+        name: gift.name,
+        value: gift.value,
+        image_url: gift.icon
+    };
+    items.push(newItem);
+    fs.writeFileSync(localInvFile, JSON.stringify(items, null, 2));
+}
+
+async function dbRemoveInventoryItem(userId, itemId) {
+    try {
+        if (pgPool) {
+            await pgPool.query("DELETE FROM inventory WHERE id = (SELECT id FROM inventory WHERE user_id = $1 AND item_id = $2 LIMIT 1)", [String(userId), parseInt(itemId)]);
+            return;
+        }
+    } catch (e) {
+        console.error("DB Fallback RemoveInventory:", e.message);
+    }
+    const items = JSON.parse(fs.readFileSync(localInvFile, 'utf8'));
+    const idx = items.findIndex(i => String(i.user_id) === String(userId) && parseInt(i.item_id) === parseInt(itemId));
+    if (idx !== -1) {
+        items.splice(idx, 1);
+        fs.writeFileSync(localInvFile, JSON.stringify(items, null, 2));
+    }
+}
+
+if (bot) {
+    bot.on('callback_query', async (callbackQuery) => {
+        const action = callbackQuery.data; 
+        const message = callbackQuery.message;
+        const msgId = message.message_id;
+        const chatId = message.chat.id;
+
+        try {
+            if (action.startsWith('approve_dep_') || action.startsWith('reject_dep_')) {
+                const parts = action.split('_');
+                const isApproved = parts[0] === 'approve';
+                const user_id = parts[2];
+                const item_id = parseInt(parts[3]);
+
+                const user = await dbGetUser(user_id);
+                const gift = ALL_GIFT_ITEMS[item_id];
+
+                if (!gift) {
+                    return bot.answerCallbackQuery(callbackQuery.id, { text: "Ошибка: предмет не найден!", show_alert: true });
+                }
+
+                if (isApproved) {
+                    await dbAddInventoryItem(user_id, item_id);
+                    await bot.editMessageText("✅ **Успешно одобрено!**\nПодарок *" + gift.name + "* добавлен игроку @" + (user ? user.username : 'Unknown') + " (ID: " + user_id + ") в инвентарь.", {
+                        chat_id: chatId,
+                        message_id: msgId,
+                        parse_mode: 'Markdown'
+                    });
+                } else {
+                    await bot.editMessageText("❌ **Заявка отклонена!**\nПодарок *" + gift.name + "* для игрока @" + (user ? user.username : 'Unknown') + " (ID: " + user_id + ") отклонен.", {
+                        chat_id: chatId,
+                        message_id: msgId,
+                        parse_mode: 'Markdown'
+                    });
+                }
+
+                bot.answerCallbackQuery(callbackQuery.id, { text: isApproved ? "Депозит зачислен!" : "Заявка отклонена" });
+            }
+        } catch (err) {
+            console.error("Bot Callback Error:", err.message);
+        }
+    });
+
+    bot.on('message', async (msg) => {
+        try {
+            const chatId = msg.chat.id;
+            const text = msg.text ? msg.text.trim() : '';
+            const isAdmin = String(chatId).trim() === String(ADMIN_CHAT_ID).trim();
+
+            if (text === '/start') {
+                const welcomeMsg = "🎉 **Добро пожаловать в BestGifts!**\n\n" +
+                                   "Нажмите на кнопку **Open** (меню слева снизу), чтобы запустить игру!\n\n" +
+                                   "ℹ️ Ваш Chat ID: `" + chatId + "`" + (isAdmin ? " (Администратор ⭐)" : "");
+                bot.sendMessage(chatId, welcomeMsg, { parse_mode: "Markdown" });
+                return;
+            }
+
+            if (isAdmin) {
+                if (text.startsWith('/addbalance')) {
+                    const parts = text.split(' ');
+                    if (parts.length < 3) {
+                        bot.sendMessage(chatId, "⚠️ Формат команды:\n`/addbalance <ID_Пользователя> <Сумма>`", { parse_mode: "Markdown" });
+                        return;
+                    }
+                    const targetId = parts[1].trim();
+                    const amount = parseFloat(parts[2]);
+                    if (isNaN(amount) || amount <= 0) {
+                        bot.sendMessage(chatId, "⚠️ Сумма должна быть положительным числом.");
+                        return;
+                    }
+                    let user = await dbGetUser(targetId);
+                    if (!user) {
+                        bot.sendMessage(chatId, `⚠️ Игрок с ID ${targetId} не найден в базе.`);
+                        return;
+                    }
+                    user.balance = parseFloat((parseFloat(user.balance) + amount).toFixed(3));
+                    await dbSaveUser(targetId, user);
+                    bot.sendMessage(chatId, `✅ Игроку @${user.username} успешно начислено *+${amount} GRAM*.\nНовый баланс: *${user.balance} GRAM*`, { parse_mode: "Markdown" });
+                    
+                    try {
+                        await bot.sendMessage(targetId, `💎 **Баланс пополнен!**\n\nАдминистратор пополнил ваш баланс на *+${amount.toFixed(3)} GRAM*!`, { parse_mode: "Markdown" });
+                    } catch (err) {
+                        console.error("Не удалось отправить сообщение игроку через бота:", err.message);
+                    }
+                    return;
+                }
+
+                if (text === '/ban') {
+                    adminStates[chatId] = 'awaiting_ban';
+                    bot.sendMessage(chatId, "🚫 **Блокировка игрока**\n\nПожалуйста, введите Telegram ID игрока, которого нужно забанить:", { parse_mode: "Markdown" });
+                    return;
+                }
+
+                if (text === '/unban') {
+                    adminStates[chatId] = 'awaiting_unban';
+                    bot.sendMessage(chatId, "✅ **Разблокировка игрока**\n\nПожалуйста, введите Telegram ID игрока, которого нужно разблокировать:", { parse_mode: "Markdown" });
+                    return;
+                }
+
+                if (text === '/status') {
+                    adminStates[chatId] = 'awaiting_status';
+                    bot.sendMessage(chatId, "🔍 **Статус игрока**\n\nПожалуйста, введите Telegram ID игрока для проверки его профиля:", { parse_mode: "Markdown" });
+                    return;
+                }
+
+                const state = adminStates[chatId];
+                if (state) {
+                    const targetId = text;
+                    if (!targetId || isNaN(targetId)) {
+                        bot.sendMessage(chatId, "⚠️ ID должен состоять только из цифр. Повторите ввод:");
+                        return;
+                    }
+
+                    let user = await dbGetUser(targetId);
+                    
+                    if (state === 'awaiting_ban') {
+                        if (!user) {
+                            user = { id: targetId, username: "unknown", first_name: "Неизвестный", balance: 0.0, avatar_url: "https://img.icons8.com/color/96/user.png", last_daily_case_open: null, is_banned: true };
+                        } else {
+                            user.is_banned = true;
+                        }
+                        await dbSaveUser(targetId, user);
+                        
+                        const banMsg = "🚫 **Игрок заблокирован!**\n\n" +
+                                       "**ID:** `" + targetId + "`\n" +
+                                       "**Имя:** @" + user.username + " (" + user.first_name + ")\n\n" +
+                                       "Доступ к Web App для него мгновенно закрыт.";
+                        bot.sendMessage(chatId, banMsg, { parse_mode: "Markdown" });
+                    
+                    } else if (state === 'awaiting_unban') {
+                        if (!user) {
+                            user = { id: targetId, username: "unknown", first_name: "Неизвестный", balance: 50.0, avatar_url: "https://img.icons8.com/color/96/user.png", last_daily_case_open: null, is_banned: false };
+                        } else {
+                            user.is_banned = false;
+                        }
+                        await dbSaveUser(targetId, user);
+                        
+                        const unbanMsg = "✅ **Игрок успешно разблокирован!**\n\n" +
+                                         "**ID:** `" + targetId + "`\n" +
+                                         "**Имя:** @" + user.username + " (" + user.first_name + ")\n\n" +
+                                         "Доступ к приложению восстановлен.";
+                        bot.sendMessage(chatId, unbanMsg, { parse_mode: "Markdown" });
+                    
+                    } else if (state === 'awaiting_status') {
+                        if (!user) {
+                            bot.sendMessage(chatId, "🔍 Пользователь с ID `" + targetId + "` не найден в базе данных.", { parse_mode: "Markdown" });
+                        } else {
+                            const bannedStatus = user.is_banned ? "Забанен 🚫" : "Активен ✅";
+                            const statusMsg = "🔍 **Информация о профиле:**\n\n" +
+                                              "**ID:** `" + targetId + "`\n" +
+                                              "**Имя:** @" + user.username + " (" + user.first_name + ")\n" +
+                                              "**Баланс:** " + parseFloat(user.balance || 0).toFixed(3) + " GRAM\n" +
+                                              "**Статус блокировки:** " + bannedStatus + "\n" +
+                                              "**Последний бонус:** " + (user.last_daily_case_open || "Не открывал");
+                            bot.sendMessage(chatId, statusMsg, { parse_mode: "Markdown" });
+                        }
+                    }
+
+                    delete adminStates[chatId]; 
+                    return;
+                }
+            } else {
+                if (text === '/ban' || text === '/unban' || text === '/status' || text.startsWith('/addbalance')) {
+                    bot.sendMessage(chatId, "⚠️ У вас нет прав администратора для выполнения этой команды.");
+                }
+            }
+        } catch (err) {
+            console.error("Error processing message event:", err.message);
+        }
+    });
 }
 
 const ALL_GIFT_ITEMS = {
