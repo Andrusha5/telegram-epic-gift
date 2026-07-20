@@ -31,7 +31,7 @@ process.on('unhandledRejection', (reason, promise) => {
     console.error('⛔ СИСТЕМНЫЙ ПЕРЕХВАТ НЕОБРАБОТАННОГО ПРОМИСА:', reason);
 });
 
-// Цветовая палитра
+// Цветовая палитра игроков
 const defaultColors = ['#8d3df5', '#00e676', '#0088cc', '#ff9500', '#ff3b30', '#c25dff'];
 function getUserColor(userId, roundNumber) {
     const idStr = String(userId || 'guest') + "_" + String(roundNumber || 1);
@@ -409,7 +409,7 @@ if (bot) {
     });
 }
 
-// 🎰 Состояние раундов арены
+// Состояние раундов Арены
 let arenaState = {
     status: "waiting", 
     roundNumber: 1,
@@ -451,7 +451,7 @@ function saveArenaState() {
 
 loadArenaState();
 
-// Главный бесконечный цикл Арены
+// Главный бесконечный цикл Арены (1 шаг в 1 секунду)
 setInterval(() => {
     try {
         let stateChanged = false;
