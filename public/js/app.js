@@ -51,9 +51,9 @@ tg.ready();
         
         /* Красивое неоновое свечение победившего сектора */
         @keyframes winningSectorPulse {
-            0% { filter: drop-shadow(0 0 8px var(--glow-color)) brightness(1.2); stroke: #ffffff; stroke-width: 4px; }
-            50% { filter: drop-shadow(0 0 30px var(--glow-color)) brightness(1.7); stroke: #ffffff; stroke-width: 8px; }
-            100% { filter: drop-shadow(0 0 8px var(--glow-color)) brightness(1.2); stroke: #ffffff; stroke-width: 4px; }
+            0% { filter: drop-shadow(0 0 15px var(--glow-color)) brightness(1.2); stroke: #ffffff; stroke-width: 5px; }
+            50% { filter: drop-shadow(0 0 35px var(--glow-color)) brightness(1.7); stroke: #ffffff; stroke-width: 8px; }
+            100% { filter: drop-shadow(0 0 15px var(--glow-color)) brightness(1.2); stroke: #ffffff; stroke-width: 5px; }
         }
         .winning-segment-glow {
             stroke: #ffffff !important;
@@ -193,7 +193,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         let arenaStatusStr = "waiting";
 
         let lastAnimatedRound = null;
-        let lastShowedWinnerRound = null; // Защита от дублирования модалок
+        let lastShowedWinnerRound = null; 
+        let lastClearedRound = null; // Позволяет мгновенно гасить раунд на клиенте локально
         let localExpectedBetAmount = 0;
         let lastObservedRoundNumber = null;
         let lastRenderedBalance = null;
@@ -248,6 +249,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             lastObservedRoundNumber = null;
             lastAnimatedRound = null;
             lastShowedWinnerRound = null;
+            lastClearedRound = null;
         }
         localStorage.setItem('active_user_id', userId);
 
@@ -754,29 +756,31 @@ document.addEventListener('DOMContentLoaded', async () => {
                     return; 
                 }
 
+                // КОРРЕКТНЫЙ, БЕЗОПАСНЫЙ РЕНДЕРИНГ ДЛЯ 2 ИГРОКОВ (ИСКЛЮЧАЕТ ПЕРЕКРАСКУ ПОЛЯ!)
                 if (N === 2) {
                     const s = Math.sqrt(2 * shares[0]); 
                     const sizeX = (W * s);
                     const sizeY = (H * s);
 
-                    const bg = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-                    bg.setAttribute("width", "100%");
-                    bg.setAttribute("height", "100%");
-                    bg.setAttribute("fill", arenaPlayers[1].color); 
-                    bg.setAttribute("data-user-id", arenaPlayers[1].userId);
-                    svg.appendChild(bg);
-
-                    const poly = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
+                    // Полигон Игрока 1 (Ограниченный треугольник)
+                    const poly1 = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
                     const p1Pts = [{x:0, y:0}, {x:sizeX, y:0}, {x:0, y:sizeY}];
-                    poly.setAttribute("points", p1Pts.map(p => `${p.x},${p.y}`).join(' '));
-                    poly.setAttribute("fill", arenaPlayers[0].color); 
-                    poly.setAttribute("data-user-id", arenaPlayers[0].userId);
-                    svg.appendChild(poly);
+                    poly1.setAttribute("points", p1Pts.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' '));
+                    poly1.setAttribute("fill", arenaPlayers[0].color); 
+                    poly1.setAttribute("data-user-id", arenaPlayers[0].userId);
+                    svg.appendChild(poly1);
 
-                    const c1 = getPolygonCentroid(p1Pts);
+                    // Полигон Игрока 2 (Остальная часть доски - независимый 5-угольник)
+                    const poly2 = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
                     const p2Pts = [ 
                         {x:sizeX, y:0}, {x:W, y:0}, {x:W, y:H}, {x:0, y:H}, {x:0, y:sizeY}
                     ];
+                    poly2.setAttribute("points", p2Pts.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' '));
+                    poly2.setAttribute("fill", arenaPlayers[1].color); 
+                    poly2.setAttribute("data-user-id", arenaPlayers[1].userId);
+                    svg.appendChild(poly2);
+
+                    const c1 = getPolygonCentroid(p1Pts);
                     const c2 = getPolygonCentroid(p2Pts);
 
                     const safeC1X = Math.max(50, Math.min(270, c1.x));
@@ -1063,7 +1067,13 @@ document.addEventListener('DOMContentLoaded', async () => {
             const W = 320;
             const H = 320;
 
-            let simulation = simulateBallPathDeterministic(targetX, targetY, seedSignature, W, H, 8);
+            let simulation = null;
+            try {
+                simulation = simulateBallPathDeterministic(targetX, targetY, seedSignature, W, H, 8);
+            } catch (err) {
+                console.error("Simulation crash, forcing complete", err);
+            }
+
             let lastMatchedPlayer = null;
 
             if (!simulation) {
@@ -1209,6 +1219,29 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                     arenaStatusStr = state.status || state.state || "waiting";
 
+                    // ЕСЛИ РАУНД УЖЕ ПОЛНОСТЬЮ ЛОКАЛЬНО ОЧИЩЕН, МЫ ИГНОРИРУЕМ СТАРЫЕ ДАННЫЕ С СЕРВЕРА
+                    if (correctRoundNumber === lastClearedRound) {
+                        const svgCanvas = document.getElementById('arena-svg-canvas');
+                        if (svgCanvas) svgCanvas.innerHTML = '';
+                        const avatarsContainer = document.getElementById('arena-avatars-container');
+                        if (avatarsContainer) avatarsContainer.innerHTML = '';
+                        const ballCanvas = document.getElementById('arena-ball-svg');
+                        if (ballCanvas) ballCanvas.innerHTML = '';
+                        
+                        const statusText = document.getElementById('arena-status-text');
+                        if (statusText && statusText.classList.contains('hidden')) {
+                            statusText.classList.remove('hidden');
+                            statusText.innerText = "Ждем ставки...";
+                        }
+                        
+                        renderBetButtons();
+                        updateBalanceUI();
+                        if (isPollingActive && !isBallAnimating && !forceInstant) {
+                            setTimeout(pollArenaLoop, 1500);
+                        }
+                        return;
+                    }
+
                     const rawBets = state.bets || state.players || state.activeBets || [];
                     const serverPlayers = rawBets.map(bet => ({
                         userId: bet.userId || bet.user_id || bet.id || "",
@@ -1224,6 +1257,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                         setBallAnimating(false);
                         const ballCanvas = document.getElementById('arena-ball-svg');
                         if (ballCanvas) ballCanvas.innerHTML = '';
+                        
+                        // Сбрасываем блокировку локальной очистки
+                        if (lastClearedRound === correctRoundNumber - 1) {
+                            lastClearedRound = null;
+                        }
                     }
 
                     if (arenaStatusStr === 'waiting' && serverPlayers.length === 0) {
@@ -1289,7 +1327,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         const completeRoundUiSequence = () => {
                             const svgCanvas = document.getElementById('arena-svg-canvas');
                             if (svgCanvas) {
-                                // Очищаем старые свечения
+                                // Очищаем старые свечения у всех
                                 svgCanvas.querySelectorAll('.winning-segment-glow').forEach(el => el.classList.remove('winning-segment-glow'));
 
                                 const winningPolygon = svgCanvas.querySelector(`[data-user-id="${winId}"]`);
@@ -1316,11 +1354,25 @@ document.addEventListener('DOMContentLoaded', async () => {
                                 }
                             }
 
-                            // Очищаем шарик через 1 секунду после окончания
+                            // ОЧИЩАЕМ ШАРИК И ПОЛЕ ОДНОВРЕМЕННО через 1 секунду после окончания
                             setTimeout(() => {
                                 const ballCanvas = document.getElementById('arena-ball-svg');
                                 if (ballCanvas) ballCanvas.innerHTML = '';
-                                setBallAnimating(false);
+                                
+                                const svgCanvas2 = document.getElementById('arena-svg-canvas');
+                                if (svgCanvas2) svgCanvas2.innerHTML = '';
+                                const avatarsContainer = document.getElementById('arena-avatars-container');
+                                if (avatarsContainer) avatarsContainer.innerHTML = '';
+                                
+                                lastClearedRound = correctRoundNumber;
+                                
+                                const statusText = document.getElementById('arena-status-text');
+                                if (statusText) {
+                                    statusText.classList.remove('hidden');
+                                    statusText.innerText = "Ждем ставки...";
+                                }
+
+                                setBallAnimating(false); 
                                 fetchUserData();
                             }, 1000);
                         };
