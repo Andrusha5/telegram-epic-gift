@@ -24,33 +24,50 @@ tg.ready();
             object-fit: cover !important;
             pointer-events: none !important;
             z-index: 5 !important;
+            transition: opacity 0.3s ease-in-out !important;
+        }
+
+        /* Плавные переходы для плавного затухания (fade-out) элементов */
+        #arena-ball-svg, #arena-svg-canvas, #arena-avatars-container {
+            transition: opacity 0.3s ease-in-out !important;
+            opacity: 1;
+        }
+        .fade-out {
+            opacity: 0 !important;
         }
         
-        /* БЕЛЫЙ СВЕТЯЩИЙСЯ ШАРИК (Жесткий оверрайд во всех превью на главном экране) */
-        .best-arena-preview .ball,
-        .arena-preview-ball,
-        [class*="preview-ball"],
-        [class*="preview"] circle,
-        [class*="preview"] .ball,
-        .arena-preview-container .ball,
-        #arena-preview-ball,
+        /* УЛЬТИМАТИВНЫЙ БЕЛЫЙ СВЕТЯЩИЙСЯ ШАРИК (перебивает все другие синие стили) */
+        .game-card.game-arena-trigger .ball,
+        .game-card.game-arena-trigger circle,
         .game-card .ball,
         .game-card circle,
-        [class*="game-card"] .ball,
-        [class*="game-card"] circle,
-        .arena-btn .ball,
-        .arena-button .ball,
-        #arena-ball,
-        #physics-ball,
-        /* Самый сильный селектор для кнопки Best Arena */
-        div.game-arena-trigger .ball,
-        div[class*="trigger"] div[class*="ball"] { 
+        #game-arena-trigger .ball,
+        #game-arena-trigger circle,
+        div.game-arena-trigger div.ball,
+        div.game-arena-trigger circle,
+        .best-arena-preview .ball,
+        .arena-preview-ball,
+        [class*="arena"] [class*="ball"],
+        [class*="preview"] [class*="ball"],
+        #arena-preview-ball {
             background: #ffffff !important;
             background-color: #ffffff !important;
             fill: #ffffff !important; 
             color: #ffffff !important; 
-            box-shadow: 0 0 12px #ffffff, 0 0 24px #ffffff, 0 0 36px #ffffff !important;
+            box-shadow: 0 0 14px #ffffff, 0 0 28px #ffffff !important;
             filter: drop-shadow(0 0 8px #ffffff) !important;
+        }
+        
+        /* Предотвращение искажения (кривого растягивания) SVG-элементов */
+        #arena-svg-canvas, #arena-ball-svg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border-radius: 16px;
+            overflow: hidden;
+            aspect-ratio: 1/1 !important;
         }
         
         /* Красивое неоновое свечение победившего сектора */
@@ -135,7 +152,8 @@ function createPRNG(seedString) {
     }
 }
 
-const defaultColors = ['#8d3df5', '#00e676', '#0088cc', '#ff9500', '#ff3b30', '#c25dff'];
+// Новая яркая, контрастная цветовая палитра игроков
+const defaultColors = ['#ff3b30', '#4cd964', '#007aff', '#ffcc00', '#5856d6', '#ff2d55', '#5ac8fa', '#00e676', '#ff9500', '#0088cc'];
 
 function getUserColor(userId, roundNumber) {
     const idStr = String(userId || 'guest') + "_" + String(roundNumber || 1);
@@ -198,16 +216,15 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         let lastAnimatedRound = null;
         let lastShowedWinnerRound = null; 
-        let lastClearedRoundNumber = null; // Номер раунда, который был *уже* локально очищен
+        let lastClearedRoundNumber = null; 
         let localExpectedBetAmount = 0;
         let lastObservedRoundNumber = null;
-        let currentServerRoundNumber = 0; // Для отображения roundNumber в UI
+        let currentServerRoundNumber = 0; 
         let lastRenderedBalance = null;
 
         let countdownIntervalId = null;
         let localCountdownValue = 0;
 
-        // Константы длительности анимации/свечения
         const ANIMATION_DURATION_MS = 4000; 
         const POST_ANIMATION_GLOW_DURATION_MS = 1000; 
 
@@ -221,7 +238,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     if (isBallAnimating) {
                         console.warn("[ARENA CLIENT] Сработал предохранитель! Анимация сброшена.");
                         isBallAnimating = false;
-                        clearArenaRoundUi(); // Принудительно очищаем UI
+                        clearArenaRoundUi(); 
                         fetchUserData();
                     }
                 }, ANIMATION_DURATION_MS + POST_ANIMATION_GLOW_DURATION_MS + 1000); 
@@ -247,7 +264,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         if (!userId) userId = localGuestId;
 
-        // СБРОС И ОЧИСТКА ПРИ СМЕНЕ ПОЛЬЗОВАТЕЛЯ (Исключает зависания аккаунтов)
         const savedActiveId = localStorage.getItem('active_user_id');
         if (savedActiveId && String(savedActiveId) !== String(userId)) {
             console.log("Detect user change! Resetting local parameters.");
@@ -732,8 +748,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const avatarsContainer = document.getElementById('arena-avatars-container');
                 if (!svg || !avatarsContainer) return;
 
-                svg.innerHTML = ''; // Очищаем только сегменты
-                avatarsContainer.innerHTML = ''; // Очищаем только аватарки
+                svg.innerHTML = ''; 
+                avatarsContainer.innerHTML = ''; 
 
                 const N = arenaPlayers.length;
                 if (N === 0) return;
@@ -743,7 +759,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const CX = W / 2;
                 const CY = H / 2;
 
-                const shares = calculateSharesProtection(arenaPlayers);
+                let shares = calculateSharesProtection(arenaPlayers);
+                if (!shares || shares.length < N) {
+                    shares = Array(N).fill(1 / N);
+                }
                 
                 if (N === 1) {
                     const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
@@ -751,9 +770,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                     rect.setAttribute("y", "0");
                     rect.setAttribute("width", "100%");
                     rect.setAttribute("height", "100%");
-                    rect.setAttribute("fill", arenaPlayers[0].color);
+                    rect.setAttribute("fill", arenaPlayers[0].color || '#ff3b30');
                     rect.setAttribute("data-user-id", arenaPlayers[0].userId);
-                    rect.setAttribute("stroke", "#120f26"); // Контрастная темная граница
+                    rect.setAttribute("stroke", "#120f26"); 
                     rect.setAttribute("stroke-width", "4"); 
                     svg.appendChild(rect);
                     
@@ -761,31 +780,28 @@ document.addEventListener('DOMContentLoaded', async () => {
                     return; 
                 }
 
-                // КОРРЕКТНЫЙ, БЕЗОПАСНЫЙ РЕНДЕРИНГ ДЛЯ 2 ИГРОКОВ (ИСКЛЮЧАЕТ ПЕРЕКРАСКУ ПОЛЯ!)
                 if (N === 2) {
                     const s = Math.sqrt(2 * shares[0]); 
                     const sizeX = (W * s);
                     const sizeY = (H * s);
 
-                    // Полигон Игрока 1 (Ограниченный треугольник)
                     const poly1 = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
                     const p1Pts = [{x:0, y:0}, {x:sizeX, y:0}, {x:0, y:sizeY}];
                     poly1.setAttribute("points", p1Pts.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' '));
-                    poly1.setAttribute("fill", arenaPlayers[0].color); 
+                    poly1.setAttribute("fill", arenaPlayers[0].color || '#ff3b30'); 
                     poly1.setAttribute("data-user-id", arenaPlayers[0].userId);
-                    poly1.setAttribute("stroke", "#120f26"); // Контрастная темная граница
+                    poly1.setAttribute("stroke", "#120f26"); 
                     poly1.setAttribute("stroke-width", "4"); 
                     svg.appendChild(poly1);
 
-                    // Полигон Игрока 2 (Остальная часть доски - независимый 5-угольник)
                     const poly2 = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
                     const p2Pts = [ 
                         {x:sizeX, y:0}, {x:W, y:0}, {x:W, y:H}, {x:0, y:H}, {x:0, y:sizeY}
                     ];
                     poly2.setAttribute("points", p2Pts.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' '));
-                    poly2.setAttribute("fill", arenaPlayers[1].color); 
+                    poly2.setAttribute("fill", arenaPlayers[1].color || '#00e676'); 
                     poly2.setAttribute("data-user-id", arenaPlayers[1].userId);
-                    poly2.setAttribute("stroke", "#120f26"); // Контрастная темная граница
+                    poly2.setAttribute("stroke", "#120f26"); 
                     poly2.setAttribute("stroke-width", "4"); 
                     svg.appendChild(poly2);
 
@@ -807,7 +823,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                 for (let i = 0; i < N; i++) {
                     const player = arenaPlayers[i];
-                    const share = shares[i];
+                    const share = shares[i] || (1 / N);
                     let nextAngle = currentAngle + 2 * Math.PI * share;
 
                     const pathPoints = [];
@@ -844,9 +860,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                     const poly = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
                     poly.setAttribute("points", pathPoints.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' '));
-                    poly.setAttribute("fill", player.color);
+                    poly.setAttribute("fill", player.color || '#5856d6');
                     poly.setAttribute("data-user-id", player.userId);
-                    poly.setAttribute("stroke", "#120f26"); // Контрастная темная граница
+                    poly.setAttribute("stroke", "#120f26"); 
                     poly.setAttribute("stroke-width", "4"); 
                     svg.appendChild(poly);
 
@@ -913,6 +929,25 @@ document.addEventListener('DOMContentLoaded', async () => {
         function createAvatarElement(x, y, src, size) {
             const container = document.getElementById('arena-avatars-container');
             if (!container) return;
+
+            // Сверхнадежная защита от перекрытия центра (где таймер и шарик!)
+            const centerX = 160;
+            const centerY = 160;
+            let dx = x - centerX;
+            let dy = y - centerY;
+            let dist = Math.sqrt(dx * dx + dy * dy);
+            
+            if (dist < 75) {
+                // Выталкиваем аватарку на безопасный радиус 85px от центра
+                if (dist < 2) {
+                    x = centerX + 60;
+                    y = centerY + 60;
+                } else {
+                    x = centerX + (dx / dist) * 85;
+                    y = centerY + (dy / dist) * 85;
+                }
+            }
+
             const img = document.createElement('img');
             img.className = 'arena-player-avatar-node';
             img.src = src;
@@ -995,7 +1030,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const rng = createPRNG(seedSignature);
 
             const rngSpeed = createPRNG(seedSignature + "_speed_determinator");
-            const baseInitialSpeed = 65 + rngSpeed() * 45; // Увеличена начальная скорость
+            const baseInitialSpeed = 65 + rngSpeed() * 45; 
             const SPEED_VARIANCE = 25; 
             const MIN_PATH_LENGTH_FRAMES = 250; 
 
@@ -1096,7 +1131,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             let lastMatchedPlayer = null;
 
             if (!simulation || simulation.path.length === 0) { 
-                console.warn("Deterministic ball simulation failed or path empty, using fallback linear animation.");
                 let frame = startFrameIndex;
                 const totalFrames = 250; 
                 const step = () => {
@@ -1209,18 +1243,35 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         function clearArenaRoundUi() {
             const ballCanvas = document.getElementById('arena-ball-svg');
-            if (ballCanvas) ballCanvas.innerHTML = '';
             const svgCanvas = document.getElementById('arena-svg-canvas');
-            if (svgCanvas) svgCanvas.innerHTML = '';
             const avatarsContainer = document.getElementById('arena-avatars-container');
-            if (avatarsContainer) avatarsContainer.innerHTML = '';
-            
             const statusText = document.getElementById('arena-status-text');
+            const countdownTimer = document.getElementById('arena-countdown-timer');
+
+            // Мягкое плавное затухание (fade-out) перед очисткой
+            if (ballCanvas) ballCanvas.classList.add('fade-out');
+            if (svgCanvas) svgCanvas.classList.add('fade-out');
+            if (avatarsContainer) avatarsContainer.classList.add('fade-out');
+
+            setTimeout(() => {
+                if (ballCanvas) {
+                    ballCanvas.innerHTML = '';
+                    ballCanvas.classList.remove('fade-out');
+                }
+                if (svgCanvas) {
+                    svgCanvas.innerHTML = '';
+                    svgCanvas.classList.remove('fade-out');
+                }
+                if (avatarsContainer) {
+                    avatarsContainer.innerHTML = '';
+                    avatarsContainer.classList.remove('fade-out');
+                }
+            }, 300); 
+
             if (statusText) {
                 statusText.classList.remove('hidden'); 
                 statusText.innerText = "Ждем ставки...";
             }
-            const countdownTimer = document.getElementById('arena-countdown-timer');
             if (countdownTimer) countdownTimer.classList.add('hidden');
 
             safeSetText(elements.arenaPlayersTotal, '0');
@@ -1477,7 +1528,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (isPollingActive) return;
             
             // СБРОС ЛОКАЛЬНЫХ ФЛАГОВ БЛОКИРОВКИ ПРИ ВХОДЕ В АРЕНУ
-            // Это гарантирует моментальный перезапуск анимации при возврате
             lastAnimatedRound = null;
             lastShowedWinnerRound = null;
             lastClearedRoundNumber = null;
@@ -1517,8 +1567,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                 localBetThrottle = false;
                 btn.style.opacity = '1';
                 renderBetButtons();
-            }, 200);
+            }, 250); 
 
+            // Оптимистичное списание на клиенте (мгновенная реакция интерфейса)
             localExpectedBetAmount = parseFloat((localExpectedBetAmount + betValue).toFixed(3));
             arenaPlayers = getMergedPlayers(arenaPlayers, lastObservedRoundNumber || 1);
             
@@ -1548,6 +1599,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 
                 if (res.ok && data.success) {
                     currentUser.balance = data.newBalance;
+                    // Мгновенный форсированный опрос Арены, чтобы забрать новые данные без задержек
+                    setTimeout(() => { pollArenaLoop(true); }, 150);
                 } else {
                     triggerBalanceBadge(betValue);
                     localExpectedBetAmount = parseFloat(Math.max(0, localExpectedBetAmount - betValue).toFixed(3));
