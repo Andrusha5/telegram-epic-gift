@@ -19,29 +19,38 @@ tg.ready();
             position: absolute !important;
             transform: translate(-50%, -50%) !important;
             border-radius: 50% !important;
-            border: 2px solid #ffffff !important;
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4) !important;
+            border: 3px solid #ffffff !important;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5) !important;
             object-fit: cover !important;
             pointer-events: none !important;
             z-index: 5 !important;
         }
-        /* Белый цветящийся шарик на превью главного экрана */
-        .arena-preview-ball, [class*="preview-ball"], .best-arena-preview .ball {
+        /* БЕЛЫЙ СВЕТЯЩИЙСЯ ШАРИК НА КНОПКЕ BEST ARENA ГЛАВНОГО ЭКРАНА */
+        .best-arena-preview .ball,
+        .arena-preview-ball,
+        [class*="preview-ball"],
+        [class*="preview"] circle,
+        [class*="preview"] .ball,
+        .arena-preview-container .ball,
+        #arena-preview-ball {
             background-color: #ffffff !important;
-            box-shadow: 0 0 10px #ffffff, 0 0 20px #ffffff, 0 0 30px #ffffff !important;
+            fill: #ffffff !important;
+            color: #ffffff !important;
+            box-shadow: 0 0 12px #ffffff, 0 0 24px #ffffff, 0 0 36px #ffffff !important;
+            filter: drop-shadow(0 0 8px #ffffff) !important;
         }
         /* Красивая неоновая обводка победившего поля */
         @keyframes winningSectorPulse {
-            0% { filter: drop-shadow(0 0 8px var(--glow-color)) brightness(1.3); }
+            0% { filter: drop-shadow(0 0 8px var(--glow-color)) brightness(1.2); }
             50% { filter: drop-shadow(0 0 25px var(--glow-color)) brightness(1.6); }
-            100% { filter: drop-shadow(0 0 8px var(--glow-color)) brightness(1.3); }
+            100% { filter: drop-shadow(0 0 8px var(--glow-color)) brightness(1.2); }
         }
         .winning-segment-glow {
             stroke: #ffffff !important;
-            stroke-width: 4px !important;
+            stroke-width: 5px !important;
             stroke-linejoin: round !important;
-            animation: winningSectorPulse 0.3s infinite alternate !important;
-            z-index: 10 !important;
+            animation: winningSectorPulse 0.35s infinite alternate !important;
+            z-index: 100 !important;
         }
     `;
     document.head.appendChild(style);
@@ -183,7 +192,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         let countdownIntervalId = null;
         let localCountdownValue = 0;
 
-        // ⚡ ЖЕСТКИЕ СТАРТОВЫЕ ФОЛБЕКИ ДЛЯ ПРЕДОТВРАЩЕНИЯ СБОЕВ GESTURE КОШЕЛЬКА
+        // ⚡ ПРЕДЗАГРУЖЕННЫЕ ФОЛБЕКИ (КОШЕЛЕК ОТКРОЕТСЯ МОМЕНТАЛЬНО)
         let preloadedAdminAddress = "EQC3481up9_gG98_wK8Jv_Zz1yLp9p0_Y-7Jv7x4b9a9JKe6";
         let preloadedPayloadBase64 = "te6ccgEBAQEAAgAAAA==";
         let isPreloadingPayment = false;
@@ -288,7 +297,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                     }
                 } catch (e) {}
             }
-
             return true;
         }
 
@@ -301,14 +309,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
                 return true;
             }
-
             isPreloadingPayment = true;
             await fetchPaymentParamsInternal();
             isPreloadingPayment = false;
             return true;
         }
         
-        // Фоновый запуск предзагрузки реквизитов (ОЧЕНЬ ВАЖНО)
+        // Фоновое получение адресов при запуске игры
         fetchPaymentParamsInternal();
 
         function loadSavedBets() {
@@ -500,7 +507,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         if (elements.depositBalanceBtn) {
             elements.depositBalanceBtn.addEventListener('click', () => {
-                // МГНОВЕННОЕ ОТКРЫТИЕ МОДАЛКИ (БЕЗ асинхронных задержек, сохраняя жест)
+                // МГНОВЕННЫЙ ЗАПУСК МОДАЛКИ БЕЗ ASYNC ОЖИДАНИЙ
                 if (elements.depositAmountModal) {
                     elements.depositAmountModal.classList.remove('hidden');
                     if (elements.modalDepositInput) elements.modalDepositInput.value = "0.1";
@@ -530,7 +537,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                 closeDepositModal();
 
-                // ⚡ ПОЛНОСТЬЮ СИНХРОННЫЙ ВЫЗОВ (ГАРАНТИРУЕТ ОТКРЫТИЕ КОШЕЛЬКА!)
+                // ⚡ ПОЛНОСТЬЮ СИНХРОННЫЙ СТАРТ ТРАНЗАКЦИИ (КОШЕЛЕК 100% ОТКРОЕТСЯ!)
                 try {
                     const nanoAmount = Math.floor(amount * 1000000000).toString();
 
@@ -755,10 +762,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                     ];
                     const c2 = getPolygonCentroid(p2Pts);
 
-                    const safeC1X = Math.max(35, Math.min(285, c1.x));
-                    const safeC1Y = Math.max(35, Math.min(285, c1.y));
-                    const safeC2X = Math.max(35, Math.min(285, c2.x));
-                    const safeC2Y = Math.max(35, Math.min(285, c2.y));
+                    const safeC1X = Math.max(50, Math.min(270, c1.x));
+                    const safeC1Y = Math.max(50, Math.min(270, c1.y));
+                    const safeC2X = Math.max(50, Math.min(270, c2.x));
+                    const safeC2Y = Math.max(50, Math.min(270, c2.y));
 
                     createAvatarElement(safeC1X, safeC1Y, arenaPlayers[0].avatar, 42);
                     createAvatarElement(safeC2X, safeC2Y, arenaPlayers[1].avatar, 42);
@@ -812,15 +819,15 @@ document.addEventListener('DOMContentLoaded', async () => {
                     svg.appendChild(poly);
 
                     const c = getPolygonCentroid(pathPoints);
-                    const safeCX = Math.max(35, Math.min(285, c.x));
-                    const safeCY = Math.max(35, Math.min(285, c.y));
+                    const safeCX = Math.max(50, Math.min(270, c.x));
+                    const safeCY = Math.max(50, Math.min(270, c.y));
                     
                     createAvatarElement(safeCX, safeCY, player.avatar, 38);
 
                     currentAngle = nextAngle;
                 }
             } catch(e) {
-                console.error("Error drawing arena segments:", e);
+                console.error("Error drawing segments:", e);
             }
         }
 
@@ -925,7 +932,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     listContainer.appendChild(row);
                 });
                 safeSetText(elements.arenaPlayersTotal, arenaPlayers.length);
-            } catch (e) { console.error("Error updating players list UI:", e); }
+            } catch (e) { console.error("Error list UI:", e); }
         }
 
         function renderBetButtons() {
@@ -1150,8 +1157,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         async function pollArenaLoop(forceInstant = false) {
-            // ⚡ ЖЕСТКИЙ БЛОКЕР ОБНОВЛЕНИЯ ВО ВРЕМЯ АНИМАЦИИ
-            // Пока шарик летит или победитель светится, мы не принимаем никаких данных от сервера!
+            // 🚫 БЛОКИРОВАТЕЛЬ: Не обновляем поле, пока идет полет шара или фаза подсветки!
             if (isBallAnimating) {
                 if (isPollingActive && !forceInstant) {
                     setTimeout(pollArenaLoop, 1000);
@@ -1263,11 +1269,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                             
                             if (statusText) statusText.classList.add('hidden');
 
-                            // Запуск анимации (игрок временно блокирует пуллинг)
+                            // Локальный захват анимации
                             isBallAnimating = true;
 
                             animateBouncingBall(winX, winY, signature, () => {
-                                // 🌟 ПАТЧ ПОДСВЕТКИ ПОБЕДИТЕЛЯ (100% ТОЧНОСТЬ):
+                                // 🌟 ПАТЧ ПОДСВЕТКИ ПОБЕДИТЕЛЯ (МГНОВЕННЫЙ ЭФФЕКТ):
                                 const svgCanvas = document.getElementById('arena-svg-canvas');
                                 if (svgCanvas) {
                                     const winningPolygon = svgCanvas.querySelector(`[data-user-id="${winId}"]`);
@@ -1275,11 +1281,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                                         const winnerColor = winningPolygon.getAttribute('fill') || '#00e676';
                                         winningPolygon.style.setProperty('--glow-color', winnerColor);
                                         winningPolygon.classList.add('winning-segment-glow');
-                                        svgCanvas.appendChild(winningPolygon);
+                                        svgCanvas.appendChild(winningPolygon); // На передний план
                                     }
                                 }
 
-                                // ⏰ Ровно через 1 секунду убираем всю анимацию и сбрасываем шарик
+                                // ⏰ Ждем ровно 1 секунду до удаления и сброса шарика
                                 setTimeout(() => {
                                     const ballCanvas = document.getElementById('arena-ball-svg');
                                     if (ballCanvas) ballCanvas.innerHTML = '';
@@ -1287,7 +1293,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                                     const glowingPoly = svgCanvas?.querySelector('.winning-segment-glow');
                                     if (glowingPoly) glowingPoly.classList.remove('winning-segment-glow');
 
-                                    // Показываем модальное окно и зачисляем баланс
+                                    // Показываем модальное окно победителя
                                     const isWeWinner = (String(winId) === String(userId));
                                     if (isWeWinner) {
                                         showCustomModal({
@@ -1299,7 +1305,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                                         triggerBalanceBadge(parseFloat(tPool));
                                     }
 
-                                    isBallAnimating = false; // Разблокируем пуллинг!
+                                    isBallAnimating = false; // Освобождаем блокировщик
                                     fetchUserData();
                                 }, 1000); 
                             });
@@ -1333,7 +1339,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     updateBalanceUI();
                 }
             } catch (err) {
-                console.error("Error polling arena state:", err);
+                console.error("Error polling:", err);
             } finally {
                 if (isPollingActive && !isBallAnimating && !forceInstant) {
                     setTimeout(pollArenaLoop, 1500); 
@@ -1375,7 +1381,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             localExpectedBetAmount = 0; 
             isBallAnimating = false;
             updatePlayersListUI(); 
-
             renderBetButtons();
         }
 
@@ -1388,7 +1393,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             const betValue = parseFloat(btn.getAttribute('data-bet'));
             if (isNaN(betValue) || betValue < 0.1) return; 
 
-            // Блокируем кнопку на 200мс для исключения случайных двойных кликов
             localBetThrottle = true;
             btn.style.opacity = '0.5';
             setTimeout(() => {
@@ -1433,7 +1437,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     fetchUserData();
                 }
             } catch (err) {
-                console.warn("Сетевой лаг. Ставка ожидает синхронизации...");
+                console.warn("Сетевой лаг. Ставка в очереди...");
             }
         };
 
@@ -1512,7 +1516,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 } catch(e) {}
 
                 closeEditBetsModal();
-                showNotification("Кнопки ставок настроены!", "✏️");
+                showNotification("Кнопки настроены!", "✏️");
                 renderBetButtons();
             });
         }
@@ -1569,10 +1573,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             { id: 112, name: "Мишка классический", icon: "/Images/Items/michka.jpg", price: "0.11 GRAM", rawPrice: 0.11, isGold: false, type: "gift" },
             { id: 113, name: "Пополнение 0.1 GRAM (Новичок)", icon: GRAMCOIN_ICON_URL, price: "0.1 GRAM", rawPrice: 0.1, isGold: false, type: "balance" },
             { id: 114, name: "Пополнение 0.07 GRAM (Новичок)", icon: GRAMCOIN_ICON_URL, price: "0.07 GRAM", rawPrice: 0.07, isGold: false, type: "balance" },
-            { id: 115, name: "Пополнение 0.05 GRAM (Новичок)", icon: GRAMCOIN_ICON_URL, price: "0.05 GRAM", rawPrice: 0.05, isGold: false, type: "balance" },
-            { id: 116, name: "Пополнение 0.03 GRAM (Новичок)", icon: GRAMCOIN_ICON_URL, price: "0.03 GRAM", rawPrice: 0.03, isGold: false, type: "balance" },
-            { id: 117, name: "Пополнение 0.01 GRAM (Новичок)", icon: GRAMCOIN_ICON_URL, price: "0.01 GRAM", rawPrice: 0.01, isGold: false, type: "balance" },
-            { id: 118, name: "Пополнение 0.005 GRAM (Новичок)", icon: GRAMCOIN_ICON_URL, price: "0.005 GRAM", rawPrice: 0.005, isGold: false, type: "balance" }
+            { id: 115, name: "Пополнение 0.05 GRAM (Новичок)", icon: GRAMCOIN_ICON_URL, price: "0.05 GRAM", rawPrice: 0.05, isGold: false, type: "balance" }
         ];
 
         const allImagesToPreload = [
