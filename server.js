@@ -37,7 +37,7 @@ function getUserColor(userId, roundNumber) {
     const idStr = String(userId || 'guest') + "_" + String(roundNumber || 1);
     let hash = 0;
     for (let i = 0; i < idStr.length; i++) {
-        hash = idStr.charCodeAt(i) + ((hash << 5) - hash);
+        h = idStr.charCodeAt(i) + ((h << 5) - h);
     }
     const index = Math.abs(hash) % defaultColors.length;
     return defaultColors[index];
@@ -427,13 +427,20 @@ function loadArenaState() {
     try {
         if (fs.existsSync(localArenaFile)) {
             const data = JSON.parse(fs.readFileSync(localArenaFile, 'utf8'));
-            if (data && Array.isArray(data.bets)) {
-                arenaState = data;
-                if (arenaState.status === "countdown" || arenaState.status === "finished") {
-                    arenaState.status = "waiting";
-                    arenaState.timeLeft = 15;
-                }
-                console.log("SUCCESS: Arena State restored. Active bets count: " + arenaState.bets.length);
+            if (data && typeof data === 'object') {
+                // ПРИОРИТИЗАЦИЯ СОХРАНЕННОГО НОМЕРА РАУНДА
+                arenaState.roundNumber = data.roundNumber || arenaState.roundNumber; 
+                // Остальные поля сбрасываются для нового старта сервера, кроме раундНумбер
+                arenaState.bets = []; 
+                arenaState.status = "waiting"; 
+                arenaState.timeLeft = 15;
+                arenaState.resolvedAt = 0;
+                arenaState.winnerId = null;
+                arenaState.winnerName = null;
+                arenaState.winnerX = 160;
+                arenaState.winnerY = 160;
+                arenaState.totalPool = 0;
+                console.log("SUCCESS: Arena State restored. Round number: " + arenaState.roundNumber);
             }
         }
     } catch (e) {
@@ -876,7 +883,7 @@ app.post('/api/withdraw_gift', parseTelegramInitData, async (req, res) => {
     await dbRemoveInventoryItem(user.id, itemId);
 
     if (bot && ADMIN_CHAT_ID) {
-        const textMsg = "📤 **Заявка на вывод подарка!**\n\n" +
+        const textMsg = "📤 **Заявка на вывод подарка!**\n" +
                         "**Игрок:** @" + user.username + " (ID: " + user.id + ")\n" +
                         "**Предмет на вывод:** *" + gift.name + "* (" + gift.value + " GRAM)\n\n" +
                         "_Пожалуйста, отправьте ему этот подарок в Telegram!_";
@@ -1010,7 +1017,7 @@ app.post('/api/open_newbie_case', parseTelegramInitData, async (req, res) => {
         user.balance = parseFloat((parseFloat(user.balance) - price).toFixed(3));
 
         const rewards = [
-            { id: 109, name: "Холодный огонь", type: "gift", value: 2.2 },
+            { id: 109, name: "Холодный ого", type: "gift", value: 2.2 },
             { id: 112, name: "Мишка классический", type: "gift", value: 0.11 },
             { id: 113, name: "Пополнение 0.1 GRAM (Новичок)", type: "balance", value: 0.1 }
         ];
