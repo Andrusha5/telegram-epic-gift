@@ -14,6 +14,14 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Логирование запросов в консоль Render
+app.use((req, res, next) => {
+    if (req.path.startsWith('/api/')) {
+        console.log(`[API REQUEST] ${req.method} ${req.path}`);
+    }
+    next();
+});
+
 // 🛡️ ГЛОБАЛЬНЫЙ ЩИТ ОТ ЛЮБЫХ ПАДЕНИЙ СЕРВЕРА
 process.on('uncaughtException', (err) => {
     console.error('⛔ СИСТЕМНЫЙ ПЕРЕХВАТ ОШИБКИ:', err.stack || err);
@@ -357,7 +365,6 @@ if (bot) {
                         }
                         await dbSaveUser(targetId, user);
                         
-                        // 🌟 ИСПРАВЛЕННЫЕ СТРОКИ С ДВОЙНЫМИ КАВЫЧКАМИ (УСТРАНЁН CRASH СЕРВЕРА!)
                         const banMsg = "🚫 **Игрок заблокирован!**\n\n" +
                                        "**ID:** `" + targetId + "`\n" +
                                        "**Имя:** @" + user.username + " (" + user.first_name + ")\n\n" +
@@ -449,7 +456,7 @@ function saveArenaState() {
 
 loadArenaState();
 
-// Игровой цикл бэкенда (Время фазы finished установлено на безопасные 8 секунд)
+// Игровой цикл бэкенда с подробным логированием процессов (Решает проблему зависания раундов)
 setInterval(() => {
     try {
         let stateChanged = false;
@@ -459,17 +466,20 @@ setInterval(() => {
                 arenaState.status = "countdown";
                 arenaState.timeLeft = 15;
                 stateChanged = true;
+                console.log(`[ARENA] 🟢 Достаточно игроков (${arenaState.bets.length}). Отсчет раунда №${arenaState.roundNumber} запущен: 15 сек.`);
             }
         } else if (arenaState.status === "countdown") {
             arenaState.timeLeft--;
             stateChanged = true;
             if (arenaState.timeLeft <= 0) {
+                console.log(`[ARENA] ⏳ Отсчет завершен. Разыгрываем раунд...`);
                 resolveArenaRound().catch(e => console.error("Error resolving round:", e.message));
             }
         } else if (arenaState.status === "finished") {
             arenaState.timeLeft--;
             stateChanged = true;
             if (arenaState.timeLeft <= 0) {
+                console.log(`[ARENA] 🔄 Раунд №${arenaState.roundNumber} полностью завершен. Сброс состояния.`);
                 arenaState.bets = [];
                 arenaState.status = "waiting";
                 arenaState.timeLeft = 15;
@@ -490,46 +500,56 @@ setInterval(() => {
 }, 1000);
 
 async function resolveArenaRound() {
-    if (arenaState.bets.length < 2) {
-        arenaState.status = "waiting";
-        saveArenaState();
-        return;
-    }
-
-    let pool = 0;
-    arenaState.bets.forEach(b => pool += parseFloat(b.amount));
-    arenaState.totalPool = pool;
-
-    const rand = Math.random() * pool;
-    let sum = 0;
-    let winnerBet = arenaState.bets[arenaState.bets.length - 1];
-
-    for (let i = 0; i < arenaState.bets.length; i++) {
-        sum += arenaState.bets[i].amount;
-        if (rand <= sum) {
-            winnerBet = arenaState.bets[i];
-            break;
+    try {
+        if (arenaState.bets.length < 2) {
+            arenaState.status = "waiting";
+            saveArenaState();
+            return;
         }
-    }
 
-    const winnerIndex = arenaState.bets.indexOf(winnerBet);
-    const coords = generateCoordsForWinner(winnerIndex, arenaState.bets);
+        let pool = 0;
+        arenaState.bets.forEach(b => pool += parseFloat(b.amount));
+        arenaState.totalPool = pool;
 
-    arenaState.winnerId = winnerBet.userId;
-    arenaState.winnerName = winnerBet.username;
-    arenaState.winnerX = coords.x;
-    arenaState.winnerY = coords.y;
-    arenaState.resolvedAt = Date.now();
-    arenaState.status = "finished";
-    
-    // ⚡ БЕЗОПАСНЫЙ ТАЙМАУТ FINISHED-РАУНДА НА СЕРВЕРЕ (8 СЕКУНД)
-    arenaState.timeLeft = 8; 
-    saveArenaState();
+        const rand = Math.random() * pool;
+        let sum = 0;
+        let winnerBet = arenaState.bets[arenaState.bets.length - 1];
 
-    const winnerUser = await dbGetUser(winnerBet.userId);
-    if (winnerUser) {
-        winnerUser.balance = parseFloat((parseFloat(winnerUser.balance) + pool).toFixed(3));
-        await dbSaveUser(winnerBet.userId, winnerUser);
+        for (let i = 0; i < arenaState.bets.length; i++) {
+            sum += arenaState.bets[i].amount;
+            if (rand <= sum) {
+                winnerBet = arenaState.bets[i];
+                break;
+            }
+        }
+
+        const winnerIndex = arenaState.bets.indexOf(winnerBet);
+        const coords = generateCoordsForWinner(winnerIndex, arenaState.bets);
+
+        arenaState.winnerId = winnerBet.userId;
+        arenaState.winnerName = winnerBet.username;
+        arenaState.winnerX = coords.x;
+        arenaState.winnerY = coords.y;
+        arenaState.resolvedAt = Date.now();
+        arenaState.status = "finished";
+        
+        // ⚡ БЕЗОПАСНЫЙ ТАЙМАУТ FINISHED-РАУНДА НА СЕРВЕРЕ (8 СЕКУНД)
+        arenaState.timeLeft = 8; 
+        saveArenaState();
+        console.log(`[ARENA] 🏆 Победитель определен: @${winnerBet.username} (ID: ${winnerBet.userId}) с банком ${pool} GRAM! Координаты шара: x=${coords.x}, y=${coords.y}`);
+
+        const winnerUser = await dbGetUser(winnerBet.userId);
+        if (winnerUser) {
+            winnerUser.balance = parseFloat((parseFloat(winnerUser.balance) + pool).toFixed(3));
+            await dbSaveUser(winnerBet.userId, winnerUser);
+            console.log(`[ARENA] 💰 Баланс победителя @${winnerUser.username} изменен до ${winnerUser.balance} GRAM.`);
+        }
+    } catch (err) {
+        console.error("[ARENA] ❌ Критическая ошибка розыгрыша раунда:", err);
+        // Аварийный сброс, чтобы игра не зависала намертво
+        arenaState.status = "waiting";
+        arenaState.timeLeft = 15;
+        saveArenaState();
     }
 }
 
@@ -550,15 +570,17 @@ function generateCoordsForWinner(winnerIndex, bets) {
             let u = Math.random();
             let v = Math.random();
             if (u + v > 1) { u = 1 - u; v = 1 - v; }
-            return { x: Math.max(35, u * sizeX), y: Math.max(35, v * sizeY) };
+            return { x: Math.max(45, u * sizeX), y: Math.max(45, v * sizeY) };
         } else {
-            while (true) {
-                let rx = 35 + Math.random() * 250;
-                let ry = 35 + Math.random() * 250;
+            // Лимит итераций для защиты от зависаний while(true)
+            for (let attempt = 0; attempt < 500; attempt++) {
+                let rx = 45 + Math.random() * 230;
+                let ry = 45 + Math.random() * 230;
                 if (!(rx / sizeX + ry / sizeY <= 1)) {
                     return { x: rx, y: ry };
                 }
             }
+            return { x: 200, y: 200 };
         }
     }
 
@@ -597,8 +619,8 @@ function generateCoordsForWinner(winnerIndex, bets) {
 
             const centroid = getPolygonCentroid(pathPoints);
             return {
-                x: Math.max(40, Math.min(280, centroid.x + (Math.random() * 14 - 7))),
-                y: Math.max(40, Math.min(280, centroid.y + (Math.random() * 14 - 7)))
+                x: Math.max(50, Math.min(270, centroid.x + (Math.random() * 12 - 6))),
+                y: Math.max(50, Math.min(270, centroid.y + (Math.random() * 12 - 6)))
             };
         }
         currentAngle = nextAngle;
