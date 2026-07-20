@@ -26,7 +26,7 @@ tg.ready();
             z-index: 5 !important;
         }
         
-        /* БЕЛЫЙ СВЕТЯЩИЙСЯ ШАРИК */
+        /* БЕЛЫЙ СВЕТЯЩИЙСЯ ШАРИК (усиление селектора) */
         .best-arena-preview .ball,
         .arena-preview-ball,
         [class*="preview-ball"],
@@ -42,11 +42,11 @@ tg.ready();
         .arena-button .ball,
         #arena-ball,
         #physics-ball,
-        /* Специально для шарика на кнопке Best Arena */
+        /* Специально для шарика на кнопке Best Arena - самый сильный селектор */
         div.game-arena-trigger .ball { 
             background-color: #ffffff !important;
-            fill: #ffffff !important;
-            color: #ffffff !important;
+            fill: #ffffff !important; /* For SVG circles */
+            color: #ffffff !important; /* Just in case */
             box-shadow: 0 0 12px #ffffff, 0 0 24px #ffffff, 0 0 36px #ffffff !important;
             filter: drop-shadow(0 0 8px #ffffff) !important;
         }
@@ -55,7 +55,7 @@ tg.ready();
         @keyframes winningSectorPulse {
             0% { filter: drop-shadow(0 0 15px var(--glow-color)) brightness(1.2); stroke: #ffffff; stroke-width: 5px; }
             50% { filter: drop-shadow(0 0 35px var(--glow-color)) brightness(1.7); stroke: #ffffff; stroke-width: 8px; }
-            100% { filter: drop-shadow(0 0 15px var(--glow-color)) brightness(1.2); stroke: #ffffff; stroke-width: 5px; }
+            100% { filter: drop_shadow(0 0 15px var(--glow-color)) brightness(1.2); stroke: #ffffff; stroke-width: 5px; }
         }
         .winning-segment-glow {
             stroke: #ffffff !important;
@@ -205,6 +205,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         let countdownIntervalId = null;
         let localCountdownValue = 0;
 
+        // Константы длительности анимации/свечения
+        const ANIMATION_DURATION_MS = 4000; // Total ball animation duration (e.g., 4 seconds)
+        const POST_ANIMATION_GLOW_DURATION_MS = 1000; // Glow duration after ball stops
+
         // Предохранитель зависания
         let animatingTimeout = null;
         function setBallAnimating(val) {
@@ -218,7 +222,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         clearArenaRoundUi(); // Принудительно очищаем UI
                         fetchUserData();
                     }
-                }, 9000); 
+                }, ANIMATION_DURATION_MS + POST_ANIMATION_GLOW_DURATION_MS + 1000); // 1 секунда запаса
             }
         }
 
@@ -726,10 +730,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const avatarsContainer = document.getElementById('arena-avatars-container');
                 if (!svg || !avatarsContainer) return;
 
-                if (arenaStatusStr === 'waiting') {
-                    setBallAnimating(false);
-                }
-
                 // НЕ очищаем шарик здесь, его состояние управляется pollArenaLoop/animateBouncingBall
                 svg.innerHTML = ''; // Очищаем только сегменты
                 avatarsContainer.innerHTML = ''; // Очищаем только аватарки
@@ -752,6 +752,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                     rect.setAttribute("height", "100%");
                     rect.setAttribute("fill", arenaPlayers[0].color);
                     rect.setAttribute("data-user-id", arenaPlayers[0].userId);
+                    rect.setAttribute("stroke", "#0a0a0a"); // Добавляем обводку
+                    rect.setAttribute("stroke-width", "2"); // Толщина обводки
                     svg.appendChild(rect);
                     
                     createAvatarElement(CX, 240, arenaPlayers[0].avatar, 56); 
@@ -770,6 +772,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                     poly1.setAttribute("points", p1Pts.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' '));
                     poly1.setAttribute("fill", arenaPlayers[0].color); 
                     poly1.setAttribute("data-user-id", arenaPlayers[0].userId);
+                    poly1.setAttribute("stroke", "#0a0a0a"); // Добавляем обводку
+                    poly1.setAttribute("stroke-width", "2"); // Толщина обводки
                     svg.appendChild(poly1);
 
                     // Полигон Игрока 2 (Остальная часть доски - независимый 5-угольник)
@@ -780,6 +784,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                     poly2.setAttribute("points", p2Pts.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' '));
                     poly2.setAttribute("fill", arenaPlayers[1].color); 
                     poly2.setAttribute("data-user-id", arenaPlayers[1].userId);
+                    poly2.setAttribute("stroke", "#0a0a0a"); // Добавляем обводку
+                    poly2.setAttribute("stroke-width", "2"); // Толщина обводки
                     svg.appendChild(poly2);
 
                     const c1 = getPolygonCentroid(p1Pts);
@@ -839,6 +845,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                     poly.setAttribute("points", pathPoints.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' '));
                     poly.setAttribute("fill", player.color);
                     poly.setAttribute("data-user-id", player.userId);
+                    poly.setAttribute("stroke", "#0a0a0a"); // Добавляем обводку
+                    poly.setAttribute("stroke-width", "1"); // Толщина обводки
                     svg.appendChild(poly);
 
                     const c = getPolygonCentroid(pathPoints);
@@ -986,18 +994,19 @@ document.addEventListener('DOMContentLoaded', async () => {
             const rng = createPRNG(seedSignature);
 
             const rngSpeed = createPRNG(seedSignature + "_speed_determinator");
-            const baseRoundSpeed = 38 + rngSpeed() * 57; 
+            const baseInitialSpeed = 60 + rngSpeed() * 40; // Increased base speed for longer travel
+            const SPEED_VARIANCE = 20; // Added variance
+            const MIN_PATH_LENGTH_FRAMES = 250; // Minimum frames for animation (approx 4 seconds at 60fps)
 
-            // Увеличиваем количество попыток, чтобы найти хороший путь
             for (let trial = 0; trial < 10000; trial++) { 
                 const startX = boardWidth / 2;
                 const startY = boardHeight / 2;
 
                 const angle = rng() * Math.PI * 2;
-                const speed = baseRoundSpeed + rng() * 10; 
+                const initialSpeed = baseInitialSpeed + (rng() - 0.5) * SPEED_VARIANCE; // Introduce more consistent speed
 
-                let vx = Math.cos(angle) * speed;
-                let vy = Math.sin(angle) * speed;
+                let vx = Math.cos(angle) * initialSpeed;
+                let vy = Math.sin(angle) * initialSpeed;
 
                 let path = [];
                 let currentVx = vx;
@@ -1005,10 +1014,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                 let currentX = startX;
                 let currentY = startY;
 
-                const MIN_PATH_LENGTH_FRAMES = 250; // Минимум кадров для анимации (4 секунды при 60fps)
                 let pathLength = 0;
+                const MAX_SIMULATION_FRAMES = 1000; // Cap to prevent excessively long simulations
 
-                while ((Math.abs(currentVx) > 0.04 || Math.abs(currentVy) > 0.04) || pathLength < MIN_PATH_LENGTH_FRAMES) {
+                while ((Math.abs(currentVx) > 0.04 || Math.abs(currentVy) > 0.04) && pathLength < MAX_SIMULATION_FRAMES) {
                     currentX += currentVx;
                     currentY += currentVy;
 
@@ -1033,19 +1042,21 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                     path.push({ x: currentX, y: currentY });
                     pathLength++;
-
-                    // Предотвращаем бесконечный цикл на очень долгих симуляциях
-                    if (pathLength > 1000) break; 
                 }
 
-                // Убедимся, что путь достаточно длинный, если скорость не упала до нуля
-                if (path.length >= MIN_PATH_LENGTH_FRAMES) {
-                    // Последняя точка пути ДОЛЖНА быть целевой, чтобы избежать погрешностей
+                // If the path is too short but stopped, or if it hit max frames,
+                // ensure it has at least MIN_PATH_LENGTH_FRAMES and ends at target.
+                while (path.length < MIN_PATH_LENGTH_FRAMES && path.length < MAX_SIMULATION_FRAMES) {
+                    path.push({ x: currentX, y: currentY }); // Just hold position
+                }
+                
+                // Ensure the very last point of the path is the target winner coordinates
+                if (path.length > 0) {
                     path[path.length - 1] = {x: targetX, y: targetY};
                     return { path };
                 }
             }
-            // Если не удалось найти длинный путь после многих попыток, возвращаем null, чтобы использовать fallback
+            // If after many trials, we still can't get a valid path, return null
             return null; 
         }
 
@@ -1090,7 +1101,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (!simulation || simulation.path.length === 0) { // Fallback if simulation fails or path is empty
                 console.warn("Deterministic ball simulation failed or path empty, using fallback linear animation.");
                 let frame = startFrameIndex;
-                const totalFrames = 250; // Longer fallback animation
+                const totalFrames = 250; // Fallback animation length
                 const step = () => {
                     if (!isBallAnimating) return; // Stop if animation was externally reset
                     if (frame >= totalFrames) {
@@ -1210,7 +1221,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             
             const statusText = document.getElementById('arena-status-text');
             if (statusText) {
-                statusText.classList.remove('hidden');
+                statusText.classList.remove('hidden'); // Убираем hidden чтобы текст "Ждем ставки" был виден
                 statusText.innerText = "Ждем ставки...";
             }
             const countdownTimer = document.getElementById('arena-countdown-timer');
@@ -1263,15 +1274,18 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                     arenaStatusStr = state.status || state.state || "waiting";
 
-                    // ЕСЛИ РАУНД УЖЕ ПОЛНОСТЬЮ ЛОКАЛЬНО ОЧИЩЕН, МЫ ИГНОРИРУЕМ СТАРЫЕ ДАННЫЕ С СЕРВЕРА
-                    if (correctRoundNumber === lastClearedRoundNumber && arenaStatusStr !== 'countdown') { // Игнорируем только если не в режиме отсчета
-                        // UI уже очищен, просто ждем следующего раунда
-                        renderBetButtons();
-                        updateBalanceUI();
-                        if (isPollingActive && !isBallAnimating && !forceInstant) {
-                            setTimeout(pollArenaLoop, 1500);
+                    // ЕСЛИ РАУНД УЖЕ БЫЛ ЛОКАЛЬНО ОЧИЩЕН, МЫ ИГНОРИРУЕМ СТАРЫЕ ДАННЫЕ С СЕРВЕРА ДЛЯ ЭТОГО РАУНДА
+                    if (correctRoundNumber === lastClearedRoundNumber && arenaStatusStr !== 'countdown') {
+                        // UI уже очищен, просто ждем следующего раунда, если он еще не начался
+                        // Если статус стал countdown, мы должны перерисовать (ниже)
+                        if (arenaStatusStr === 'waiting') {
+                            renderBetButtons();
+                            updateBalanceUI();
+                            if (isPollingActive && !isBallAnimating && !forceInstant) {
+                                setTimeout(pollArenaLoop, 1500);
+                            }
+                            return;
                         }
-                        return;
                     }
 
                     const rawBets = state.bets || state.players || state.activeBets || [];
@@ -1354,24 +1368,45 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                         const signature = winId + "_" + tPool + "_" + winX + "_" + winY + "_" + correctRoundNumber;
                         const age = serverTime - resolvedAt; 
+                        
+                        // The UI sequence after ball animation finishes and before full clear
+                        const completeRoundUiSequence = (winnerId, totalPool, currentRoundNum, targetX, targetY) => {
+                            // Ensure ball is snapped to final position
+                            const ballCanvas = document.getElementById('arena-ball-svg');
+                            if (ballCanvas) {
+                                ballCanvas.innerHTML = `
+                                    <circle id="physics-ball" cx="${targetX}" cy="${targetY}" r="8" fill="#ffffff"></circle>
+                                `;
+                                const textElement = document.createElementNS("http://www.w3.org/2000/svg", "text");
+                                textElement.setAttribute("id", "physics-ball-text");
+                                textElement.setAttribute("fill", "#ffffff");
+                                textElement.setAttribute("font-size", "12");
+                                textElement.setAttribute("font-weight", "900");
+                                textElement.setAttribute("text-anchor", "middle");
+                                textElement.setAttribute("filter", "drop-shadow(0px 2px 3px rgba(0,0,0,0.9))");
+                                textElement.setAttribute("x", targetX.toFixed(1));
+                                const isNearTopWall = targetY < 40;
+                                const textY = isNearTopWall ? (targetY + 24) : (targetY - 16);
+                                textElement.setAttribute("y", textY.toFixed(1));
+                                const winnerPlayer = arenaPlayers.find(p => String(p.userId) === String(winnerId));
+                                if (winnerPlayer) textElement.textContent = winnerPlayer.username;
+                                else textElement.textContent = "Победитель";
+                                ballCanvas.appendChild(textElement);
+                            }
 
-                        // ФУНКЦИЯ ОДНОЙ ТОЧКИ ЗАВЕРШЕНИЯ (Активация неонового свечения и модального окна)
-                        const completeRoundUiSequence = (winnerId, totalPool, currentRoundNum) => {
                             const svgCanvas = document.getElementById('arena-svg-canvas');
                             if (svgCanvas) {
-                                // Очищаем старые свечения у всех
                                 svgCanvas.querySelectorAll('.winning-segment-glow').forEach(el => el.classList.remove('winning-segment-glow'));
-
                                 const winningPolygon = svgCanvas.querySelector(`[data-user-id="${winnerId}"]`);
                                 if (winningPolygon) {
                                     const winnerColor = winningPolygon.getAttribute('fill') || '#00e676';
                                     winningPolygon.style.setProperty('--glow-color', winnerColor);
                                     winningPolygon.classList.add('winning-segment-glow');
-                                    svgCanvas.appendChild(winningPolygon); // Перенос наверх для корректного неона
+                                    // Перемещаем элемент в конец для отрисовки поверх других (для неонового свечения)
+                                    svgCanvas.appendChild(winningPolygon); 
                                 }
                             }
 
-                            // Моментальный показ выигрыша без задержек!
                             if (currentRoundNum !== lastShowedWinnerRound) {
                                 lastShowedWinnerRound = currentRoundNum;
                                 const isWeWinner = (String(winnerId) === String(userId));
@@ -1386,64 +1421,44 @@ document.addEventListener('DOMContentLoaded', async () => {
                                 }
                             }
 
-                            // ОЧИЩАЕМ ШАРИК И ПОЛЕ ОДНОВРЕМЕННО через 1 секунду после окончания подсветки
+                            // ОЧИЩАЕМ ШАРИК И ПОЛЕ ОДНОВРЕМЕННО через POST_ANIMATION_GLOW_DURATION_MS после остановки шарика
                             setTimeout(() => {
                                 clearArenaRoundUi();
                                 lastClearedRoundNumber = currentRoundNum; // Фиксируем, что этот раунд очищен
                                 setBallAnimating(false); // Анимация завершена
                                 fetchUserData(); // Обновляем баланс
-                            }, 1000); // Подсветка длится 1 секунду
+                            }, POST_ANIMATION_GLOW_DURATION_MS);
                         };
 
-                        if (correctRoundNumber !== lastAnimatedRound && age < 4000) {
+
+                        // Logic to decide whether to animate or just snap to end
+                        if (correctRoundNumber !== lastAnimatedRound && age < ANIMATION_DURATION_MS) {
                             // Игрок успевает увидеть полет шара. Высчитываем разницу во времени
                             lastAnimatedRound = correctRoundNumber;
                             currentRoundSignature = signature;
                             
                             if (statusText) statusText.classList.add('hidden');
 
-                            // Вычисляем стартовый кадр для "подхвата" на лету
-                            const targetFrameRate = 60; // 60 кадров в секунду
+                            const targetFrameRate = 60; 
                             const elapsedSec = age / 1000;
-                            const calculatedStartFrame = Math.min(249, Math.floor(elapsedSec * targetFrameRate)); // Макс 249 для 250 кадров
+                            const calculatedStartFrame = Math.min(249, Math.floor(elapsedSec * targetFrameRate)); // Max 249 for 250 frames
 
                             animateBouncingBall(winX, winY, signature, calculatedStartFrame, () => {
-                                completeRoundUiSequence(winId, tPool, correctRoundNumber);
+                                // Once animation is complete, trigger the post-animation sequence
+                                completeRoundUiSequence(winId, tPool, correctRoundNumber, winX, winY);
                             });
 
-                        } else if (correctRoundNumber !== lastAnimatedRound && age >= 4000 && age < 8000) {
-                            // Анимация шарика уже должна завершиться! Сразу ставим шарик на место и включаем подсветку
+                        } else if (correctRoundNumber !== lastAnimatedRound && age >= ANIMATION_DURATION_MS && age < (ANIMATION_DURATION_MS + POST_ANIMATION_GLOW_DURATION_MS + 500)) { // +500ms запас
+                            // Анимация шарика уже должна завершиться или только что завершилась. Сразу ставим шарик на место и включаем подсветку
                             lastAnimatedRound = correctRoundNumber;
                             currentRoundSignature = signature;
                             
                             if (statusText) statusText.classList.add('hidden');
+                            setBallAnimating(true); // Маркируем как анимирующийся, чтобы поллинг не прервал
+                            completeRoundUiSequence(winId, tPool, correctRoundNumber, winX, winY);
 
-                            setBallAnimating(true);
-                            const ballCanvas = document.getElementById('arena-ball-svg');
-                            if (ballCanvas) {
-                                ballCanvas.innerHTML = `
-                                    <circle id="physics-ball" cx="${winX}" cy="${winY}" r="8" fill="#ffffff"></circle>
-                                `;
-                                const textElement = document.createElementNS("http://www.w3.org/2000/svg", "text");
-                                textElement.setAttribute("id", "physics-ball-text");
-                                textElement.setAttribute("fill", "#ffffff");
-                                textElement.setAttribute("font-size", "12");
-                                textElement.setAttribute("font-weight", "900");
-                                textElement.setAttribute("text-anchor", "middle");
-                                textElement.setAttribute("filter", "drop-shadow(0px 2px 3px rgba(0,0,0,0.9))");
-                                textElement.setAttribute("x", winX.toFixed(1));
-                                const isNearTopWall = winY < 40;
-                                const textY = isNearTopWall ? (winY + 24) : (winY - 16);
-                                textElement.setAttribute("y", textY.toFixed(1));
-                                const winnerPlayer = arenaPlayers.find(p => String(p.userId) === String(winId));
-                                if (winnerPlayer) textElement.textContent = winnerPlayer.username;
-                                else textElement.textContent = "Победитель";
-                                ballCanvas.appendChild(textElement);
-                            }
-                            completeRoundUiSequence(winId, tPool, correctRoundNumber);
-
-                        } else if (correctRoundNumber !== lastAnimatedRound && age >= 8000) {
-                            // Раунд давно закончен, ничего не анимируем, просто очищаем
+                        } else if (correctRoundNumber !== lastAnimatedRound && age >= (ANIMATION_DURATION_MS + POST_ANIMATION_GLOW_DURATION_MS + 500)) {
+                            // Раунд давно закончен, ничего не анимируем, просто очищаем UI
                             lastAnimatedRound = correctRoundNumber;
                             currentRoundSignature = signature;
                             
@@ -1452,20 +1467,20 @@ document.addEventListener('DOMContentLoaded', async () => {
                             setBallAnimating(false);
                             fetchUserData();
                         }
-                    } else { // arenaStatusStr === 'waiting'
+                    } else { // arenaStatusStr === 'waiting' or 'countdown'
                         clearInterval(countdownIntervalId);
                         countdownIntervalId = null;
+                        if (countdownTimer) countdownTimer.classList.add('hidden');
+                        
+                        // Clear UI only if not animating AND current round not yet cleared
+                        if (!isBallAnimating && correctRoundNumber !== lastClearedRoundNumber) {
+                            clearArenaRoundUi(); 
+                            lastClearedRoundNumber = null; // Сброс для нового раунда
+                        }
+
                         if (statusText && !isBallAnimating) {
                             statusText.classList.remove('hidden');
                             statusText.innerText = "Ждем ставки...";
-                        }
-                        if (countdownTimer) {
-                            countdownTimer.classList.add('hidden');
-                        }
-                        
-                        if (!isBallAnimating) { // Если нет активной анимации
-                            clearArenaRoundUi(); // Убедимся, что UI чист
-                            lastClearedRoundNumber = correctRoundNumber; // Отмечаем, что UI чист для этого раунда
                         }
                     }
 
@@ -1491,6 +1506,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             isPollingActive = false;
             clearInterval(countdownIntervalId);
             countdownIntervalId = null;
+            // При остановке поллинга, если не было активной анимации, очищаем UI
+            if (!isBallAnimating) {
+                 clearArenaRoundUi();
+                 lastClearedRoundNumber = currentServerRoundNumber; // Считаем, что UI очищен для текущего раунда
+            }
         }
 
         // Эта функция больше не сбрасывает все состояние, а только UI
