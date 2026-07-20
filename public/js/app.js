@@ -10,9 +10,11 @@ const tg = (window.Telegram && window.Telegram.WebApp) ? window.Telegram.WebApp 
 tg.expand();
 tg.ready();
 
+// Динамическое внедрение CSS стилей для аватарок, неоновой обводки секторов и белого шарика
 (function injectStyles() {
     const style = document.createElement('style');
     style.innerHTML = `
+        /* Настоящее центрирование аватарок внутри секторов */
         .arena-player-avatar-node {
             position: absolute !important;
             transform: translate(-50%, -50%) !important;
@@ -24,6 +26,7 @@ tg.ready();
             z-index: 5 !important;
         }
         
+        /* БЕЛЫЙ СВЕТЯЩИЙСЯ ШАРИК */
         .best-arena-preview .ball,
         .arena-preview-ball,
         [class*="preview-ball"],
@@ -37,7 +40,8 @@ tg.ready();
         [class*="game-card"] circle,
         .arena-btn .ball,
         .arena-button .ball,
-        #arena-ball {
+        #arena-ball,
+        #physics-ball {
             background-color: #ffffff !important;
             fill: #ffffff !important;
             color: #ffffff !important;
@@ -45,6 +49,7 @@ tg.ready();
             filter: drop-shadow(0 0 8px #ffffff) !important;
         }
         
+        /* Красивое неоновое свечение победившего сектора */
         @keyframes winningSectorPulse {
             0% { filter: drop-shadow(0 0 8px var(--glow-color)) brightness(1.2); stroke: #ffffff; stroke-width: 4px; }
             50% { filter: drop-shadow(0 0 30px var(--glow-color)) brightness(1.7); stroke: #ffffff; stroke-width: 8px; }
@@ -61,6 +66,7 @@ tg.ready();
     document.head.appendChild(style);
 })();
 
+// FALLBACK ГОСТЕВОГО РЕЖИМА
 let localGuestId = localStorage.getItem('mock_guest_id');
 if (!localGuestId) {
     localGuestId = 'guest_' + Math.random().toString(36).substring(2, 9);
@@ -187,6 +193,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         let arenaStatusStr = "waiting";
 
         let lastAnimatedRound = null;
+        let lastShowedWinnerRound = null; // Защита от дублирования модалок
         let localExpectedBetAmount = 0;
         let lastObservedRoundNumber = null;
         let lastRenderedBalance = null;
@@ -194,6 +201,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         let countdownIntervalId = null;
         let localCountdownValue = 0;
 
+        // Предохранитель зависания
         let animatingTimeout = null;
         function setBallAnimating(val) {
             isBallAnimating = val;
@@ -201,7 +209,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (val) {
                 animatingTimeout = setTimeout(() => {
                     if (isBallAnimating) {
-                        console.warn("[ARENA CLIENT] Сработал предохранитель! Анимация сброшена принудительно.");
+                        console.warn("[ARENA CLIENT] Сработал предохранитель! Анимация сброшена.");
                         isBallAnimating = false;
                         const ballCanvas = document.getElementById('arena-ball-svg');
                         if (ballCanvas) ballCanvas.innerHTML = '';
@@ -229,6 +237,19 @@ document.addEventListener('DOMContentLoaded', async () => {
             } catch (e) {}
         }
         if (!userId) userId = localGuestId;
+
+        // СБРОС И ОЧИСТКА ПРИ СМЕНЕ ПОЛЬЗОВАТЕЛЯ (Исключает зависания аккаунтов)
+        const savedActiveId = localStorage.getItem('active_user_id');
+        if (savedActiveId && String(savedActiveId) !== String(userId)) {
+            console.log("Detect user change! Resetting local parameters.");
+            localStorage.removeItem(`custom_bets_${savedActiveId}`);
+            localStorage.removeItem(`user_cache_${savedActiveId}`);
+            localExpectedBetAmount = 0;
+            lastObservedRoundNumber = null;
+            lastAnimatedRound = null;
+            lastShowedWinnerRound = null;
+        }
+        localStorage.setItem('active_user_id', userId);
 
         const elements = {
             homeSection: document.getElementById('home-section'),
@@ -318,21 +339,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             return true;
         }
 
-        async function ensurePaymentParamsForUserAction() {
-            if (isPreloadingPayment) {
-                let waitedTime = 0;
-                while (isPreloadingPayment && waitedTime < 15000) { 
-                    await new Promise(r => setTimeout(r, 100));
-                    waitedTime += 100;
-                }
-                return true;
-            }
-            isPreloadingPayment = true;
-            await fetchPaymentParamsInternal();
-            isPreloadingPayment = false;
-            return true;
-        }
-        
         fetchPaymentParamsInternal();
 
         function loadSavedBets() {
@@ -1028,8 +1034,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             return null; 
         }
 
-        function animateBouncingBall(targetX, targetY, seedSignature, onComplete) {
-            if (isBallAnimating) return;
+        function animateBouncingBall(targetX, targetY, seedSignature, startFrameIndex = 0, onComplete) {
+            if (isBallAnimating && startFrameIndex === 0) return;
             setBallAnimating(true);
 
             renderBetButtons(); 
@@ -1061,7 +1067,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             let lastMatchedPlayer = null;
 
             if (!simulation) {
-                let frame = 0;
+                let frame = startFrameIndex;
                 const totalFrames = 180; 
                 const step = () => {
                     if (frame >= totalFrames) {
@@ -1098,7 +1104,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 return;
             }
 
-            let frameIndex = 0;
+            let frameIndex = startFrameIndex;
             const path = simulation.path;
 
             const renderFrame = () => {
@@ -1167,9 +1173,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             return merged;
         }
 
+        // КЛИЕНТСКИЙ МУЛЬТИПЛЕЕРНЫЙ ЦИКЛ ОПРОСА (С ЕДИНОЙ СИНХРОНИЗАЦИЕЙ ВРЕМЕНИ)
         async function pollArenaLoop(forceInstant = false) {
-            if (isBallAnimating) {
-                if (isPollingActive && !forceInstant) {
+            if (isBallAnimating && !forceInstant) {
+                if (isPollingActive) {
                     setTimeout(pollArenaLoop, 1000);
                 }
                 return;
@@ -1278,47 +1285,80 @@ document.addEventListener('DOMContentLoaded', async () => {
                         const signature = winId + "_" + tPool + "_" + winX + "_" + winY + "_" + correctRoundNumber;
                         const age = serverTime - resolvedAt; 
 
-                        if (correctRoundNumber !== lastAnimatedRound && age < 9000) {
+                        // ФУНКЦИЯ ОДНОЙ ТОЧКИ ЗАВЕРШЕНИЯ (Активация неонового свечения и модального окна)
+                        const completeRoundUiSequence = () => {
+                            const svgCanvas = document.getElementById('arena-svg-canvas');
+                            if (svgCanvas) {
+                                // Очищаем старые свечения
+                                svgCanvas.querySelectorAll('.winning-segment-glow').forEach(el => el.classList.remove('winning-segment-glow'));
+
+                                const winningPolygon = svgCanvas.querySelector(`[data-user-id="${winId}"]`);
+                                if (winningPolygon) {
+                                    const winnerColor = winningPolygon.getAttribute('fill') || '#00e676';
+                                    winningPolygon.style.setProperty('--glow-color', winnerColor);
+                                    winningPolygon.classList.add('winning-segment-glow');
+                                    svgCanvas.appendChild(winningPolygon); // Перенос наверх для корректного неона
+                                }
+                            }
+
+                            // Моментальный показ выигрыша без задержек!
+                            if (correctRoundNumber !== lastShowedWinnerRound) {
+                                lastShowedWinnerRound = correctRoundNumber;
+                                const isWeWinner = (String(winId) === String(userId));
+                                if (isWeWinner) {
+                                    showCustomModal({
+                                        icon: '🏆',
+                                        title: 'Победа!',
+                                        message: `🎉 Поздравляем! Вы получили весь банк: +${parseFloat(tPool).toFixed(3)} GRAM!`,
+                                        buttons: [{ text: 'Забрать!', primary: true }]
+                                    });
+                                    triggerBalanceBadge(parseFloat(tPool));
+                                }
+                            }
+
+                            // Очищаем шарик через 1 секунду после окончания
+                            setTimeout(() => {
+                                const ballCanvas = document.getElementById('arena-ball-svg');
+                                if (ballCanvas) ballCanvas.innerHTML = '';
+                                setBallAnimating(false);
+                                fetchUserData();
+                            }, 1000);
+                        };
+
+                        if (correctRoundNumber !== lastAnimatedRound && age < 4000) {
+                            // Игрок успевает увидеть полет шара. Высчитываем разницу во времени
                             lastAnimatedRound = correctRoundNumber;
                             currentRoundSignature = signature;
                             
                             if (statusText) statusText.classList.add('hidden');
 
-                            animateBouncingBall(winX, winY, signature, () => {
-                                const svgCanvas = document.getElementById('arena-svg-canvas');
-                                if (svgCanvas) {
-                                    const winningPolygon = svgCanvas.querySelector(`[data-user-id="${winId}"]`);
-                                    if (winningPolygon) {
-                                        const winnerColor = winningPolygon.getAttribute('fill') || '#00e676';
-                                        winningPolygon.style.setProperty('--glow-color', winnerColor);
-                                        winningPolygon.classList.add('winning-segment-glow');
-                                        svgCanvas.appendChild(winningPolygon); 
-                                    }
-                                }
+                            // Вычисляем стартовый кадр для "подхвата" на лету
+                            const targetFrameRate = 60; // 60 кадров в секунду
+                            const elapsedSec = age / 1000;
+                            const calculatedStartFrame = Math.min(179, Math.floor(elapsedSec * targetFrameRate));
 
-                                setTimeout(() => {
-                                    const ballCanvas = document.getElementById('arena-ball-svg');
-                                    if (ballCanvas) ballCanvas.innerHTML = '';
-                                    
-                                    const glowingPoly = svgCanvas?.querySelector('.winning-segment-glow');
-                                    if (glowingPoly) glowingPoly.classList.remove('winning-segment-glow');
-
-                                    const isWeWinner = (String(winId) === String(userId));
-                                    if (isWeWinner) {
-                                        showCustomModal({
-                                            icon: '🏆',
-                                            title: 'Победа!',
-                                            message: `🎉 Поздравляем! Вы получили весь банк: +${parseFloat(tPool).toFixed(3)} GRAM!`,
-                                            buttons: [{ text: 'Забрать!', primary: true }]
-                                        });
-                                        triggerBalanceBadge(parseFloat(tPool));
-                                    }
-
-                                    setBallAnimating(false); 
-                                    fetchUserData();
-                                }, 1000); 
+                            animateBouncingBall(winX, winY, signature, calculatedStartFrame, () => {
+                                completeRoundUiSequence();
                             });
-                        } else if (correctRoundNumber !== lastAnimatedRound && age >= 9000) {
+
+                        } else if (correctRoundNumber !== lastAnimatedRound && age >= 4000 && age < 8000) {
+                            // Анимация шарика уже должна завершиться! Сразу ставим шарик на место и включаем подсветку
+                            lastAnimatedRound = correctRoundNumber;
+                            currentRoundSignature = signature;
+                            
+                            if (statusText) statusText.classList.add('hidden');
+
+                            setBallAnimating(true);
+                            const ballCanvas = document.getElementById('arena-ball-svg');
+                            if (ballCanvas) {
+                                ballCanvas.innerHTML = `
+                                    <circle id="physics-ball" cx="${winX}" cy="${winY}" r="8" fill="#ffffff"></circle>
+                                `;
+                            }
+                            completeRoundUiSequence();
+
+                        } else if (correctRoundNumber !== lastAnimatedRound && age >= 8000) {
+                            // Раунд давно закончен, ничего не анимируем
                             lastAnimatedRound = correctRoundNumber;
                             currentRoundSignature = signature;
                             
@@ -1342,6 +1382,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                         if (!isBallAnimating) {
                             const ballCanvas = document.getElementById('arena-ball-svg');
                             if (ballCanvas) ballCanvas.innerHTML = '';
+                            const svgCanvas = document.getElementById('arena-svg-canvas');
+                            if (svgCanvas) {
+                                svgCanvas.querySelectorAll('.winning-segment-glow').forEach(el => el.classList.remove('winning-segment-glow'));
+                            }
                         }
                     }
 
