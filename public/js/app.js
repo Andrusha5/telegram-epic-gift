@@ -32,7 +32,8 @@ tg.ready();
         [class*="preview"] circle,
         [class*="preview"] .ball,
         .arena-preview-container .ball,
-        #arena-preview-ball {
+        #arena-preview-ball,
+        .game-card .ball {
             background-color: #ffffff !important;
             fill: #ffffff !important;
             color: #ffffff !important;
@@ -41,9 +42,9 @@ tg.ready();
         }
         /* Красивая неоновая обводка победившего поля */
         @keyframes winningSectorPulse {
-            0% { filter: drop-shadow(0 0 8px var(--glow-color)) brightness(1.2); }
-            50% { filter: drop-shadow(0 0 25px var(--glow-color)) brightness(1.6); }
-            100% { filter: drop-shadow(0 0 8px var(--glow-color)) brightness(1.2); }
+            0% { filter: drop-shadow(0 0 8px var(--glow-color)) brightness(1.2); stroke-width: 4px; }
+            50% { filter: drop-shadow(0 0 25px var(--glow-color)) brightness(1.6); stroke-width: 6px; }
+            100% { filter: drop-shadow(0 0 8px var(--glow-color)) brightness(1.2); stroke-width: 4px; }
         }
         .winning-segment-glow {
             stroke: #ffffff !important;
@@ -507,7 +508,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         if (elements.depositBalanceBtn) {
             elements.depositBalanceBtn.addEventListener('click', () => {
-                // МГНОВЕННЫЙ ЗАПУСК МОДАЛКИ БЕЗ ASYNC ОЖИДАНИЙ
+                // МГНОВЕННЫЙ ЗАПУСК МОДАЛКИ БЕЗ ASYNC ОЖИДАНИЙ (Сохранение жеста)
                 if (elements.depositAmountModal) {
                     elements.depositAmountModal.classList.remove('hidden');
                     if (elements.modalDepositInput) elements.modalDepositInput.value = "0.1";
@@ -932,7 +933,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     listContainer.appendChild(row);
                 });
                 safeSetText(elements.arenaPlayersTotal, arenaPlayers.length);
-            } catch (e) { console.error("Error list UI:", e); }
+            } catch (e) { console.error("Error updating list UI:", e); }
         }
 
         function renderBetButtons() {
@@ -1273,7 +1274,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                             isBallAnimating = true;
 
                             animateBouncingBall(winX, winY, signature, () => {
-                                // 🌟 ПАТЧ ПОДСВЕТКИ ПОБЕДИТЕЛЯ (МГНОВЕННЫЙ ЭФФЕКТ):
+                                // 🌟 ПАТЧ ПОДСВЕТКИ ПОБЕДИТЕЛЯ (МГНОВЕННЫЙ НЕОНОВЫЙ ЭФФЕКТ):
                                 const svgCanvas = document.getElementById('arena-svg-canvas');
                                 if (svgCanvas) {
                                     const winningPolygon = svgCanvas.querySelector(`[data-user-id="${winId}"]`);
@@ -1281,7 +1282,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                                         const winnerColor = winningPolygon.getAttribute('fill') || '#00e676';
                                         winningPolygon.style.setProperty('--glow-color', winnerColor);
                                         winningPolygon.classList.add('winning-segment-glow');
-                                        svgCanvas.appendChild(winningPolygon); // На передний план
+                                        svgCanvas.appendChild(winningPolygon); // Перенос полигона на передний план для видимости неонового штриха
                                     }
                                 }
 
