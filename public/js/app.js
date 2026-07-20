@@ -10,11 +10,9 @@ const tg = (window.Telegram && window.Telegram.WebApp) ? window.Telegram.WebApp 
 tg.expand();
 tg.ready();
 
-// Динамическое внедрение стилей для отображения аватарок по центру, неонового свечения и белого шарика
 (function injectStyles() {
     const style = document.createElement('style');
     style.innerHTML = `
-        /* Настоящее центрирование аватарок внутри игровых секторов */
         .arena-player-avatar-node {
             position: absolute !important;
             transform: translate(-50%, -50%) !important;
@@ -26,7 +24,6 @@ tg.ready();
             z-index: 5 !important;
         }
         
-        /* БЕЛЫЙ СВЕТЯЩИЙСЯ ШАРИК НА КНОПКЕ BEST ARENA ГЛАВНОГО ЭКРАНА */
         .best-arena-preview .ball,
         .arena-preview-ball,
         [class*="preview-ball"],
@@ -48,7 +45,6 @@ tg.ready();
             filter: drop-shadow(0 0 8px #ffffff) !important;
         }
         
-        /* Красивая неоновая обводка победившего поля */
         @keyframes winningSectorPulse {
             0% { filter: drop-shadow(0 0 8px var(--glow-color)) brightness(1.2); stroke: #ffffff; stroke-width: 4px; }
             50% { filter: drop-shadow(0 0 30px var(--glow-color)) brightness(1.7); stroke: #ffffff; stroke-width: 8px; }
@@ -65,7 +61,6 @@ tg.ready();
     document.head.appendChild(style);
 })();
 
-// FALLBACK ДЛЯ ТЕСТОВ
 let localGuestId = localStorage.getItem('mock_guest_id');
 if (!localGuestId) {
     localGuestId = 'guest_' + Math.random().toString(36).substring(2, 9);
@@ -130,7 +125,6 @@ function createPRNG(seedString) {
     }
 }
 
-// Стабильная палитра цветов
 const defaultColors = ['#8d3df5', '#00e676', '#0088cc', '#ff9500', '#ff3b30', '#c25dff'];
 
 function getUserColor(userId, roundNumber) {
@@ -160,7 +154,6 @@ async function fetchWithTimeout(resource, options = {}) {
     }
 }
 
-// ВСПЛЫВАЮЩИЕ ПИЛЮЛИ ИЗМЕНЕНИЯ БАЛАНСА
 function triggerBalanceBadge(amount) {
     const container = document.getElementById('balance-badge-container');
     if (!container) return;
@@ -201,7 +194,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         let countdownIntervalId = null;
         let localCountdownValue = 0;
 
-        // 🛡️ ПРЕДОХРАНИТЕЛЬ ОТ ЗАВИСАНИЯ АНИМАЦИИ В БРАУЗЕРЕ (Принудительный сброс через 9 сек)
         let animatingTimeout = null;
         function setBallAnimating(val) {
             isBallAnimating = val;
@@ -219,7 +211,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         }
 
-        // ⚡ ПРЕДЗАГРУЖЕННЫЕ ФОЛБЕКИ (КОШЕЛЕК ОТКРОЕТСЯ МОМЕНТАЛЬНО)
         let preloadedAdminAddress = "EQC3481up9_gG98_wK8Jv_Zz1yLp9p0_Y-7Jv7x4b9a9JKe6";
         let preloadedPayloadBase64 = "te6ccgEBAQEAAgAAAA==";
         let isPreloadingPayment = false;
@@ -342,7 +333,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             return true;
         }
         
-        // Фоновое получение адресов при запуске игры
         fetchPaymentParamsInternal();
 
         function loadSavedBets() {
@@ -563,7 +553,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                 closeDepositModal();
 
-                // ⚡ ПОЛНОСТЬЮ СИНХРОННЫЙ СТАРТ ТРАНЗАКЦИИ (КОШЕЛЕК 100% ОТКРОЕТСЯ!)
                 try {
                     const nanoAmount = Math.floor(amount * 1000000000).toString();
 
@@ -606,10 +595,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
         }
 
-        // -----------------------------------------------------------------------
-        // ГЕОМЕТРИЧЕСКИЙ ДВИЖОК SVG И МУЛЬТИПЛЕЕРНАЯ СИНХРОНИЗАЦИЯ BEST ARENA
-        // -----------------------------------------------------------------------
-        
         function calculateSharesProtection(players) {
             const N = players.length;
             if (N === 0) return [];
@@ -1183,7 +1168,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         async function pollArenaLoop(forceInstant = false) {
-            // 🚫 БЛОКИРОВАТЕЛЬ: Не запрашиваем новые данные, пока идет полет шара или фаза подсветки!
             if (isBallAnimating) {
                 if (isPollingActive && !forceInstant) {
                     setTimeout(pollArenaLoop, 1000);
@@ -1254,36 +1238,41 @@ document.addEventListener('DOMContentLoaded', async () => {
                     if (arenaStatusStr === 'countdown') {
                         if (statusText) statusText.classList.add('hidden');
                         
-                        localCountdownValue = parseInt(stateTimeLeft, 10);
-                        if (!isNaN(localCountdownValue)) {
-                            if (countdownTimer) {
-                                countdownTimer.classList.remove('hidden');
-                                countdownTimer.innerText = localCountdownValue;
+                        let serverCountdown = parseInt(stateTimeLeft, 10);
+                        if (!isNaN(serverCountdown)) {
+                            if (Math.abs(localCountdownValue - serverCountdown) > 1 || !countdownIntervalId) {
+                                localCountdownValue = serverCountdown;
+                                if (countdownTimer) {
+                                    countdownTimer.classList.remove('hidden');
+                                    countdownTimer.innerText = localCountdownValue;
+                                }
                             }
                             
-                            clearInterval(countdownIntervalId);
-                            countdownIntervalId = setInterval(() => {
-                                localCountdownValue--;
-                                if (localCountdownValue <= 0) {
-                                    clearInterval(countdownIntervalId);
-                                    if (countdownTimer) countdownTimer.classList.add('hidden');
-                                    setTimeout(() => { pollArenaLoop(true); }, 50);
-                                } else {
-                                    if (countdownTimer) {
-                                        countdownTimer.classList.remove('hidden');
-                                        countdownTimer.innerText = localCountdownValue;
+                            if (!countdownIntervalId) {
+                                countdownIntervalId = setInterval(() => {
+                                    localCountdownValue--;
+                                    if (localCountdownValue <= 0) {
+                                        clearInterval(countdownIntervalId);
+                                        countdownIntervalId = null;
+                                        if (countdownTimer) countdownTimer.classList.add('hidden');
+                                        setTimeout(() => { pollArenaLoop(true); }, 50);
+                                    } else {
+                                        if (countdownTimer) {
+                                            countdownTimer.classList.remove('hidden');
+                                            countdownTimer.innerText = localCountdownValue;
+                                        }
                                     }
-                                }
-                            }, 1000);
+                                }, 1000);
+                            }
                         }
                     } else if (arenaStatusStr === 'finished') {
                         clearInterval(countdownIntervalId);
+                        countdownIntervalId = null;
                         if (countdownTimer) countdownTimer.classList.add('hidden');
 
                         const winId = state.winnerId || state.winner_id || "";
                         const winX = state.winnerX || state.winner_x || 0;
                         const winY = state.winnerY || state.winner_y || 0;
-                        const winName = state.winnerName || state.winner_name || "Победитель";
                         const tPool = state.totalPool || state.total_pool || state.pool || 0;
 
                         const signature = winId + "_" + tPool + "_" + winX + "_" + winY + "_" + correctRoundNumber;
@@ -1295,11 +1284,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                             
                             if (statusText) statusText.classList.add('hidden');
 
-                            // Локальный захват анимации
-                            setBallAnimating(true);
-
                             animateBouncingBall(winX, winY, signature, () => {
-                                // 🌟 ПАТЧ ПОДСВЕТКИ ПОБЕДИТЕЛЯ (МГНОВЕННЫЙ НЕОНОВЫЙ ЭФФЕКТ):
                                 const svgCanvas = document.getElementById('arena-svg-canvas');
                                 if (svgCanvas) {
                                     const winningPolygon = svgCanvas.querySelector(`[data-user-id="${winId}"]`);
@@ -1307,11 +1292,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                                         const winnerColor = winningPolygon.getAttribute('fill') || '#00e676';
                                         winningPolygon.style.setProperty('--glow-color', winnerColor);
                                         winningPolygon.classList.add('winning-segment-glow');
-                                        svgCanvas.appendChild(winningPolygon); // Перенос полигона на передний план для видимости неонового штриха
+                                        svgCanvas.appendChild(winningPolygon); 
                                     }
                                 }
 
-                                // ⏰ Ждем ровно 1 секунду до удаления и сброса шарика
                                 setTimeout(() => {
                                     const ballCanvas = document.getElementById('arena-ball-svg');
                                     if (ballCanvas) ballCanvas.innerHTML = '';
@@ -1319,7 +1303,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                                     const glowingPoly = svgCanvas?.querySelector('.winning-segment-glow');
                                     if (glowingPoly) glowingPoly.classList.remove('winning-segment-glow');
 
-                                    // Показываем модальное окно победителя
                                     const isWeWinner = (String(winId) === String(userId));
                                     if (isWeWinner) {
                                         showCustomModal({
@@ -1331,7 +1314,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                                         triggerBalanceBadge(parseFloat(tPool));
                                     }
 
-                                    setBallAnimating(false); // Освобождаем блокировщик
+                                    setBallAnimating(false); 
                                     fetchUserData();
                                 }, 1000); 
                             });
@@ -1347,6 +1330,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         }
                     } else {
                         clearInterval(countdownIntervalId);
+                        countdownIntervalId = null;
                         if (statusText && !isBallAnimating) {
                             statusText.classList.remove('hidden');
                             statusText.innerText = "Ждем ставки...";
@@ -1382,6 +1366,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         function stopArenaPolling() {
             isPollingActive = false;
             clearInterval(countdownIntervalId);
+            countdownIntervalId = null;
         }
 
         function resetArenaGame() {
@@ -1410,7 +1395,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             renderBetButtons();
         }
 
-        // КЛИК СТАВКИ (ЖЕЛЕЗНАЯ СТАБИЛЬНОСТЬ БЕЗ ВОЗВРАТОВ!)
         let localBetThrottle = false;
         const handleBetClick = async (e) => {
             const btn = e.currentTarget;
@@ -1427,7 +1411,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 renderBetButtons();
             }, 200);
 
-            // Оптимистичное локальное списание баланса
             localExpectedBetAmount = parseFloat((localExpectedBetAmount + betValue).toFixed(3));
             arenaPlayers = getMergedPlayers(arenaPlayers, lastObservedRoundNumber || 1);
             
