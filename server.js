@@ -292,7 +292,6 @@ if (bot) {
             }
 
             if (isAdmin) {
-                // 💎 КОМАНДА ПОПОЛНЕНИЯ БАЛАНСА С МГНОВЕННЫМ УВЕДОМЛЕНИЕМ ИГРОКА
                 if (text.startsWith('/addbalance')) {
                     const parts = text.split(' ');
                     if (parts.length < 3) {
@@ -467,7 +466,7 @@ function saveArenaState() {
 
 loadArenaState();
 
-// Игровой цикл бэкенда (ЖЕСТКО: запуск таймера только когда игроков >= 2)
+// Игровой цикл бэкенда
 setInterval(() => {
     try {
         let stateChanged = false;
@@ -540,8 +539,9 @@ async function resolveArenaRound() {
     arenaState.resolvedAt = Date.now();
     arenaState.status = "finished";
     
-    // ⚡ ТАЙМАУТ ЗАВЕРШЕННОГО СТАТУСА НА СЕРВЕРЕ СОКРАЩЕН С 10 ДО 3 СЕКУНД (ПОЛНОЕ ОТСУТСТВИЕ ЗАДЕРЖЕК!)
-    arenaState.timeLeft = 3; 
+    // ⚡ БЕЗОПАСНЫЙ ТАЙМАУТ FINISHED-РАУНДА НА СЕРВЕРЕ (8 СЕКУНД)
+    // Это гарантирует, что медленные устройства успеют дорисовать полет шарика до сброса игры!
+    arenaState.timeLeft = 8; 
     saveArenaState();
 
     const winnerUser = await dbGetUser(winnerBet.userId);
@@ -568,11 +568,11 @@ function generateCoordsForWinner(winnerIndex, bets) {
             let u = Math.random();
             let v = Math.random();
             if (u + v > 1) { u = 1 - u; v = 1 - v; }
-            return { x: Math.max(30, u * sizeX), y: Math.max(30, v * sizeY) };
+            return { x: Math.max(35, u * sizeX), y: Math.max(35, v * sizeY) };
         } else {
             while (true) {
-                let rx = 30 + Math.random() * 260;
-                let ry = 30 + Math.random() * 260;
+                let rx = 35 + Math.random() * 250;
+                let ry = 35 + Math.random() * 250;
                 if (!(rx / sizeX + ry / sizeY <= 1)) {
                     return { x: rx, y: ry };
                 }
@@ -615,8 +615,8 @@ function generateCoordsForWinner(winnerIndex, bets) {
 
             const centroid = getPolygonCentroid(pathPoints);
             return {
-                x: Math.max(35, Math.min(285, centroid.x + (Math.random() * 15 - 7.5))),
-                y: Math.max(35, Math.min(285, centroid.y + (Math.random() * 15 - 7.5)))
+                x: Math.max(40, Math.min(280, centroid.x + (Math.random() * 14 - 7))),
+                y: Math.max(40, Math.min(280, centroid.y + (Math.random() * 14 - 7)))
             };
         }
         currentAngle = nextAngle;
