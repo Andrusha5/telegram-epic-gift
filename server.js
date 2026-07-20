@@ -8,7 +8,7 @@ const TelegramBot = require('node-telegram-bot-api');
 require('dotenv').config();
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 10000;
 
 app.use(cors());
 app.use(express.json());
@@ -148,7 +148,7 @@ async function dbGetUser(id) {
             return res.rows[0] || null;
         }
     } catch (e) {
-        console.error("DB GetUser fallback to local storage:", e.message);
+        console.error("DB Fallback GetUser:", e.message);
     }
     const data = JSON.parse(fs.readFileSync(localUsersFile, 'utf8'));
     return data[String(id)] || null;
@@ -167,7 +167,7 @@ async function dbSaveUser(id, user) {
             return;
         }
     } catch (e) {
-        console.error("DB SaveUser fallback to local storage:", e.message);
+        console.error("DB Fallback SaveUser:", e.message);
     }
     const data = JSON.parse(fs.readFileSync(localUsersFile, 'utf8'));
     user.is_banned = isBannedValue;
@@ -182,7 +182,7 @@ async function dbGetInventory(userId) {
             return res.rows;
         }
     } catch (e) {
-        console.error("DB GetInventory fallback to local storage:", e.message);
+        console.error("DB Fallback GetInventory:", e.message);
     }
     const items = JSON.parse(fs.readFileSync(localInvFile, 'utf8'));
     return items.filter(i => String(i.user_id) === String(userId));
@@ -201,7 +201,7 @@ async function dbAddInventoryItem(userId, itemId) {
             return;
         }
     } catch (e) {
-        console.error("DB AddInventoryItem fallback to local storage:", e.message);
+        console.error("DB Fallback AddInventory:", e.message);
     }
     const items = JSON.parse(fs.readFileSync(localInvFile, 'utf8'));
     const newItem = {
@@ -223,7 +223,7 @@ async function dbRemoveInventoryItem(userId, itemId) {
             return;
         }
     } catch (e) {
-        console.error("DB RemoveInventoryItem fallback to local storage:", e.message);
+        console.error("DB Fallback RemoveInventory:", e.message);
     }
     const items = JSON.parse(fs.readFileSync(localInvFile, 'utf8'));
     const idx = items.findIndex(i => String(i.user_id) === String(userId) && parseInt(i.item_id) === parseInt(itemId));
@@ -343,7 +343,7 @@ if (bot) {
                 if (state) {
                     const targetId = text;
                     if (!targetId || isNaN(targetId)) {
-                        bot.sendMessage(chatId, "⚠️ ID должен состоять только из цифр. Повторите ввод корректного ID:");
+                        bot.sendMessage(chatId, "⚠️ ID должен состоять только из цифр. Повторите ввод:");
                         return;
                     }
 
@@ -351,73 +351,36 @@ if (bot) {
                     
                     if (state === 'awaiting_ban') {
                         if (!user) {
-                            user = {
-                                id: targetId,
-                                username: "unknown",
-                                first_name: "Неизвестный",
-                                balance: 0.0,
-                                avatar_url: "https://img.icons8.com/color/96/user.png",
-                                last_daily_case_open: null,
-                                is_banned: true
-                            };
+                            user = { id: targetId, username: "unknown", first_name: "Неизвестный", balance: 0.0, avatar_url: "https://img.icons8.com/color/96/user.png", last_daily_case_open: null, is_banned: true };
                         } else {
                             user.is_banned = true;
                         }
                         await dbSaveUser(targetId, user);
-                        
-                        const banMsg = "🚫 **Игрок заблокирован!**\n\n" +
-                                       "**ID:** `" + targetId + "`\n" +
-                                       "**Имя:** @" + user.username + " (" + user.first_name + ")\n\n" +
-                                       "Доступ к Web App для него мгновенно закрыт.";
-                        bot.sendMessage(chatId, banMsg, { parse_mode: "Markdown" });
+                        bot.sendMessage(chatId, `🚫 **Игрок заблокирован!**\n\nID: `${targetId}`\nИмя: @${user.username}\nДоступ заблокирован.`, { parse_mode: "Markdown" });
                     
                     } else if (state === 'awaiting_unban') {
                         if (!user) {
-                            user = {
-                                id: targetId,
-                                username: "unknown",
-                                first_name: "Неизвестный",
-                                balance: 50.0,
-                                avatar_url: "https://img.icons8.com/color/96/user.png",
-                                last_daily_case_open: null,
-                                is_banned: false
-                            };
+                            user = { id: targetId, username: "unknown", first_name: "Неизвестный", balance: 50.0, avatar_url: "https://img.icons8.com/color/96/user.png", last_daily_case_open: null, is_banned: false };
                         } else {
                             user.is_banned = false;
                         }
                         await dbSaveUser(targetId, user);
-                        
-                        const unbanMsg = "✅ **Игрок успешно разблокирован!**\n\n" +
-                                         "**ID:** `" + targetId + "`\n" +
-                                         "**Имя:** @" + user.username + " (" + user.first_name + ")\n\n" +
-                                         "Доступ к приложению восстановлен.";
-                        bot.sendMessage(chatId, unbanMsg, { parse_mode: "Markdown" });
+                        bot.sendMessage(chatId, `✅ **Игрок успешно разблокирован!**\n\nID: `${targetId}`\nИмя: @${user.username}\nДоступ восстановлен.`, { parse_mode: "Markdown" });
                     
                     } else if (state === 'awaiting_status') {
                         if (!user) {
-                            bot.sendMessage(chatId, "🔍 Пользователь с ID `" + targetId + "` не найден в базе данных.", { parse_mode: "Markdown" });
+                            bot.sendMessage(chatId, "🔍 Пользователь не найден.", { parse_mode: "Markdown" });
                         } else {
                             const bannedStatus = user.is_banned ? "Забанен 🚫" : "Активен ✅";
-                            const statusMsg = "🔍 **Информация о профиле:**\n\n" +
-                                              "**ID:** `" + targetId + "`\n" +
-                                              "**Имя:** @" + user.username + " (" + user.first_name + ")\n" +
-                                              "**Баланс:** " + parseFloat(user.balance || 0).toFixed(3) + " GRAM\n" +
-                                              "**Статус блокировки:** " + bannedStatus + "\n" +
-                                              "**Последний бонус:** " + (user.last_daily_case_open || "Не открывал");
-                            bot.sendMessage(chatId, statusMsg, { parse_mode: "Markdown" });
+                            bot.sendMessage(chatId, `🔍 **Информация о профиле:**\n\nID: `${targetId}`\nИмя: @${user.username}\nБаланс: ${parseFloat(user.balance || 0).toFixed(3)} GRAM\nСтатус: ${bannedStatus}`, { parse_mode: "Markdown" });
                         }
                     }
-
                     delete adminStates[chatId]; 
                     return;
                 }
-            } else {
-                if (text === '/ban' || text === '/unban' || text === '/status' || text.startsWith('/addbalance')) {
-                    bot.sendMessage(chatId, "⚠️ У вас нет прав администратора для выполнения этой команды.");
-                }
             }
         } catch (err) {
-            console.error("Error processing message event:", err.message);
+            console.error("Bot general error:", err.message);
         }
     });
 }
@@ -436,7 +399,6 @@ let arenaState = {
     totalPool: 0
 };
 
-// Функция загрузки Арены из базы
 function loadArenaState() {
     try {
         if (fs.existsSync(localArenaFile)) {
@@ -447,26 +409,25 @@ function loadArenaState() {
                     arenaState.status = "waiting";
                     arenaState.timeLeft = 15;
                 }
-                console.log("SUCCESS: Arena State restored. Active bets count: " + arenaState.bets.length);
+                console.log("SUCCESS: Arena State restored. Bets: " + arenaState.bets.length);
             }
         }
     } catch (e) {
-        console.error("Error loading Arena State:", e.message);
+        console.error("Error loading Arena:", e.message);
     }
 }
 
-// Функция сохранения Арены в базу
 function saveArenaState() {
     try {
         fs.writeFileSync(localArenaFile, JSON.stringify(arenaState, null, 2));
     } catch (e) {
-        console.error("Error saving Arena State:", e.message);
+        console.error("Error saving Arena:", e.message);
     }
 }
 
 loadArenaState();
 
-// Игровой цикл бэкенда
+// Игровой цикл бэкенда (Таймаут конца раунда увеличен до 8 секунд, чтобы анимация на клиентах не сбрасывалась досрочно!)
 setInterval(() => {
     try {
         let stateChanged = false;
@@ -481,7 +442,7 @@ setInterval(() => {
             arenaState.timeLeft--;
             stateChanged = true;
             if (arenaState.timeLeft <= 0) {
-                resolveArenaRound().catch(e => console.error("Error resolving round:", e.message));
+                resolveArenaRound().catch(e => console.error("Error resolving:", e.message));
             }
         } else if (arenaState.status === "finished") {
             arenaState.timeLeft--;
@@ -539,8 +500,7 @@ async function resolveArenaRound() {
     arenaState.resolvedAt = Date.now();
     arenaState.status = "finished";
     
-    // ⚡ БЕЗОПАСНЫЙ ТАЙМАУТ FINISHED-РАУНДА НА СЕРВЕРЕ (8 СЕКУНД)
-    // Это гарантирует, что медленные устройства успеют дорисовать полет шарика до сброса игры!
+    // ⚡ БЕЗОПАСНОЕ ВРЕМЯ НА ХОД ШАРИКА И ПОДСВЕТКУ У КЛИЕНТОВ (8 СЕКУНД)
     arenaState.timeLeft = 8; 
     saveArenaState();
 
@@ -557,7 +517,7 @@ function generateCoordsForWinner(winnerIndex, bets) {
     const shares = calculateShares(bets);
 
     if (N === 1) {
-        return { x: 60 + Math.random() * 200, y: 60 + Math.random() * 200 };
+        return { x: 80 + Math.random() * 160, y: 80 + Math.random() * 160 };
     }
 
     if (N === 2) {
@@ -568,11 +528,11 @@ function generateCoordsForWinner(winnerIndex, bets) {
             let u = Math.random();
             let v = Math.random();
             if (u + v > 1) { u = 1 - u; v = 1 - v; }
-            return { x: Math.max(35, u * sizeX), y: Math.max(35, v * sizeY) };
+            return { x: Math.max(50, u * sizeX), y: Math.max(50, v * sizeY) };
         } else {
             while (true) {
-                let rx = 35 + Math.random() * 250;
-                let ry = 35 + Math.random() * 250;
+                let rx = 50 + Math.random() * 220;
+                let ry = 50 + Math.random() * 220;
                 if (!(rx / sizeX + ry / sizeY <= 1)) {
                     return { x: rx, y: ry };
                 }
@@ -615,8 +575,8 @@ function generateCoordsForWinner(winnerIndex, bets) {
 
             const centroid = getPolygonCentroid(pathPoints);
             return {
-                x: Math.max(40, Math.min(280, centroid.x + (Math.random() * 14 - 7))),
-                y: Math.max(40, Math.min(280, centroid.y + (Math.random() * 14 - 7)))
+                x: Math.max(55, Math.min(265, centroid.x + (Math.random() * 10 - 5))),
+                y: Math.max(55, Math.min(265, centroid.y + (Math.random() * 10 - 5)))
             };
         }
         currentAngle = nextAngle;
@@ -821,7 +781,7 @@ app.post('/api/verify_payment', parseTelegramInitData, async (req, res) => {
     });
 });
 
-// ДЕПОЗИТ
+// ДЕПОЗИТ ВЫБОРОЧНЫХ NFT
 app.post('/api/deposit_gift_request', parseTelegramInitData, async (req, res) => {
     const { itemId } = req.body;
     const gift = ALL_GIFT_ITEMS[itemId];
@@ -926,7 +886,6 @@ app.post('/api/place_bet', parseTelegramInitData, async (req, res) => {
             chosenColor = '#8d3df5';
         }
 
-        // Списываем средства
         user.balance = parseFloat((parseFloat(user.balance) - amount).toFixed(3));
         await dbSaveUser(user.id, user);
 
