@@ -31,8 +31,8 @@ process.on('unhandledRejection', (reason, promise) => {
     console.error('⛔ СИСТЕМНЫЙ ПЕРЕХВАТ НЕОБРАБОТАННОГО ПРОМИСА:', reason);
 });
 
-// Цветовая палитра игроков
-const defaultColors = ['#8d3df5', '#00e676', '#0088cc', '#ff9500', '#ff3b30', '#c25dff'];
+// Новая премиальная, контрастная цветовая палитра игроков
+const defaultColors = ['#ff3b30', '#4cd964', '#007aff', '#ffcc00', '#5856d6', '#ff2d55', '#5ac8fa', '#00e676', '#ff9500', '#0088cc'];
 function getUserColor(userId, roundNumber) {
     const idStr = String(userId || 'guest') + "_" + String(roundNumber || 1);
     let hash = 0;
@@ -72,7 +72,10 @@ if (BOT_TOKEN && BOT_TOKEN !== "undefined" && BOT_TOKEN !== "") {
         console.log("SUCCESS: Telegram Bot successfully initialized.");
 
         bot.on('polling_error', (error) => {
-            console.warn("⚠️ Предупреждение Polling:", error.message);
+            // Бесшумное логирование конфликтов сессии при перезапуске Render
+            if (!error.message.includes('409 Conflict')) {
+                console.warn("⚠️ Предупреждение Polling:", error.message);
+            }
         });
 
         bot.on('error', (error) => {
@@ -237,178 +240,6 @@ async function dbRemoveInventoryItem(userId, itemId) {
     }
 }
 
-if (bot) {
-    bot.on('callback_query', async (callbackQuery) => {
-        const action = callbackQuery.data; 
-        const message = callbackQuery.message;
-        const msgId = message.message_id;
-        const chatId = message.chat.id;
-
-        try {
-            if (action.startsWith('approve_dep_') || action.startsWith('reject_dep_')) {
-                const parts = action.split('_');
-                const isApproved = parts[0] === 'approve';
-                const user_id = parts[2];
-                const item_id = parseInt(parts[3]);
-
-                const user = await dbGetUser(user_id);
-                const gift = ALL_GIFT_ITEMS[item_id];
-
-                if (!gift) {
-                    return bot.answerCallbackQuery(callbackQuery.id, { text: "Ошибка: предмет не найден!", show_alert: true });
-                }
-
-                if (isApproved) {
-                    await dbAddInventoryItem(user_id, item_id);
-                    await bot.editMessageText("✅ **Успешно одобрено!**\nПодарок *" + gift.name + "* добавлен игроку @" + (user ? user.username : 'Unknown') + " (ID: " + user_id + ") в инвентарь.", {
-                        chat_id: chatId,
-                        message_id: msgId,
-                        parse_mode: 'Markdown'
-                    });
-                } else {
-                    await bot.editMessageText("❌ **Заявка отклонена!**\nПодарок *" + gift.name + "* для игрока @" + (user ? user.username : 'Unknown') + " (ID: " + user_id + ") отклонен.", {
-                        chat_id: chatId,
-                        message_id: msgId,
-                        parse_mode: 'Markdown'
-                    });
-                }
-
-                bot.answerCallbackQuery(callbackQuery.id, { text: isApproved ? "Депозит зачислен!" : "Заявка отклонена" });
-            }
-        } catch (err) {
-            console.error("Bot Callback Error:", err.message);
-        }
-    });
-
-    bot.on('message', async (msg) => {
-        try {
-            const chatId = msg.chat.id;
-            const text = msg.text ? msg.text.trim() : '';
-            const isAdmin = String(chatId).trim() === String(ADMIN_CHAT_ID).trim();
-
-            if (text === '/start') {
-                const welcomeMsg = "🎉 **Добро пожаловать в BestGifts!**\n\n" +
-                                   "Нажмите на кнопку **Open** (меню слева снизу), чтобы запустить игру!\n\n" +
-                                   "ℹ️ Ваш Chat ID: `" + chatId + "`" + (isAdmin ? " (Администратор ⭐)" : "");
-                bot.sendMessage(chatId, welcomeMsg, { parse_mode: "Markdown" });
-                return;
-            }
-
-            if (isAdmin) {
-                if (text.startsWith('/addbalance')) {
-                    const parts = text.split(' ');
-                    if (parts.length < 3) {
-                        bot.sendMessage(chatId, "⚠️ Формат команды:\n`/addbalance <ID_Пользователя> <Сумма>`", { parse_mode: "Markdown" });
-                        return;
-                    }
-                    const targetId = parts[1].trim();
-                    const amount = parseFloat(parts[2]);
-                    if (isNaN(amount) || amount <= 0) {
-                        bot.sendMessage(chatId, "⚠️ Сумма должна быть положительным числом.");
-                        return;
-                    }
-                    let user = await dbGetUser(targetId);
-                    if (!user) {
-                        bot.sendMessage(chatId, `⚠️ Игрок с ID ${targetId} не найден в базе.`);
-                        return;
-                    }
-                    user.balance = parseFloat((parseFloat(user.balance) + amount).toFixed(3));
-                    await dbSaveUser(targetId, user);
-                    bot.sendMessage(chatId, `✅ Игроку @${user.username} успешно начислено *+${amount} GRAM*.\nНовый баланс: *${user.balance} GRAM*`, { parse_mode: "Markdown" });
-                    
-                    try {
-                        await bot.sendMessage(targetId, `💎 **Баланс пополнен!**\n\nАдминистратор пополнил ваш баланс на *+${amount.toFixed(3)} GRAM*!`, { parse_mode: "Markdown" });
-                    } catch (err) {
-                        console.error("Не удалось отправить сообщение игроку через бота:", err.message);
-                    }
-                    return;
-                }
-
-                if (text === '/ban') {
-                    adminStates[chatId] = 'awaiting_ban';
-                    bot.sendMessage(chatId, "🚫 **Блокировка игрока**\n\nПожалуйста, введите Telegram ID игрока, которого нужно забанить:", { parse_mode: "Markdown" });
-                    return;
-                }
-
-                if (text === '/unban') {
-                    adminStates[chatId] = 'awaiting_unban';
-                    bot.sendMessage(chatId, "✅ **Разблокировка игрока**\n\nПожалуйста, введите Telegram ID игрока, которого нужно разблокировать:", { parse_mode: "Markdown" });
-                    return;
-                }
-
-                if (text === '/status') {
-                    adminStates[chatId] = 'awaiting_status';
-                    bot.sendMessage(chatId, "🔍 **Статус игрока**\n\nПожалуйста, введите Telegram ID игрока для проверки его профиля:", { parse_mode: "Markdown" });
-                    return;
-                }
-
-                const state = adminStates[chatId];
-                if (state) {
-                    const targetId = text;
-                    if (!targetId || isNaN(targetId)) {
-                        bot.sendMessage(chatId, "⚠️ ID должен состоять только из цифр. Повторите ввод:");
-                        return;
-                    }
-
-                    let user = await dbGetUser(targetId);
-                    
-                    if (state === 'awaiting_ban') {
-                        if (!user) {
-                            user = { id: targetId, username: "unknown", first_name: "Неизвестный", balance: 0.0, avatar_url: "https://img.icons8.com/color/96/user.png", last_daily_case_open: null, is_banned: true };
-                        } else {
-                            user.is_banned = true;
-                        }
-                        await dbSaveUser(targetId, user);
-                        
-                        const banMsg = "🚫 **Игрок заблокирован!**\n\n" +
-                                       "**ID:** `" + targetId + "`\n" +
-                                       "**Имя:** @" + user.username + " (" + user.first_name + ")\n\n" +
-                                       "Доступ к Web App для него мгновенно закрыт.";
-                        bot.sendMessage(chatId, banMsg, { parse_mode: "Markdown" });
-                    
-                    } else if (state === 'awaiting_unban') {
-                        if (!user) {
-                            user = { id: targetId, username: "unknown", first_name: "Неизвестный", balance: 50.0, avatar_url: "https://img.icons8.com/color/96/user.png", last_daily_case_open: null, is_banned: false };
-                        } else {
-                            user.is_banned = false;
-                        }
-                        await dbSaveUser(targetId, user);
-                        
-                        const unbanMsg = "✅ **Игрок успешно разблокирован!**\n\n" +
-                                         "**ID:** `" + targetId + "`\n" +
-                                         "**Имя:** @" + user.username + " (" + user.first_name + ")\n\n" +
-                                         "Доступ к приложению восстановлен.";
-                        bot.sendMessage(chatId, unbanMsg, { parse_mode: "Markdown" });
-                    
-                    } else if (state === 'awaiting_status') {
-                        if (!user) {
-                            bot.sendMessage(chatId, "🔍 Пользователь с ID `" + targetId + "` не найден в базе данных.", { parse_mode: "Markdown" });
-                        } else {
-                            const bannedStatus = user.is_banned ? "Забанен 🚫" : "Активен ✅";
-                            const statusMsg = "🔍 **Информация о профиле:**\n\n" +
-                                              "**ID:** `" + targetId + "`\n" +
-                                              "**Имя:** @" + user.username + " (" + user.first_name + ")\n" +
-                                              "**Баланс:** " + parseFloat(user.balance || 0).toFixed(3) + " GRAM\n" +
-                                              "**Статус блокировки:** " + bannedStatus + "\n" +
-                                              "**Последний бонус:** " + (user.last_daily_case_open || "Не открывал");
-                            bot.sendMessage(chatId, statusMsg, { parse_mode: "Markdown" });
-                        }
-                    }
-
-                    delete adminStates[chatId]; 
-                    return;
-                }
-            } else {
-                if (text === '/ban' || text === '/unban' || text === '/status' || text.startsWith('/addbalance')) {
-                    bot.sendMessage(chatId, "⚠️ У вас нет прав администратора для выполнения этой команды.");
-                }
-            }
-        } catch (err) {
-            console.error("Error processing message event:", err.message);
-        }
-    });
-}
-
 // Состояние раундов Арены
 let arenaState = {
     status: "waiting", 
@@ -428,9 +259,7 @@ function loadArenaState() {
         if (fs.existsSync(localArenaFile)) {
             const data = JSON.parse(fs.readFileSync(localArenaFile, 'utf8'));
             if (data && typeof data === 'object') {
-                // ПРИОРИТИЗАЦИЯ СОХРАНЕННОГО НОМЕРА РАУНДА
                 arenaState.roundNumber = data.roundNumber || arenaState.roundNumber; 
-                // Остальные поля сбрасываются для нового старта сервера, кроме раундНумбер
                 arenaState.bets = []; 
                 arenaState.status = "waiting"; 
                 arenaState.timeLeft = 15;
@@ -535,7 +364,6 @@ async function resolveArenaRound() {
         arenaState.resolvedAt = Date.now();
         arenaState.status = "finished";
         
-        // 8 секунд на красивую анимацию + поздравление на клиенте
         arenaState.timeLeft = 8; 
         saveArenaState();
         console.log(`[ARENA] 🏆 Победитель: @${winnerBet.username} (ID: ${winnerBet.userId}) Банк: ${pool} GRAM! x=${coords.x}, y=${coords.y}`);
