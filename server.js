@@ -14,15 +14,13 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Логирование запросов в консоль Render
 app.use((req, res, next) => {
     if (req.path.startsWith('/api/')) {
-        console.log(`[API REQUEST] ${req.method} ${req.path}`);
+        console.log(`[API] ${req.method} ${req.path}`);
     }
     next();
 });
 
-// 🛡️ ГЛОБАЛЬНЫЙ ЩИТ ОТ ЛЮБЫХ ПАДЕНИЙ СЕРВЕРА
 process.on('uncaughtException', (err) => {
     console.error('⛔ СИСТЕМНЫЙ ПЕРЕХВАТ ОШИБКИ:', err.stack || err);
 });
@@ -31,7 +29,6 @@ process.on('unhandledRejection', (reason, promise) => {
     console.error('⛔ СИСТЕМНЫЙ ПЕРЕХВАТ НЕОБРАБОТАННОГО ПРОМИСА:', reason);
 });
 
-// СТАБИЛЬНАЯ ПАЛИТРА ЦВЕТОВ НА БЭКЕНДЕ
 const defaultColors = ['#8d3df5', '#00e676', '#0088cc', '#ff9500', '#ff3b30', '#c25dff'];
 function getUserColor(userId, roundNumber) {
     const idStr = String(userId || 'guest') + "_" + String(roundNumber || 1);
@@ -43,7 +40,6 @@ function getUserColor(userId, roundNumber) {
     return defaultColors[index];
 }
 
-// ⚡ ОЧЕРЕДЬ ОПЕРАЦИЙ ДЛЯ ИСКЛЮЧЕНИЯ БАГОВ КОНКУРЕНТНОЙ ЗАПИСИ
 const userQueues = {};
 function enqueueUserAction(userId, actionFn) {
     const idStr = String(userId);
@@ -59,7 +55,6 @@ function enqueueUserAction(userId, actionFn) {
     return nextPromise;
 }
 
-// НАСТРОЙКИ TG-БОТА И КОШЕЛЬКА
 const BOT_TOKEN = String(process.env.TELEGRAM_BOT_TOKEN || process.env.BOT_TOKEN || '').trim().replace(/^["']|["']$/g, '');
 const ADMIN_CHAT_ID = String(process.env.ADMIN_TELEGRAM_ID || process.env.ADMIN_CHAT_ID || '').trim().replace(/^["']|["']$/g, '');
 const DEPOSIT_ADDRESS = String(process.env.DEPOSIT_ADDRESS || 'EQC3481up9_gG98_wK8Jv_Zz1yLp9p0_Y-7Jv7x4b9a9JKe6').trim().replace(/^["']|["']$/g, '');
@@ -103,7 +98,6 @@ if (BOT_TOKEN && BOT_TOKEN !== "undefined" && BOT_TOKEN !== "") {
     }
 }
 
-// СПИСОК ВСЕХ ДОСТУПНЫХ ПОДАРКОВ
 const ALL_GIFT_ITEMS = {
     1: { name: "Статуя птицы серая", value: 20.0, icon: "/Images/Items/rare_bird.jpg" },
     2: { name: "Тыква", value: 8.0, icon: "/Images/Items/pumpkin.jpg" },
@@ -129,7 +123,6 @@ const ALL_GIFT_ITEMS = {
     112: { name: "Мишка классический", value: 0.11, icon: "/Images/Items/michka.jpg" }
 };
 
-// ИНИЦИАЛИЗАЦИЯ И СВЯЗЬ С БД
 let pgPool = null;
 const localUsersFile = path.join(__dirname, 'database_users.json');
 const localInvFile = path.join(__dirname, 'database_inventory.json');
@@ -148,7 +141,6 @@ if (process.env.DATABASE_URL) {
     });
 }
 
-// УНИВЕРСАЛЬНЫЕ МЕТОДЫ РАБОТЫ С ДАННЫМИ
 async function dbGetUser(id) {
     try {
         if (pgPool) {
@@ -241,7 +233,6 @@ async function dbRemoveInventoryItem(userId, itemId) {
     }
 }
 
-// ОБРАБОТКА TG КОМАНД С ПРОВЕРКОЙ НА АДМИНА
 if (bot) {
     bot.on('callback_query', async (callbackQuery) => {
         const action = callbackQuery.data; 
@@ -414,9 +405,8 @@ if (bot) {
     });
 }
 
-// 🎰 СОСТОЯНИЕ ИГРЫ ARENA
 let arenaState = {
-    status: "waiting", // waiting, countdown, finished
+    status: "waiting", 
     roundNumber: 1,
     bets: [],
     timeLeft: 15,
@@ -456,7 +446,6 @@ function saveArenaState() {
 
 loadArenaState();
 
-// Игровой цикл бэкенда с подробным логированием процессов (Решает проблему зависания раундов)
 setInterval(() => {
     try {
         let stateChanged = false;
@@ -533,7 +522,6 @@ async function resolveArenaRound() {
         arenaState.resolvedAt = Date.now();
         arenaState.status = "finished";
         
-        // ⚡ БЕЗОПАСНЫЙ ТАЙМАУТ FINISHED-РАУНДА НА СЕРВЕРЕ (8 СЕКУНД)
         arenaState.timeLeft = 8; 
         saveArenaState();
         console.log(`[ARENA] 🏆 Победитель определен: @${winnerBet.username} (ID: ${winnerBet.userId}) с банком ${pool} GRAM! Координаты шара: x=${coords.x}, y=${coords.y}`);
@@ -546,7 +534,6 @@ async function resolveArenaRound() {
         }
     } catch (err) {
         console.error("[ARENA] ❌ Критическая ошибка розыгрыша раунда:", err);
-        // Аварийный сброс, чтобы игра не зависала намертво
         arenaState.status = "waiting";
         arenaState.timeLeft = 15;
         saveArenaState();
@@ -572,7 +559,6 @@ function generateCoordsForWinner(winnerIndex, bets) {
             if (u + v > 1) { u = 1 - u; v = 1 - v; }
             return { x: Math.max(45, u * sizeX), y: Math.max(45, v * sizeY) };
         } else {
-            // Лимит итераций для защиты от зависаний while(true)
             for (let attempt = 0; attempt < 500; attempt++) {
                 let rx = 45 + Math.random() * 230;
                 let ry = 45 + Math.random() * 230;
@@ -735,7 +721,6 @@ function getCornerAnglesRad() {
     ].map(a => (a < 0 ? a + 2 * Math.PI : a));
 }
 
-// АВТОРИЗАЦИЯ И ПОЛУЧЕНИЕ ПОЛЬЗОВАТЕЛЯ ИЗ БД
 async function getOrCreateUser(initDataUnsafe) {
     const tgUser = initDataUnsafe?.user || { id: "guest_user_id", username: "Пользователь", first_name: "Пользователь" };
     const id = String(tgUser.id);
@@ -756,7 +741,6 @@ async function getOrCreateUser(initDataUnsafe) {
     return user;
 }
 
-// MIDDLEWARE С ЖЕСТКОЙ БЛОКИРОВКОЙ ЗАБАНЕННЫХ
 async function parseTelegramInitData(req, res, next) {
     const rawHeader = req.headers['x-telegram-init-data'];
     let initDataUnsafe = {};
@@ -782,7 +766,6 @@ async function parseTelegramInitData(req, res, next) {
     next();
 }
 
-// API РОУТЫ
 app.get('/api/user', parseTelegramInitData, (req, res) => {
     const user = req.user;
     const isAdmin = String(user.id).trim() === String(ADMIN_CHAT_ID).trim();
@@ -799,7 +782,6 @@ app.get('/api/user', parseTelegramInitData, (req, res) => {
     });
 });
 
-// МОМЕНТАЛЬНОЕ НАЧИСЛЕНИЕ БАЛАНСА ПОСЛЕ TON ТРАНЗАКЦИИ
 app.post('/api/verify_payment', parseTelegramInitData, async (req, res) => {
     const { amount } = req.body;
     const paymentAmount = parseFloat(amount);
@@ -825,7 +807,6 @@ app.post('/api/verify_payment', parseTelegramInitData, async (req, res) => {
     });
 });
 
-// ДЕПОЗИТ ВЫБОРОЧНЫХ NFT
 app.post('/api/deposit_gift_request', parseTelegramInitData, async (req, res) => {
     const { itemId } = req.body;
     const gift = ALL_GIFT_ITEMS[itemId];
@@ -861,7 +842,6 @@ app.get('/api/inventory', parseTelegramInitData, async (req, res) => {
     res.json(userInventory);
 });
 
-// ПРОДАЖА ПОДАРКА ИЗ ИНВЕНТАРЯ (С ОЧЕРЕДЬЮ!)
 app.post('/api/sell_gift', parseTelegramInitData, async (req, res) => {
     const { itemId, price } = req.body;
     const userId = req.user.id;
@@ -900,7 +880,6 @@ app.post('/api/withdraw_gift', parseTelegramInitData, async (req, res) => {
     res.json({ success: true });
 });
 
-// СТАВКА В АРЕНУ (100% ГАРАНТИЯ И ПРЕДОТВРАЩЕНИЕ ОШИБОК)
 app.post('/api/place_bet', parseTelegramInitData, async (req, res) => {
     const userId = req.user.id;
 
@@ -970,7 +949,6 @@ app.get('/api/arena/state', parseTelegramInitData, (req, res) => {
     });
 });
 
-// ОТКРЫТИЕ ЕЖЕДНЕВНОГО КЕЙСА
 app.post('/api/open_daily_case', parseTelegramInitData, async (req, res) => {
     const userId = req.user.id;
 
@@ -1010,7 +988,6 @@ app.post('/api/open_daily_case', parseTelegramInitData, async (req, res) => {
     });
 });
 
-// ОТКРЫТИЕ КЕЙСА НОВИЧКА
 app.post('/api/open_newbie_case', parseTelegramInitData, async (req, res) => {
     const userId = req.user.id;
 
@@ -1053,7 +1030,6 @@ app.get('/api/daily_case_info', (req, res) => {
     res.json({ channel_username: "@BestGiftsChannel" });
 });
 
-// АДРЕС ПОПОЛНЕНИЯ
 app.get('/api/deposit_address', (req, res) => {
     res.json({ address: DEPOSIT_ADDRESS });
 });
