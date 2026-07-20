@@ -356,7 +356,13 @@ if (bot) {
                             user.is_banned = true;
                         }
                         await dbSaveUser(targetId, user);
-                        bot.sendMessage(chatId, `🚫 **Игрок заблокирован!**\n\nID: `${targetId}`\nИмя: @${user.username}\nДоступ заблокирован.`, { parse_mode: "Markdown" });
+                        
+                        // 🌟 ИСПРАВЛЕННЫЕ СТРОКИ С ДВОЙНЫМИ КАВЫЧКАМИ (УСТРАНЁН CRASH СЕРВЕРА!)
+                        const banMsg = "🚫 **Игрок заблокирован!**\n\n" +
+                                       "**ID:** `" + targetId + "`\n" +
+                                       "**Имя:** @" + user.username + " (" + user.first_name + ")\n\n" +
+                                       "Доступ к Web App для него мгновенно закрыт.";
+                        bot.sendMessage(chatId, banMsg, { parse_mode: "Markdown" });
                     
                     } else if (state === 'awaiting_unban') {
                         if (!user) {
@@ -365,22 +371,38 @@ if (bot) {
                             user.is_banned = false;
                         }
                         await dbSaveUser(targetId, user);
-                        bot.sendMessage(chatId, `✅ **Игрок успешно разблокирован!**\n\nID: `${targetId}`\nИмя: @${user.username}\nДоступ восстановлен.`, { parse_mode: "Markdown" });
+                        
+                        const unbanMsg = "✅ **Игрок успешно разблокирован!**\n\n" +
+                                         "**ID:** `" + targetId + "`\n" +
+                                         "**Имя:** @" + user.username + " (" + user.first_name + ")\n\n" +
+                                         "Доступ к приложению восстановлен.";
+                        bot.sendMessage(chatId, unbanMsg, { parse_mode: "Markdown" });
                     
                     } else if (state === 'awaiting_status') {
                         if (!user) {
-                            bot.sendMessage(chatId, "🔍 Пользователь не найден.", { parse_mode: "Markdown" });
+                            bot.sendMessage(chatId, "🔍 Пользователь с ID `" + targetId + "` не найден в базе данных.", { parse_mode: "Markdown" });
                         } else {
                             const bannedStatus = user.is_banned ? "Забанен 🚫" : "Активен ✅";
-                            bot.sendMessage(chatId, `🔍 **Информация о профиле:**\n\nID: `${targetId}`\nИмя: @${user.username}\nБаланс: ${parseFloat(user.balance || 0).toFixed(3)} GRAM\nСтатус: ${bannedStatus}`, { parse_mode: "Markdown" });
+                            const statusMsg = "🔍 **Информация о профиле:**\n\n" +
+                                              "**ID:** `" + targetId + "`\n" +
+                                              "**Имя:** @" + user.username + " (" + user.first_name + ")\n" +
+                                              "**Баланс:** " + parseFloat(user.balance || 0).toFixed(3) + " GRAM\n" +
+                                              "**Статус блокировки:** " + bannedStatus + "\n" +
+                                              "**Последний бонус:** " + (user.last_daily_case_open || "Не открывал");
+                            bot.sendMessage(chatId, statusMsg, { parse_mode: "Markdown" });
                         }
                     }
+
                     delete adminStates[chatId]; 
                     return;
                 }
+            } else {
+                if (text === '/ban' || text === '/unban' || text === '/status' || text.startsWith('/addbalance')) {
+                    bot.sendMessage(chatId, "⚠️ У вас нет прав администратора для выполнения этой команды.");
+                }
             }
         } catch (err) {
-            console.error("Bot general error:", err.message);
+            console.error("Error processing message event:", err.message);
         }
     });
 }
@@ -409,11 +431,11 @@ function loadArenaState() {
                     arenaState.status = "waiting";
                     arenaState.timeLeft = 15;
                 }
-                console.log("SUCCESS: Arena State restored. Bets: " + arenaState.bets.length);
+                console.log("SUCCESS: Arena State restored. Active bets count: " + arenaState.bets.length);
             }
         }
     } catch (e) {
-        console.error("Error loading Arena:", e.message);
+        console.error("Error loading Arena State:", e.message);
     }
 }
 
@@ -421,13 +443,13 @@ function saveArenaState() {
     try {
         fs.writeFileSync(localArenaFile, JSON.stringify(arenaState, null, 2));
     } catch (e) {
-        console.error("Error saving Arena:", e.message);
+        console.error("Error saving Arena State:", e.message);
     }
 }
 
 loadArenaState();
 
-// Игровой цикл бэкенда (Таймаут конца раунда увеличен до 8 секунд, чтобы анимация на клиентах не сбрасывалась досрочно!)
+// Игровой цикл бэкенда (Время фазы finished установлено на безопасные 8 секунд)
 setInterval(() => {
     try {
         let stateChanged = false;
@@ -442,7 +464,7 @@ setInterval(() => {
             arenaState.timeLeft--;
             stateChanged = true;
             if (arenaState.timeLeft <= 0) {
-                resolveArenaRound().catch(e => console.error("Error resolving:", e.message));
+                resolveArenaRound().catch(e => console.error("Error resolving round:", e.message));
             }
         } else if (arenaState.status === "finished") {
             arenaState.timeLeft--;
@@ -500,7 +522,7 @@ async function resolveArenaRound() {
     arenaState.resolvedAt = Date.now();
     arenaState.status = "finished";
     
-    // ⚡ БЕЗОПАСНОЕ ВРЕМЯ НА ХОД ШАРИКА И ПОДСВЕТКУ У КЛИЕНТОВ (8 СЕКУНД)
+    // ⚡ БЕЗОПАСНЫЙ ТАЙМАУТ FINISHED-РАУНДА НА СЕРВЕРЕ (8 СЕКУНД)
     arenaState.timeLeft = 8; 
     saveArenaState();
 
@@ -517,7 +539,7 @@ function generateCoordsForWinner(winnerIndex, bets) {
     const shares = calculateShares(bets);
 
     if (N === 1) {
-        return { x: 80 + Math.random() * 160, y: 80 + Math.random() * 160 };
+        return { x: 60 + Math.random() * 200, y: 60 + Math.random() * 200 };
     }
 
     if (N === 2) {
@@ -528,11 +550,11 @@ function generateCoordsForWinner(winnerIndex, bets) {
             let u = Math.random();
             let v = Math.random();
             if (u + v > 1) { u = 1 - u; v = 1 - v; }
-            return { x: Math.max(50, u * sizeX), y: Math.max(50, v * sizeY) };
+            return { x: Math.max(35, u * sizeX), y: Math.max(35, v * sizeY) };
         } else {
             while (true) {
-                let rx = 50 + Math.random() * 220;
-                let ry = 50 + Math.random() * 220;
+                let rx = 35 + Math.random() * 250;
+                let ry = 35 + Math.random() * 250;
                 if (!(rx / sizeX + ry / sizeY <= 1)) {
                     return { x: rx, y: ry };
                 }
@@ -575,8 +597,8 @@ function generateCoordsForWinner(winnerIndex, bets) {
 
             const centroid = getPolygonCentroid(pathPoints);
             return {
-                x: Math.max(55, Math.min(265, centroid.x + (Math.random() * 10 - 5))),
-                y: Math.max(55, Math.min(265, centroid.y + (Math.random() * 10 - 5)))
+                x: Math.max(40, Math.min(280, centroid.x + (Math.random() * 14 - 7))),
+                y: Math.max(40, Math.min(280, centroid.y + (Math.random() * 14 - 7)))
             };
         }
         currentAngle = nextAngle;
