@@ -31,7 +31,7 @@ process.on('unhandledRejection', (reason, promise) => {
     console.error('⛔ СИСТЕМНЫЙ ПЕРЕХВАТ НЕОБРАБОТАННОГО ПРОМИСА:', reason);
 });
 
-// Новая премиальная, контрастная цветовая палитра игроков
+// Премиальная, контрастная цветовая палитра игроков
 const defaultColors = ['#ff3b30', '#4cd964', '#007aff', '#ffcc00', '#5856d6', '#ff2d55', '#5ac8fa', '#00e676', '#ff9500', '#0088cc'];
 function getUserColor(userId, roundNumber) {
     const idStr = String(userId || 'guest') + "_" + String(roundNumber || 1);
@@ -72,7 +72,6 @@ if (BOT_TOKEN && BOT_TOKEN !== "undefined" && BOT_TOKEN !== "") {
         console.log("SUCCESS: Telegram Bot successfully initialized.");
 
         bot.on('polling_error', (error) => {
-            // Бесшумное логирование конфликтов сессии при перезапуске Render
             if (!error.message.includes('409 Conflict')) {
                 console.warn("⚠️ Предупреждение Polling:", error.message);
             }
@@ -287,7 +286,7 @@ function saveArenaState() {
 
 loadArenaState();
 
-// Главный бесконечный цикл Арены (1 шаг в 1 секунду)
+// Главный бесконечный цикл Арены
 setInterval(() => {
     try {
         let stateChanged = false;
