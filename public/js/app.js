@@ -24,40 +24,8 @@ tg.ready();
             object-fit: cover !important;
             pointer-events: none !important;
             z-index: 5 !important;
-            transition: opacity 0.3s ease-in-out !important;
         }
 
-        /* Плавные переходы для плавного затухания (fade-out) элементов */
-        #arena-ball-svg, #arena-svg-canvas, #arena-avatars-container {
-            transition: opacity 0.3s ease-in-out !important;
-            opacity: 1;
-        }
-        .fade-out {
-            opacity: 0 !important;
-        }
-        
-        /* УЛЬТИМАТИВНЫЙ БЕЛЫЙ СВЕТЯЩИЙСЯ ШАРИК (перебивает все другие синие стили) */
-        .game-card.game-arena-trigger .ball,
-        .game-card.game-arena-trigger circle,
-        .game-card .ball,
-        .game-card circle,
-        #game-arena-trigger .ball,
-        #game-arena-trigger circle,
-        div.game-arena-trigger div.ball,
-        div.game-arena-trigger circle,
-        .best-arena-preview .ball,
-        .arena-preview-ball,
-        [class*="arena"] [class*="ball"],
-        [class*="preview"] [class*="ball"],
-        #arena-preview-ball {
-            background: #ffffff !important;
-            background-color: #ffffff !important;
-            fill: #ffffff !important; 
-            color: #ffffff !important; 
-            box-shadow: 0 0 14px #ffffff, 0 0 28px #ffffff !important;
-            filter: drop-shadow(0 0 8px #ffffff) !important;
-        }
-        
         /* Предотвращение искажения (кривого растягивания) SVG-элементов */
         #arena-svg-canvas, #arena-ball-svg {
             position: absolute;
@@ -67,7 +35,40 @@ tg.ready();
             height: 100%;
             border-radius: 16px;
             overflow: hidden;
+            background: transparent !important; /* Убирает белый фон холста */
             aspect-ratio: 1/1 !important;
+        }
+
+        /* ТОЧЕЧНЫЙ, ИДЕАЛЬНЫЙ СТИЛЬ ШАРИКА НА ГЛАВНОМ ЭКРАНЕ (Без белых квадратов-подложек!) */
+        .game-arena-trigger .ball,
+        .best-arena-preview .ball,
+        .arena-preview-ball,
+        #arena-preview-ball {
+            background: #ffffff !important;
+            background-color: #ffffff !important;
+            border-radius: 50% !important;
+            width: 12px !important;
+            height: 12px !important;
+            box-shadow: 0 0 10px #ffffff, 0 0 20px #ffffff !important;
+            filter: drop-shadow(0 0 4px #ffffff) !important;
+        }
+
+        /* Убирает белый фон у любых контейнеров и оберток шарика на главной */
+        .game-arena-trigger .ball-container,
+        .game-arena-trigger .ball-wrapper,
+        .best-arena-preview .ball-container,
+        .best-arena-preview .ball-wrapper {
+            background: transparent !important;
+            background-color: transparent !important;
+            box-shadow: none !important;
+            filter: none !important;
+        }
+
+        /* Физический шарик внутри самой игры на SVG холсте */
+        #physics-ball {
+            fill: #ffffff !important;
+            r: 8 !important;
+            filter: drop-shadow(0 0 6px #ffffff) !important;
         }
         
         /* Красивое неоновое свечение победившего сектора */
@@ -152,7 +153,7 @@ function createPRNG(seedString) {
     }
 }
 
-// Новая яркая, контрастная цветовая палитра игроков
+// Премиальная контрастная цветовая палитра
 const defaultColors = ['#ff3b30', '#4cd964', '#007aff', '#ffcc00', '#5856d6', '#ff2d55', '#5ac8fa', '#00e676', '#ff9500', '#0088cc'];
 
 function getUserColor(userId, roundNumber) {
@@ -930,7 +931,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const container = document.getElementById('arena-avatars-container');
             if (!container) return;
 
-            // Сверхнадежная защита от перекрытия центра (где таймер и шарик!)
+            // Защита от перекрытия центра (где таймер и шарик!)
             const centerX = 160;
             const centerY = 160;
             let dx = x - centerX;
@@ -938,7 +939,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             let dist = Math.sqrt(dx * dx + dy * dy);
             
             if (dist < 75) {
-                // Выталкиваем аватарку на безопасный радиус 85px от центра
                 if (dist < 2) {
                     x = centerX + 60;
                     y = centerY + 60;
@@ -1248,25 +1248,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             const statusText = document.getElementById('arena-status-text');
             const countdownTimer = document.getElementById('arena-countdown-timer');
 
-            // Мягкое плавное затухание (fade-out) перед очисткой
-            if (ballCanvas) ballCanvas.classList.add('fade-out');
-            if (svgCanvas) svgCanvas.classList.add('fade-out');
-            if (avatarsContainer) avatarsContainer.classList.add('fade-out');
-
-            setTimeout(() => {
-                if (ballCanvas) {
-                    ballCanvas.innerHTML = '';
-                    ballCanvas.classList.remove('fade-out');
-                }
-                if (svgCanvas) {
-                    svgCanvas.innerHTML = '';
-                    svgCanvas.classList.remove('fade-out');
-                }
-                if (avatarsContainer) {
-                    avatarsContainer.innerHTML = '';
-                    avatarsContainer.classList.remove('fade-out');
-                }
-            }, 300); 
+            if (ballCanvas) ballCanvas.innerHTML = '';
+            if (svgCanvas) svgCanvas.innerHTML = '';
+            if (avatarsContainer) avatarsContainer.innerHTML = '';
 
             if (statusText) {
                 statusText.classList.remove('hidden'); 
@@ -1275,8 +1259,12 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (countdownTimer) countdownTimer.classList.add('hidden');
 
             safeSetText(elements.arenaPlayersTotal, '0');
+            
+            // Синхронный сброс и полная перерисовка интерфейса в исходное "чистое" состояние
             arenaPlayers = []; 
             localExpectedBetAmount = 0; 
+            drawArenaSegments();
+            updatePlayersListUI();
             renderBetButtons(); 
         }
 
@@ -1319,6 +1307,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                     if (correctRoundNumber === lastClearedRoundNumber && arenaStatusStr !== 'countdown') {
                         if (arenaStatusStr === 'waiting') {
+                            // Обязательно перерисовываем пустой экран при ожидании нового раунда
+                            drawArenaSegments();
+                            updatePlayersListUI();
                             renderBetButtons();
                             updateBalanceUI();
                             if (isPollingActive && !isBallAnimating && !forceInstant) {
@@ -1527,7 +1518,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         function startArenaPolling() {
             if (isPollingActive) return;
             
-            // СБРОС ЛОКАЛЬНЫХ ФЛАГОВ БЛОКИРОВКИ ПРИ ВХОДЕ В АРЕНУ
+            // СБРОС ФЛАГОВ ДЛЯ МОМЕНТАЛЬНОЙ СИНХРОНИЗАЦИИ ПРИ ВХОДЕ
             lastAnimatedRound = null;
             lastShowedWinnerRound = null;
             lastClearedRoundNumber = null;
