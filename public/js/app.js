@@ -26,7 +26,7 @@ tg.ready();
             z-index: 5 !important;
         }
 
-        /* Предотвращение искажения (кривого растягивания) SVG-элементов */
+        /* Предотвращение искажения SVG-элементов (без белых наложений!) */
         #arena-svg-canvas, #arena-ball-svg {
             position: absolute;
             top: 0;
@@ -35,40 +35,46 @@ tg.ready();
             height: 100%;
             border-radius: 16px;
             overflow: hidden;
-            background: transparent !important; /* Убирает белый фон холста */
+            background: transparent !important; /* Гарантия отсутствия белого фона */
             aspect-ratio: 1/1 !important;
         }
 
-        /* ТОЧЕЧНЫЙ, ИДЕАЛЬНЫЙ СТИЛЬ ШАРИКА НА ГЛАВНОМ ЭКРАНЕ (Без белых квадратов-подложек!) */
+        /* 100% Защита: отключаем фоны у всех контейнеров, чтобы исключить появление белых квадратов */
+        .ball-container,
+        .ball-wrapper,
+        .ball-svg,
+        #arena-ball-svg,
+        .arena-ball-svg,
+        [class*="ball-container"],
+        [class*="ball-wrapper"] {
+            background: transparent !important;
+            background-color: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+            filter: none !important;
+        }
+
+        /* ИДЕАЛЬНЫЙ БЕЛЫЙ ШАРИК С КРАСИВЫМ НЕОНОВЫМ СВЕЧЕНИЕМ НА ГЛАВНОМ ЭКРАНЕ (Best Arena) */
         .game-arena-trigger .ball,
+        .game-card .ball,
         .best-arena-preview .ball,
+        #arena-preview-ball,
         .arena-preview-ball,
-        #arena-preview-ball {
+        .game-arena-trigger div.ball {
             background: #ffffff !important;
             background-color: #ffffff !important;
             border-radius: 50% !important;
             width: 12px !important;
             height: 12px !important;
-            box-shadow: 0 0 10px #ffffff, 0 0 20px #ffffff !important;
-            filter: drop-shadow(0 0 4px #ffffff) !important;
-        }
-
-        /* Убирает белый фон у любых контейнеров и оберток шарика на главной */
-        .game-arena-trigger .ball-container,
-        .game-arena-trigger .ball-wrapper,
-        .best-arena-preview .ball-container,
-        .best-arena-preview .ball-wrapper {
-            background: transparent !important;
-            background-color: transparent !important;
-            box-shadow: none !important;
-            filter: none !important;
+            box-shadow: 0 0 12px #ffffff, 0 0 24px #ffffff, 0 0 35px #ffffff !important;
+            filter: drop-shadow(0 0 6px #ffffff) !important;
         }
 
         /* Физический шарик внутри самой игры на SVG холсте */
         #physics-ball {
             fill: #ffffff !important;
             r: 8 !important;
-            filter: drop-shadow(0 0 6px #ffffff) !important;
+            filter: drop-shadow(0 0 8px #ffffff) !important;
         }
         
         /* Красивое неоновое свечение победившего сектора */
@@ -239,7 +245,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     if (isBallAnimating) {
                         console.warn("[ARENA CLIENT] Сработал предохранитель! Анимация сброшена.");
                         isBallAnimating = false;
-                        clearArenaRoundUi(); 
+                        clearArenaRoundUi(true); 
                         fetchUserData();
                     }
                 }, ANIMATION_DURATION_MS + POST_ANIMATION_GLOW_DURATION_MS + 1000); 
@@ -773,8 +779,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                     rect.setAttribute("height", "100%");
                     rect.setAttribute("fill", arenaPlayers[0].color || '#ff3b30');
                     rect.setAttribute("data-user-id", arenaPlayers[0].userId);
-                    rect.setAttribute("stroke", "#120f26"); 
-                    rect.setAttribute("stroke-width", "4"); 
+                    rect.setAttribute("stroke", "rgba(255, 255, 255, 0.25)"); /* Приятный полупрозрачный белый вместо черного */
+                    rect.setAttribute("stroke-width", "3"); 
                     svg.appendChild(rect);
                     
                     createAvatarElement(CX, 240, arenaPlayers[0].avatar, 56); 
@@ -791,8 +797,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                     poly1.setAttribute("points", p1Pts.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' '));
                     poly1.setAttribute("fill", arenaPlayers[0].color || '#ff3b30'); 
                     poly1.setAttribute("data-user-id", arenaPlayers[0].userId);
-                    poly1.setAttribute("stroke", "#120f26"); 
-                    poly1.setAttribute("stroke-width", "4"); 
+                    poly1.setAttribute("stroke", "rgba(255, 255, 255, 0.35)"); /* Приятная светлая обводка */
+                    poly1.setAttribute("stroke-width", "3"); 
+                    poly1.setAttribute("stroke-linejoin", "round");
                     svg.appendChild(poly1);
 
                     const poly2 = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
@@ -802,8 +809,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                     poly2.setAttribute("points", p2Pts.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' '));
                     poly2.setAttribute("fill", arenaPlayers[1].color || '#00e676'); 
                     poly2.setAttribute("data-user-id", arenaPlayers[1].userId);
-                    poly2.setAttribute("stroke", "#120f26"); 
-                    poly2.setAttribute("stroke-width", "4"); 
+                    poly2.setAttribute("stroke", "rgba(255, 255, 255, 0.35)"); /* Приятная светлая обводка */
+                    poly2.setAttribute("stroke-width", "3"); 
+                    poly2.setAttribute("stroke-linejoin", "round");
                     svg.appendChild(poly2);
 
                     const c1 = getPolygonCentroid(p1Pts);
@@ -863,8 +871,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                     poly.setAttribute("points", pathPoints.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' '));
                     poly.setAttribute("fill", player.color || '#5856d6');
                     poly.setAttribute("data-user-id", player.userId);
-                    poly.setAttribute("stroke", "#120f26"); 
-                    poly.setAttribute("stroke-width", "4"); 
+                    poly.setAttribute("stroke", "rgba(255, 255, 255, 0.35)"); /* Приятная светлая обводка */
+                    poly.setAttribute("stroke-width", "3"); 
+                    poly.setAttribute("stroke-linejoin", "round");
                     svg.appendChild(poly);
 
                     const c = getPolygonCentroid(pathPoints);
@@ -1241,14 +1250,15 @@ document.addEventListener('DOMContentLoaded', async () => {
             return merged;
         }
         
-        function clearArenaRoundUi() {
+        function clearArenaRoundUi(forceClearBall = false) {
             const ballCanvas = document.getElementById('arena-ball-svg');
             const svgCanvas = document.getElementById('arena-svg-canvas');
             const avatarsContainer = document.getElementById('arena-avatars-container');
             const statusText = document.getElementById('arena-status-text');
             const countdownTimer = document.getElementById('arena-countdown-timer');
 
-            if (ballCanvas) ballCanvas.innerHTML = '';
+            // Очищаем шарик только по принудительному сигналу при новой игре
+            if (forceClearBall && ballCanvas) ballCanvas.innerHTML = '';
             if (svgCanvas) svgCanvas.innerHTML = '';
             if (avatarsContainer) avatarsContainer.innerHTML = '';
 
@@ -1260,7 +1270,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             safeSetText(elements.arenaPlayersTotal, '0');
             
-            // Синхронный сброс и полная перерисовка интерфейса в исходное "чистое" состояние
             arenaPlayers = []; 
             localExpectedBetAmount = 0; 
             drawArenaSegments();
@@ -1305,20 +1314,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                     arenaStatusStr = state.status || state.state || "waiting";
 
-                    if (correctRoundNumber === lastClearedRoundNumber && arenaStatusStr !== 'countdown') {
-                        if (arenaStatusStr === 'waiting') {
-                            // Обязательно перерисовываем пустой экран при ожидании нового раунда
-                            drawArenaSegments();
-                            updatePlayersListUI();
-                            renderBetButtons();
-                            updateBalanceUI();
-                            if (isPollingActive && !isBallAnimating && !forceInstant) {
-                                setTimeout(pollArenaLoop, 1500);
-                            }
-                            return;
-                        }
-                    }
-
+                    // ПРЕЖДЕВРЕМЕННЫЙ RETURN ПОЛНОСТЬЮ УДАЛЕН ДЛЯ ОТОБРАЖЕНИЯ СТАВКИ ПЕРВОГО ИГРОКА!
                     const rawBets = state.bets || state.players || state.activeBets || [];
                     const serverPlayers = rawBets.map(bet => ({
                         userId: bet.userId || bet.user_id || bet.id || "",
@@ -1337,7 +1333,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         lastShowedWinnerRound = null;
                         lastClearedRoundNumber = null; 
                         
-                        clearArenaRoundUi(); 
+                        clearArenaRoundUi(true); // Сбрасываем шарик только при реальной смене раунда
                     }
 
                     if (arenaStatusStr === 'waiting' && serverPlayers.length === 0) {
@@ -1449,7 +1445,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                             }
 
                             setTimeout(() => {
-                                clearArenaRoundUi();
+                                clearArenaRoundUi(false); /* Оставляем шарик на экране на время "ожидания" */
                                 lastClearedRoundNumber = currentRoundNum; 
                                 setBallAnimating(false); 
                                 fetchUserData(); 
@@ -1482,7 +1478,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                             lastAnimatedRound = correctRoundNumber;
                             currentRoundSignature = signature;
                             
-                            clearArenaRoundUi();
+                            clearArenaRoundUi(false);
                             lastClearedRoundNumber = correctRoundNumber;
                             setBallAnimating(false);
                             fetchUserData();
@@ -1493,7 +1489,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         if (countdownTimer) countdownTimer.classList.add('hidden');
                         
                         if (!isBallAnimating && correctRoundNumber !== lastClearedRoundNumber) {
-                            clearArenaRoundUi(); 
+                            clearArenaRoundUi(false); 
                             lastClearedRoundNumber = null; 
                         }
 
@@ -1518,7 +1514,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         function startArenaPolling() {
             if (isPollingActive) return;
             
-            // СБРОС ФЛАГОВ ДЛЯ МОМЕНТАЛЬНОЙ СИНХРОНИЗАЦИИ ПРИ ВХОДЕ
             lastAnimatedRound = null;
             lastShowedWinnerRound = null;
             lastClearedRoundNumber = null;
@@ -1532,14 +1527,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             clearInterval(countdownIntervalId);
             countdownIntervalId = null;
             if (!isBallAnimating) {
-                 clearArenaRoundUi();
+                 clearArenaRoundUi(true);
                  lastClearedRoundNumber = currentServerRoundNumber; 
             }
         }
 
         function resetArenaGameUi() {
             stopArenaPolling();
-            clearArenaRoundUi();
+            clearArenaRoundUi(true);
             safeSetText(elements.arenaRoundNumber, currentServerRoundNumber); 
             setBallAnimating(false);
         }
@@ -1590,7 +1585,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 
                 if (res.ok && data.success) {
                     currentUser.balance = data.newBalance;
-                    // Мгновенный форсированный опрос Арены, чтобы забрать новые данные без задержек
                     setTimeout(() => { pollArenaLoop(true); }, 150);
                 } else {
                     triggerBalanceBadge(betValue);
