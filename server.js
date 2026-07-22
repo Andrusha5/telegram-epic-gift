@@ -16,10 +16,8 @@ app.use(express.static(path.join(__dirname, 'public')));
 process.on('uncaughtException', (err) => console.error('⛔ ОШИБКА:', err.stack || err));
 process.on('unhandledRejection', (reason) => console.error('⛔ ПРОМИС:', reason));
 
-// Конфигурация
 const ADMIN_CHAT_ID = String(process.env.ADMIN_TELEGRAM_ID || '').trim().replace(/^["']|["']$/g, '');
 const BOT_TOKEN = String(process.env.TELEGRAM_BOT_TOKEN || '').trim().replace(/^["']|["']$/g, '');
-const CHANNEL_USERNAME = String(process.env.CHANNEL_USERNAME || '').trim().replace(/^["']|["']$/g, '');
 
 let bot = null;
 if (BOT_TOKEN && BOT_TOKEN !== "undefined") {
@@ -38,7 +36,6 @@ if (process.env.DATABASE_URL) {
     pgPool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
 }
 
-// БАЗА ДАННЫХ
 async function dbGetUser(id) {
     try { if (pgPool) { const res = await pgPool.query("SELECT * FROM users WHERE id = $1", [String(id)]); return res.rows[0] || null; } } catch (e) { console.error("DB GetUser:", e.message); }
     return null;
@@ -108,10 +105,8 @@ const ALL_GIFT_ITEMS = {
     112: { name: "Мишка классический", value: 0.11, icon: "/Images/Items/michka.jpg" }
 };
 
-// Палитра ярких уникальных цветов
 const AVAILABLE_COLORS = ['#ff3b30', '#4cd964', '#007aff', '#ffcc00', '#5856d6', '#ff2d55', '#5ac8fa', '#00e676', '#ff9500', '#0088cc'];
 
-// АРЕНА
 let arenaState = { 
     status: "waiting", 
     roundNumber: 1, 
@@ -122,7 +117,7 @@ let arenaState = {
     winnerX: 160, 
     winnerY: 160, 
     totalPool: 0,
-    usedColors: [] // Храним цвета текущего раунда
+    usedColors: []
 };
 
 setInterval(() => {
@@ -142,7 +137,7 @@ setInterval(() => {
                 arenaState.winnerId = null; 
                 arenaState.totalPool = 0; 
                 arenaState.roundNumber++;
-                arenaState.usedColors = []; // Очищаем использованные цвета для нового раунда
+                arenaState.usedColors = [];
             }
         }
     } catch (err) { console.error("Arena interval error:", err); }
@@ -154,9 +149,8 @@ async function resolveArenaRound() {
     const rand = Math.random() * pool; let sum = 0; let winnerBet = arenaState.bets[0];
     for (let i = 0; i < arenaState.bets.length; i++) { sum += arenaState.bets[i].amount; if (rand <= sum) { winnerBet = arenaState.bets[i]; break; } }
     
-    // Координаты центра сектора победителя, чтобы шарик точно остановился в его зоне
-    const winnerX = 80 + Math.random() * 160; // Рандом по Х в пределах поля
-    const winnerY = 80 + Math.random() * 160; // Рандом по Y в пределах поля
+    const winnerX = 80 + Math.random() * 160;
+    const winnerY = 80 + Math.random() * 160;
 
     arenaState.winnerId = winnerBet.userId; 
     arenaState.winnerName = winnerBet.username;
@@ -173,7 +167,6 @@ async function resolveArenaRound() {
     }
 }
 
-// MIDDLEWARE
 async function getOrCreateUser(initDataUnsafe) {
     const tgUser = initDataUnsafe?.user || { id: "guest", username: "Пользователь", first_name: "Пользователь" };
     const id = String(tgUser.id);
@@ -192,7 +185,6 @@ async function parseTelegramInitData(req, res, next) {
     req.user = user; next();
 }
 
-// API РОУТЫ
 app.get('/api/user', parseTelegramInitData, (req, res) => res.json({ ...req.user, isAdmin: String(req.user.id).trim() === String(ADMIN_CHAT_ID).trim() }));
 
 app.post('/api/verify_payment', parseTelegramInitData, async (req, res) => {
@@ -206,7 +198,6 @@ app.post('/api/verify_payment', parseTelegramInitData, async (req, res) => {
     res.json({ success: true, newBalance: user.balance });
 });
 
-// ОТПРАВКА ПОДАРКА
 app.post('/api/send_gift', parseTelegramInitData, async (req, res) => {
     const { targetUsername, itemId } = req.body; const senderId = req.user.id;
     if (!targetUsername || !itemId) return res.status(400).json({ error: "Не указаны получатель или предмет" });
@@ -262,16 +253,12 @@ app.post('/api/place_bet', parseTelegramInitData, async (req, res) => {
     const user = await dbGetUser(userId);
     if (!user || parseFloat(user.balance) < amount) return res.status(400).json({ error: "Недостаточно баланса" });
 
-    // ВЫБОР УНИКАЛЬНОГО ЦВЕТА ДЛЯ ИГРОКА В ЭТОМ РАУНДЕ
     let chosenColor = '#8d3df5';
     const availableColors = AVAILABLE_COLORS.filter(c => !arenaState.usedColors.includes(c));
-    
     if (availableColors.length > 0) {
-        // Если есть свободные цвета, берем первый попавшийся (или рандомный)
         chosenColor = availableColors[Math.floor(Math.random() * availableColors.length)];
         arenaState.usedColors.push(chosenColor);
     } else {
-        // Если все цвета закончились (10+ игроков), берем рандомный и перезаписываем (так бывает редко)
         chosenColor = AVAILABLE_COLORS[Math.floor(Math.random() * AVAILABLE_COLORS.length)];
     }
 
@@ -281,7 +268,6 @@ app.post('/api/place_bet', parseTelegramInitData, async (req, res) => {
     const existingBet = arenaState.bets.find(b => String(b.userId) === String(user.id));
     if (existingBet) {
         existingBet.amount = parseFloat((existingBet.amount + amount).toFixed(3));
-        // Не меняем цвет, если игрок уже в раунде
     } else {
         arenaState.bets.push({ 
             userId: user.id, 
@@ -310,7 +296,6 @@ app.get('/api/arena/state', parseTelegramInitData, (req, res) => {
     });
 });
 
-// КЕЙСЫ
 app.post('/api/open_daily_case', parseTelegramInitData, async (req, res) => {
     const user = await dbGetUser(req.user.id); if (!user) return res.status(404).json({ error: "User not found" });
     const now = Date.now(); const cooldown = 24 * 60 * 60 * 1000; 
