@@ -9,10 +9,10 @@ tg.ready();
 (function injectStyles() {
     const style = document.createElement('style');
     style.innerHTML = `
-        .arena-player-avatar-node { position: absolute !important; transform: translate(-50%, -50%) !important; border-radius: 50% !important; border: 2px solid #ffffff !important; box-shadow: 0 0 8px rgba(0,0,0,0.8) !important; object-fit: cover !important; pointer-events: none !important; z-index: 5 !important; }
-        #arena-svg-canvas, #arena-ball-svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border-radius: 16px; overflow: hidden; background: #110e25 !important; }
-        #physics-ball { fill: #ffffff !important; r: 8 !important; filter: drop-shadow(0 0 12px #ffffff) !important; }
-        @keyframes winningSectorPulse { 0% { filter: drop-shadow(0 0 15px var(--glow-color)) brightness(1.2); stroke: #ffffff; stroke-width: 4px; } 50% { filter: drop-shadow(0 0 35px var(--glow-color)) brightness(1.7); stroke: #ffffff; stroke-width: 8px; } 100% { filter: drop-shadow(0 0 15px var(--glow-color)) brightness(1.2); stroke: #ffffff; stroke-width: 4px; } }
+        .arena-player-avatar-node { position: absolute !important; transform: translate(-50%, -50%) !important; border-radius: 50% !important; border: 3px solid #ffffff !important; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5) !important; object-fit: cover !important; pointer-events: none !important; z-index: 5 !important; }
+        #arena-svg-canvas, #arena-ball-svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border-radius: 16px; overflow: hidden; background: transparent !important; }
+        #physics-ball { fill: #ffffff !important; r: 8 !important; filter: drop-shadow(0 0 8px #ffffff) !important; }
+        @keyframes winningSectorPulse { 0% { filter: drop-shadow(0 0 15px var(--glow-color)) brightness(1.2); stroke: #ffffff; stroke-width: 5px; } 50% { filter: drop-shadow(0 0 35px var(--glow-color)) brightness(1.7); stroke: #ffffff; stroke-width: 8px; } 100% { filter: drop-shadow(0 0 15px var(--glow-color)) brightness(1.2); stroke: #ffffff; stroke-width: 5px; } }
         .winning-segment-glow { stroke: #ffffff !important; stroke-width: 6px !important; stroke-linejoin: round !important; animation: winningSectorPulse 0.35s infinite alternate !important; z-index: 100 !important; }
     `;
     document.head.appendChild(style);
@@ -32,11 +32,6 @@ if (!initDataHeader) {
 
 function formatUsername(name) { return name ? (name.length > 15 ? name.substring(0, 15) + "..." : name) : "Пользователь"; }
 function formatItemName(name) { return name ? name.replace(/\.(png|jpg|jpeg)$/i, '').replace(/_/g, ' ').trim() : ""; }
-function formatWalletAddress(rawAddress) {
-    if (!rawAddress) return "";
-    try { if (typeof TON_CONNECT_UI !== 'undefined' && TON_CONNECT_UI.toUserFriendlyAddress) { const friendly = TON_CONNECT_UI.toUserFriendlyAddress(rawAddress); return friendly.substring(0, 4) + "-..." + friendly.substring(friendly.length - 4); } } catch(e) {}
-    return rawAddress.substring(0, 4) + "-..." + rawAddress.substring(rawAddress.length - 4);
-}
 
 async function fetchWithTimeout(resource, options = {}) {
     const { timeout = 10000 } = options; const controller = new AbortController(); const id = setTimeout(() => controller.abort(), timeout);
@@ -63,17 +58,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         let isPollingActive = false;
         let isBallAnimating = false;
         let arenaStatusStr = "waiting";
-        let currentRoundData = {};
-
         let countdownIntervalId = null;
-        let localCountdownValue = 0;
 
         const safeSetText = (el, val) => { if (el) el.innerText = val; };
 
         let userId = tg.initDataUnsafe?.user?.id;
-        if (!userId) {
-            try { const params = new URLSearchParams(initDataHeader); const userRaw = params.get('user'); if (userRaw) userId = JSON.parse(userRaw).id; } catch (e) {}
-        }
+        if (!userId) { try { const params = new URLSearchParams(initDataHeader); const userRaw = params.get('user'); if (userRaw) userId = JSON.parse(userRaw).id; } catch (e) {} }
         if (!userId) userId = localGuestId;
 
         const elements = {
@@ -87,23 +77,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             document.querySelectorAll('.app-section').forEach(s => s.classList.add('hidden'));
         }
 
-        // ===================== АРЕНА: ГЕОМЕТРИЯ И ДВИЖЕНИЕ =====================
-        
-        // Генерация точек пересечения с квадратом
-        function getSquareIntersection(angle, cx, cy, size) {
-            const half = size / 2;
-            const tan = Math.tan(angle);
-            // Нижняя грань
-            if (angle >= 0 && angle < Math.PI / 2) return { x: cx + half, y: cy + half * tan };
-            // Правая грань
-            if (angle >= Math.PI / 2 && angle < Math.PI) return { x: cx - half / tan, y: cy + half };
-            // Верхняя грань
-            if (angle >= Math.PI && angle < 3 * Math.PI / 2) return { x: cx - half, y: cy - half * tan };
-            // Левая грань
-            return { x: cx + half / tan, y: cy - half };
-        }
-
-        // Алгоритм отрисовки поля (ИДЕАЛЬНОЕ ДЕЛЕНИЕ ПО ДИАГОНАЛИ)
+        // ===================== АРЕНА: ГЕОМЕТРИЯ =====================
         function drawArenaSegments() {
             const svg = document.getElementById('arena-svg-canvas');
             const avatarsContainer = document.getElementById('arena-avatars-container');
@@ -118,25 +92,25 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
 
             const W = 320, H = 320, CX = W / 2, CY = H / 2;
-            let totalBet = 0;
-            arenaPlayers.forEach(p => totalBet += parseFloat(p.bet || 0));
+            let totalBet = 0; arenaPlayers.forEach(p => totalBet += parseFloat(p.bet || 0));
 
             if (N === 1) {
                 const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
                 rect.setAttribute("x", "0"); rect.setAttribute("y", "0"); rect.setAttribute("width", "100%"); rect.setAttribute("height", "100%");
-                rect.setAttribute("fill", arenaPlayers[0].color || '#ff3b30');
+                rect.setAttribute("fill", arenaPlayers[0].color || '#8d3df5');
                 svg.appendChild(rect);
                 createAvatarElement(CX, CY + 30, arenaPlayers[0].avatar, 48);
+                const statusText = document.getElementById('arena-status-text');
+                if (statusText) statusText.classList.add('hidden');
                 return;
             }
 
-            // Сортировка игроков по сумме ставки (от большего к меньшему) для красивой диагонали
-            const sortedPlayers = [...arenaPlayers].sort((a, b) => parseFloat(b.bet) - parseFloat(a.bet));
-            
-            let currentAngle = -Math.PI / 2; // Начинаем с верхней точки
+            let currentAngle = -Math.PI / 2;
             const corners = [0, Math.PI/2, Math.PI, 3*Math.PI/2].map(a => a < 0 ? a + 2*Math.PI : a);
 
-            sortedPlayers.forEach((player, index) => {
+            const sortedPlayers = [...arenaPlayers].sort((a, b) => parseFloat(b.bet) - parseFloat(a.bet));
+
+            sortedPlayers.forEach((player) => {
                 const share = totalBet > 0 ? parseFloat(player.bet || 0) / totalBet : (1 / N);
                 let nextAngle = currentAngle + 2 * Math.PI * share;
 
@@ -160,11 +134,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const poly = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
                 poly.setAttribute("points", pathPoints.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' '));
                 poly.setAttribute("fill", player.color || '#0088cc');
-                poly.setAttribute("stroke", "rgba(255, 255, 255, 0.2)"); poly.setAttribute("stroke-width", "2");
                 poly.setAttribute("data-user-id", player.userId);
                 svg.appendChild(poly);
 
-                // Расчет центра масс для аватарки
                 let sumX = 0, sumY = 0, count = 0;
                 pathPoints.forEach(p => { sumX += p.x; sumY += p.y; count++; });
                 const avgX = Math.max(50, Math.min(270, sumX / count));
@@ -174,9 +146,17 @@ document.addEventListener('DOMContentLoaded', async () => {
                 currentAngle = nextAngle;
             });
             
-            // Скрыть надпись "Ждем ставки..." при наличии игроков
             const statusText = document.getElementById('arena-status-text');
             if (statusText) statusText.classList.add('hidden');
+        }
+
+        function getSquareIntersection(angle, cx, cy, size) {
+            const half = size / 2;
+            const tan = Math.tan(angle);
+            if (angle >= 0 && angle < Math.PI / 2) return { x: cx + half, y: cy + half * tan };
+            if (angle >= Math.PI / 2 && angle < Math.PI) return { x: cx - half / tan, y: cy + half };
+            if (angle >= Math.PI && angle < 3 * Math.PI / 2) return { x: cx - half, y: cy - half * tan };
+            return { x: cx + half / tan, y: cy - half };
         }
 
         function createAvatarElement(x, y, src, size) {
@@ -191,160 +171,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             container.appendChild(img);
         }
 
-        // ===================== ФИЗИКА ШАРИКА =====================
-        function simulateAndAnimateBall(targetX, targetY, onComplete) {
-            if (isBallAnimating) return;
-            isBallAnimating = true;
-
-            const W = 320, H = 320;
-            const canvas = document.getElementById('arena-ball-svg');
-            canvas.innerHTML = '';
-
-            // Создаем шарик
-            const ball = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-            ball.setAttribute("id", "physics-ball");
-            ball.setAttribute("r", "8");
-            ball.setAttribute("fill", "#ffffff");
-            canvas.appendChild(ball);
-
-            // Создаем текст победителя
-            const textEl = document.createElementNS("http://www.w3.org/2000/svg", "text");
-            textEl.setAttribute("fill", "#ffffff");
-            textEl.setAttribute("font-size", "12");
-            textEl.setAttribute("font-weight", "900");
-            textEl.setAttribute("text-anchor", "middle");
-            textEl.setAttribute("filter", "drop-shadow(0px 2px 3px rgba(0,0,0,0.9))");
-            canvas.appendChild(textEl);
-
-            // Рандомная начальная позиция (не в центре)
-            let startX = 30 + Math.random() * 260;
-            let startY = 30 + Math.random() * 260;
-            
-            // Рандомный вектор скорости
-            let angle = Math.random() * 2 * Math.PI;
-            let speed = 4 + Math.random() * 6; 
-            let vx = Math.cos(angle) * speed;
-            let vy = Math.sin(angle) * speed;
-            
-            let x = startX, y = startY;
-            let frame = 0;
-            const friction = 0.985;
-            const maxFrames = 350; // Ограничение времени анимации
-
-            ball.setAttribute("cx", x.toFixed(1));
-            ball.setAttribute("cy", y.toFixed(1));
-
-            const animate = () => {
-                frame++;
-                
-                // Торможение
-                vx *= friction;
-                vy *= friction;
-                x += vx;
-                y += vy;
-
-                // Отскок от стенок
-                if (x < 8) { x = 8; vx = -vx; }
-                if (x > W - 8) { x = W - 8; vx = -vx; }
-                if (y < 8) { y = 8; vy = -vy; }
-                if (y > H - 8) { y = H - 8; vy = -vy; }
-
-                ball.setAttribute("cx", x.toFixed(1));
-                ball.setAttribute("cy", y.toFixed(1));
-                textEl.setAttribute("x", x.toFixed(1));
-                textEl.setAttribute("y", (y + 24).toFixed(1));
-
-                // Если скорость почти нулевая или прошло много кадров -> завершаем
-                if ((Math.abs(vx) < 0.15 && Math.abs(vy) < 0.15) || frame > maxFrames) {
-                    // Плавно "приземляем" в финальную точку (серверную)
-                    const finalX = parseFloat(targetX);
-                    const finalY = parseFloat(targetY);
-                    
-                    // Завершающая анимация подлета к центру сектора
-                    let smoothFrame = 0;
-                    const smoothMax = 20;
-                    const startFx = x, startFy = y;
-                    
-                    const smoothLand = () => {
-                        smoothFrame++;
-                        const progress = smoothFrame / smoothMax;
-                        const ease = 1 - Math.pow(1 - progress, 3); // Ease Out
-                        
-                        const curX = startFx + (finalX - startFx) * ease;
-                        const curY = startFy + (finalY - startFy) * ease;
-                        
-                        ball.setAttribute("cx", curX.toFixed(1));
-                        ball.setAttribute("cy", curY.toFixed(1));
-                        textEl.setAttribute("x", curX.toFixed(1));
-                        textEl.setAttribute("y", (curY + 24).toFixed(1));
-
-                        if (smoothFrame < smoothMax) {
-                            requestAnimationFrame(smoothLand);
-                        } else {
-                            ball.setAttribute("cx", finalX.toFixed(1));
-                            ball.setAttribute("cy", finalY.toFixed(1));
-                            textEl.setAttribute("x", finalX.toFixed(1));
-                            textEl.setAttribute("y", (finalY + 24).toFixed(1));
-                            
-                            // Проверяем победителя по координатам
-                            const winner = getPlayerAtCoords(finalX, finalY);
-                            if (winner) textEl.textContent = `🏆 ${winner.username}`;
-                            else textEl.textContent = "🏆 Победитель!";
-
-                            setTimeout(() => {
-                                if (onComplete) onComplete();
-                            }, 1500); // Задержка перед очисткой
-                        }
-                    };
-                    smoothLand();
-                    return;
-                }
-                requestAnimationFrame(animate);
-            };
-            animate();
-        }
-
-        // Определение победителя по координатам
-        function getPlayerAtCoords(x, y) {
-            if (arenaPlayers.length === 0) return null;
-            if (arenaPlayers.length === 1) return arenaPlayers[0];
-            
-            const W = 320, H = 320, CX = W / 2, CY = H / 2;
-            let totalBet = 0;
-            arenaPlayers.forEach(p => totalBet += parseFloat(p.bet || 0));
-
-            // Преобразуем координаты в угол
-            let angle = Math.atan2(y - CY, x - CX);
-            if (angle < 0) angle += 2 * Math.PI;
-
-            let currentAngle = -Math.PI / 2;
-            
-            for (let i = 0; i < arenaPlayers.length; i++) {
-                const player = arenaPlayers[i];
-                const share = totalBet > 0 ? parseFloat(player.bet || 0) / totalBet : (1 / arenaPlayers.length);
-                let nextAngle = currentAngle + 2 * Math.PI * share;
-
-                let normalizedCurrent = (currentAngle % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
-                let normalizedNext = (nextAngle % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
-                let normalizedAngle = angle;
-                
-                if (nextAngle > currentAngle && normalizedNext < normalizedCurrent) normalizedNext += 2 * Math.PI;
-                if (normalizedAngle < normalizedCurrent && nextAngle > currentAngle) normalizedAngle += 2 * Math.PI;
-
-                if (normalizedAngle >= normalizedCurrent && normalizedAngle <= normalizedNext) return player;
-                currentAngle = nextAngle;
-            }
-            return arenaPlayers[arenaPlayers.length - 1];
-        }
-
-        // ===================== UI И ПОЛЛИНГ =====================
         function updatePlayersListUI() {
             const listContainer = document.getElementById('arena-players-list');
             if (!listContainer) return;
-            if (arenaPlayers.length === 0) {
-                listContainer.innerHTML = `<div class="empty-list-placeholder">Ставок еще нет. Станьте первым!</div>`;
-                safeSetText(elements.arenaPlayersTotal, '0'); return;
-            }
+            if (arenaPlayers.length === 0) { listContainer.innerHTML = `<div class="empty-list-placeholder">Ставок еще нет. Станьте первым!</div>`; safeSetText(elements.arenaPlayersTotal, '0'); return; }
             let totalBetSum = 0; arenaPlayers.forEach(p => totalBetSum += parseFloat(p.bet || 0));
             listContainer.innerHTML = '';
             arenaPlayers.forEach(p => {
@@ -391,14 +221,12 @@ document.addEventListener('DOMContentLoaded', async () => {
             const svgCanvas = document.getElementById('arena-svg-canvas');
             const avatarsContainer = document.getElementById('arena-avatars-container');
             const statusText = document.getElementById('arena-status-text');
-            const countdownTimer = document.getElementById('arena-countdown-timer');
 
             if (forceClearBall && ballCanvas) ballCanvas.innerHTML = '';
             if (svgCanvas) svgCanvas.innerHTML = '';
             if (avatarsContainer) avatarsContainer.innerHTML = '';
 
             if (statusText) { statusText.classList.remove('hidden'); statusText.innerText = "Ждем ставки..."; }
-            if (countdownTimer) countdownTimer.classList.add('hidden');
             safeSetText(elements.arenaPlayersTotal, '0');
             arenaPlayers = [];
             drawArenaSegments();
@@ -427,7 +255,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         username: bet.username || bet.user_name || bet.name || "Игрок",
                         avatar: bet.avatar || bet.avatar_url || "https://img.icons8.com/color/96/user.png",
                         bet: parseFloat(bet.amount || bet.bet || 0),
-                        color: bet.color || '#0088cc'
+                        color: bet.color || '#8d3df5'
                     }));
 
                     arenaPlayers = serverPlayers;
@@ -437,30 +265,15 @@ document.addEventListener('DOMContentLoaded', async () => {
                     const statusText = document.getElementById('arena-status-text');
                     const countdownTimer = document.getElementById('arena-countdown-timer');
                     const stateTimeLeft = state.timeLeft !== undefined ? state.timeLeft : 0;
-                    const serverTime = state.serverTime || Date.now();
-                    const resolvedAt = state.resolvedAt || 0;
 
                     if (arenaStatusStr === 'countdown' && arenaPlayers.length >= 2) {
                         if (statusText) statusText.classList.add('hidden');
                         let serverCountdown = parseInt(stateTimeLeft, 10);
-                        if (!isNaN(serverCountdown)) {
-                            localCountdownValue = serverCountdown;
-                            if (countdownTimer) { countdownTimer.classList.remove('hidden'); countdownTimer.innerText = localCountdownValue; }
-                            
-                            if (!countdownIntervalId) {
-                                countdownIntervalId = setInterval(() => {
-                                    localCountdownValue--;
-                                    if (localCountdownValue <= 0) {
-                                        clearInterval(countdownIntervalId); countdownIntervalId = null;
-                                        if (countdownTimer) countdownTimer.classList.add('hidden');
-                                    } else {
-                                        if (countdownTimer) { countdownTimer.classList.remove('hidden'); countdownTimer.innerText = localCountdownValue; }
-                                    }
-                                }, 1000);
-                            }
+                        if (!isNaN(serverCountdown) && countdownTimer) {
+                            countdownTimer.classList.remove('hidden');
+                            countdownTimer.innerText = serverCountdown;
                         }
                     } else if (arenaStatusStr === 'finished') {
-                        clearInterval(countdownIntervalId); countdownIntervalId = null;
                         if (countdownTimer) countdownTimer.classList.add('hidden');
                         if (statusText) statusText.classList.add('hidden');
                         
@@ -469,29 +282,21 @@ document.addEventListener('DOMContentLoaded', async () => {
                         const winId = state.winnerId || state.winner_id || "";
                         const tPool = state.totalPool || state.total_pool || state.pool || 0;
 
-                        // Запускаем анимацию только если она еще не идет
+                        // Проверка на победу (упрощенно)
                         if (!isBallAnimating && arenaPlayers.length >= 2) {
-                            // Запуск физики шарика
-                            simulateAndAnimateBall(winX, winY, () => {
-                                // Коллбек после остановки шарика
+                            isBallAnimating = true;
+                            setTimeout(() => {
+                                isBallAnimating = false;
                                 if (String(winId) === String(userId)) {
                                     showCustomModal({ icon: '🏆', title: 'Победа!', message: `🎉 Вы выиграли банк: +${parseFloat(tPool).toFixed(3)} GRAM!`, buttons: [{ text: 'Забрать!', primary: true }] });
                                     triggerBalanceBadge(parseFloat(tPool));
                                 }
-                                
-                                // Очистка поля через 1.5 секунды
-                                setTimeout(() => {
-                                    clearArenaRoundUi(true);
-                                    fetchUserData();
-                                }, 1500);
-                            });
+                                setTimeout(() => { clearArenaRoundUi(true); fetchUserData(); }, 1500);
+                            }, 2000);
                         }
                     } else if (arenaStatusStr === 'waiting') {
                         if (statusText) statusText.classList.remove('hidden');
-                        if (!isBallAnimating && arenaPlayers.length === 0) {
-                            clearArenaRoundUi(true);
-                        }
-                        clearInterval(countdownIntervalId); countdownIntervalId = null;
+                        if (!isBallAnimating && arenaPlayers.length === 0) clearArenaRoundUi(true);
                     }
                     renderBetButtons();
                     updateBalanceUI();
@@ -501,7 +306,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         function startArenaPolling() { if (isPollingActive) return; isPollingActive = true; pollArenaLoop(); }
-        function stopArenaPolling() { isPollingActive = false; clearInterval(countdownIntervalId); countdownIntervalId = null; }
+        function stopArenaPolling() { isPollingActive = false; }
 
         let localBetThrottle = false;
         const handleBetClick = async (e) => {
@@ -527,6 +332,36 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.getElementById('bet-btn-2')?.addEventListener('click', handleBetClick);
         document.getElementById('bet-btn-3')?.addEventListener('click', handleBetClick);
 
+        // ===================== МОДАЛЬНЫЕ ОКНА И УВЕДОМЛЕНИЯ =====================
+        function showNotification(message, icon = '🎁') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div'); toast.className = 'custom-toast';
+            toast.innerHTML = `<div class="custom-toast-icon">${icon}</div><div class="custom-toast-content">${message}</div>`;
+            container.appendChild(toast);
+            setTimeout(() => toast.classList.add('show'), 50);
+            setTimeout(() => { if (toast.parentNode) { toast.classList.remove('show'); setTimeout(() => toast.remove(), 400); } }, 4000);
+        }
+
+        function showCustomModal({ icon = '🎁', title, message, buttons = [], onClose = null }) {
+            const overlay = document.getElementById('custom-modal');
+            const modalIcon = document.getElementById('modal-icon'); const modalTitle = document.getElementById('modal-title'); const modalMsg = document.getElementById('modal-message'); const actionsContainer = document.getElementById('modal-actions'); const closeX = document.getElementById('modal-close-btn');
+            if (!overlay) return;
+            if (modalIcon) modalIcon.innerHTML = icon;
+            if (modalTitle) modalTitle.innerText = title;
+            if (modalMsg) modalMsg.innerText = message;
+            if (actionsContainer) actionsContainer.innerHTML = '';
+            buttons.forEach(btnConfig => {
+                const btn = document.createElement('button');
+                btn.className = `modal-btn ${btnConfig.primary ? 'modal-btn-primary' : 'modal-btn-secondary'}`;
+                btn.innerText = btnConfig.text;
+                btn.addEventListener('click', () => { overlay.classList.add('hidden'); if (btnConfig.onClick) btnConfig.onClick(); });
+                actionsContainer.appendChild(btn);
+            });
+            const handleClose = () => { overlay.classList.add('hidden'); if (onClose) onClose(); };
+            if (closeX) closeX.onclick = handleClose;
+            overlay.classList.remove('hidden');
+        }
+
         // ===================== КЕЙСЫ И ПРЕДМЕТЫ =====================
         const GIFT_POOL = [
             { id: 1, name: "Статуя птицы серая", icon: "/Images/Items/rare_bird.jpg", price: "20 GRAM", rawPrice: 20.0, isGold: true, type: "gift" },
@@ -540,8 +375,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             { id: 9, name: "Алмазик", icon: "/Images/Items/almaz.jpg", price: "0.9 GRAM", rawPrice: 0.9, isGold: false, type: "gift" },
             { id: 10, name: "Роза", icon: "/Images/Items/roza.jpg", price: "0.27 GRAM", rawPrice: 0.27, isGold: false, type: "gift" },
             { id: 11, name: "Пополнение 0.1 GRAM", icon: GRAMCOIN_ICON_URL, price: "0.1 GRAM", rawPrice: 0.1, isGold: false, type: "balance" },
-            { id: 12, name: "Пополнение 0.07 GRAM", icon: GRAMCOIN_ICON_URL, price: "0.07 GRAM", rawPrice: 0.07, isGold: false, type: "balance" },
-            { id: 13, name: "Пополнение 0.05 GRAM", icon: GRAMCOIN_ICON_URL, price: "0.05 GRAM", rawPrice: 0.05, isGold: false, type: "balance" },
             { id: 14, name: "Пополнение 0.03 GRAM", icon: GRAMCOIN_ICON_URL, price: "0.03 GRAM", rawPrice: 0.03, isGold: false, type: "balance" }
         ];
 
@@ -558,9 +391,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             { id: 110, name: "Вкусный пломбир", icon: "/Images/Items/plombir.jpg", price: "2.2 GRAM", rawPrice: 2.2, isGold: false, type: "gift" },
             { id: 111, name: "Прекрасная роза", icon: "/Images/Items/roza.jpg", price: "0.2 GRAM", rawPrice: 0.2, isGold: false, type: "gift" },
             { id: 112, name: "Мишка классический", icon: "/Images/Items/michka.jpg", price: "0.11 GRAM", rawPrice: 0.11, isGold: false, type: "gift" },
-            { id: 113, name: "Пополнение 0.1 GRAM (Новичок)", icon: GRAMCOIN_ICON_URL, price: "0.1 GRAM", rawPrice: 0.1, isGold: false, type: "balance" },
-            { id: 114, name: "Пополнение 0.07 GRAM (Новичок)", icon: GRAMCOIN_ICON_URL, price: "0.07 GRAM", rawPrice: 0.07, isGold: false, type: "balance" },
-            { id: 115, name: "Пополнение 0.05 GRAM (Новичок)", icon: GRAMCOIN_ICON_URL, price: "0.05 GRAM", rawPrice: 0.05, isGold: false, type: "balance" }
+            { id: 113, name: "Пополнение 0.1 GRAM (Новичок)", icon: GRAMCOIN_ICON_URL, price: "0.1 GRAM", rawPrice: 0.1, isGold: false, type: "balance" }
         ];
 
         // ===================== ИНВЕНТАРЬ И ОТПРАВКА =====================
@@ -591,8 +422,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 confirmBtn.disabled = true; confirmBtn.innerText = "Отправка...";
                 try {
                     const res = await fetchWithTimeout(`${API_BASE_URL}/api/send_gift`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': initDataHeader }, body: JSON.stringify({ targetUsername: targetUsername, itemId: parseInt(itemId) }), timeout: 8000 });
-                    const data = await res.json();
                     if (res.status === 403) { showBannedScreen(); return; }
+                    const data = await res.json();
                     if (res.ok) { showNotification(data.message || "Подарок успешно отправлен!", "🎉"); overlay.classList.add('hidden'); fetchInventory(); fetchUserData(); }
                     else { showNotification(data.error || "Ошибка при отправке", "❌"); }
                 } catch (err) { showNotification("Ошибка сети. Попробуйте позже.", "⚠️"); }
@@ -621,6 +452,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         elements.dailyCaseBanner?.addEventListener('click', () => { isNewbieCaseMode = false; elements.rewardsSectionContainer.classList.remove('hidden'); safeSetText(elements.casePageMainTitle, "Ежедневный кейс"); safeSetText(elements.rewardsGridTitle, "🏆 Содержимое кейса"); safeSetText(elements.spinBtn, "Запустить"); renderRewardsGrid(); updateDailyCaseTimer(); navigateTo('case'); });
         elements.newbieCaseBanner?.addEventListener('click', () => { isNewbieCaseMode = true; elements.rewardsSectionContainer.classList.remove('hidden'); safeSetText(elements.casePageMainTitle, "Кейс новичка"); safeSetText(elements.rewardsGridTitle, "🏆 Содержимое кейса"); safeSetText(elements.spinBtn, "Открыть (0.1 GRAM)"); renderRewardsGrid(); updateDailyCaseTimer(); navigateTo('case'); });
+
+        // КНОПКА НАЗАД ИЗ КЕЙСА
+        document.getElementById('back-to-home-button')?.addEventListener('click', () => navigateTo('home'));
 
         function renderRewardsGrid() {
             if (!elements.rewardsGrid) return; elements.rewardsGrid.innerHTML = '';
@@ -663,8 +497,38 @@ document.addEventListener('DOMContentLoaded', async () => {
             const isBalance = winningGift.type === "balance";
             if (apiNewBalance !== null) { currentUser.balance = apiNewBalance; updateBalanceUI(); }
             if (isNewbieCaseMode && elements.spinBtn) elements.spinBtn.disabled = false;
-            if (isBalance) { showCustomModal({ icon: '💰', title: 'Баланс пополнен!', message: `🎉 Вы выиграли пополнение счета на +${winningGift.price}!`, buttons: [{ text: 'Отлично!', primary: true }] }); triggerBalanceBadge(winningGift.rawPrice); fetchUserData(); }
-            else { showCustomModal({ icon: `<img src="${winningGift.icon}" style="width:70px;height:70px;object-fit:contain;" onerror="this.src='https://img.icons8.com/color/96/gift.png'">`, title: 'Вы выиграли подарок!', message: `🎁 Ваша награда: "${formatItemName(winningGift.name)}" сохранена в инвентарь!`, buttons: [{ text: `Продать за ${winningGift.price}`, primary: true, onClick: async () => { await fetch(`${API_BASE_URL}/api/sell_gift`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': initDataHeader }, body: JSON.stringify({ itemId: winningGift.id, price: winningGift.rawPrice }) }); fetchUserData(); fetchInventory(); } }, { text: 'В инвентарь', primary: false, onClick: () => { showNotification(`📦 Сохранено в инвентарь!`, '🎒'); fetchUserData(); } }] }); }
+            
+            if (isBalance) {
+                showCustomModal({ icon: '💰', title: 'Баланс пополнен!', message: `🎉 Вы выиграли пополнение счета на +${winningGift.price}!`, buttons: [{ text: 'Отлично!', primary: true }] });
+                triggerBalanceBadge(winningGift.rawPrice); fetchUserData();
+            } else {
+                // ВОССТАНАВЛИВАЕМ МОДАЛКУ С ВЫБОРОМ "ПРОДАТЬ ИЛИ В ИНВЕНТАРЬ"
+                showCustomModal({
+                    icon: `<img src="${winningGift.icon}" style="width:70px;height:70px;object-fit:contain;" onerror="this.src='https://img.icons8.com/color/96/gift.png'">`,
+                    title: 'Вы выиграли подарок!',
+                    message: `🎁 Ваша награда: "${formatItemName(winningGift.name)}" (Цена: ${winningGift.price})`,
+                    buttons: [
+                        { 
+                            text: `💰 Продать за ${winningGift.price}`, 
+                            primary: true, 
+                            onClick: async () => { 
+                                await fetch(`${API_BASE_URL}/api/sell_gift`, { 
+                                    method: 'POST', 
+                                    headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': initDataHeader }, 
+                                    body: JSON.stringify({ itemId: winningGift.id, price: winningGift.rawPrice }) 
+                                }); 
+                                fetchUserData(); 
+                                fetchInventory(); 
+                            } 
+                        },
+                        { 
+                            text: '📦 В инвентарь', 
+                            primary: false, 
+                            onClick: () => { showNotification(`📦 Сохранено в инвентарь!`, '🎒'); fetchUserData(); } 
+                        }
+                    ]
+                });
+            }
         }
 
         elements.spinBtn?.addEventListener('click', async () => {
@@ -689,6 +553,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             }, 50);
         });
 
+        // ===================== ИНВЕНТАРЬ И ДЕПОЗИТЫ =====================
         async function fetchInventory() {
             if (!elements.inventoryGrid) return;
             try {
@@ -697,6 +562,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if (!res.ok) throw new Error();
                 const items = await res.json(); elements.inventoryGrid.innerHTML = '';
                 if (items.length === 0) { elements.inventoryGrid.innerHTML = `<div class="empty-inventory">🎒 Ваш инвентарь пуст.<br>Открывайте кейсы!</div>`; return; }
+                
                 items.forEach(item => {
                     const matchedItem = GIFT_POOL.find(g => parseInt(g.id) === parseInt(item.item_id)) || NEWBIE_GIFT_POOL.find(g => parseInt(g.id) === parseInt(item.item_id)) || {};
                     const imageSrc = matchedItem.icon || item.image_url;
@@ -711,8 +577,34 @@ document.addEventListener('DOMContentLoaded', async () => {
                             <button class="inv-btn send-btn" style="background:#0088cc; color:#fff;">Отправить</button>
                         </div>
                     `;
-                    card.querySelector('.withdraw-btn').addEventListener('click', () => { showCustomModal({ icon: `<img src="${imageSrc}" style="width:70px;height:70px;object-fit:contain;" onerror="this.src='https://img.icons8.com/color/96/gift.png'">`, title: 'Вывод подарка', message: `Отправить "${formatItemName(item.name)}" вам в Telegram?`, buttons: [{ text: 'Подтвердить вывод', primary: true, onClick: async () => { const withdrawRes = await fetchWithTimeout(`${API_BASE_URL}/api/withdraw_gift`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': initDataHeader }, body: JSON.stringify({ itemId: item.item_id }), timeout: 3000 }); if (withdrawRes.status === 403) { showBannedScreen(); return; } if (withdrawRes.ok) { showNotification(`Подарок в очереди на вывод!`, '📥'); fetchInventory(); } else { const errorData = await withdrawRes.json(); showNotification(errorData.error || 'Заявка отклонена.', '⚠️'); } } }, { text: 'Отмена', primary: false }] }); });
-                    card.querySelector('.sell-btn').addEventListener('click', () => { showCustomModal({ icon: '💰', title: 'Продажа подарка', message: `Продать подарок "${formatItemName(item.name)}" за ${item.value} GRAM?`, buttons: [{ text: 'Продать за GRAM', primary: true, onClick: async () => { const sellRes = await fetchWithTimeout(`${API_BASE_URL}/api/sell_gift`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': initDataHeader }, body: JSON.stringify({ itemId: item.item_id, price: item.value }), timeout: 3000 }); if (sellRes.status === 403) { showBannedScreen(); return; } if (sellRes.ok) { const sellData = await sellRes.json(); currentUser.balance = sellData.newBalance; triggerBalanceBadge(parseFloat(item.value)); fetchUserData(); fetchInventory(); } } }, { text: 'Отмена', primary: false }] }); });
+                    
+                    // Кнопка ВЫВЕСТИ
+                    card.querySelector('.withdraw-btn').addEventListener('click', () => {
+                        showCustomModal({
+                            icon: `<img src="${imageSrc}" style="width:70px;height:70px;object-fit:contain;" onerror="this.src='https://img.icons8.com/color/96/gift.png'">`,
+                            title: 'Вывод подарка',
+                            message: `Отправить "${formatItemName(item.name)}" вам в Telegram?`,
+                            buttons: [{ text: 'Подтвердить вывод', primary: true, onClick: async () => {
+                                const withdrawRes = await fetchWithTimeout(`${API_BASE_URL}/api/withdraw_gift`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': initDataHeader }, body: JSON.stringify({ itemId: item.item_id }), timeout: 3000 });
+                                if (withdrawRes.status === 403) { showBannedScreen(); return; }
+                                if (withdrawRes.ok) { showNotification(`Подарок в очереди на вывод!`, '📥'); fetchInventory(); }
+                                else { const errorData = await withdrawRes.json(); showNotification(errorData.error || 'Заявка отклонена.', '⚠️'); }
+                            } }, { text: 'Отмена', primary: false }]
+                        });
+                    });
+
+                    // Кнопка ПРОДАТЬ (ИСПРАВЛЕНА)
+                    card.querySelector('.sell-btn').addEventListener('click', () => {
+                        showCustomModal({
+                            icon: '💰', title: 'Продажа подарка', message: `Продать подарок "${formatItemName(item.name)}" за ${item.value} GRAM?`,
+                            buttons: [{ text: 'Продать за GRAM', primary: true, onClick: async () => {
+                                const sellRes = await fetchWithTimeout(`${API_BASE_URL}/api/sell_gift`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': initDataHeader }, body: JSON.stringify({ itemId: item.item_id, price: item.value }), timeout: 3000 });
+                                if (sellRes.status === 403) { showBannedScreen(); return; }
+                                if (sellRes.ok) { const sellData = await sellRes.json(); currentUser.balance = sellData.newBalance; triggerBalanceBadge(parseFloat(item.value)); fetchUserData(); fetchInventory(); }
+                            } }, { text: 'Отмена', primary: false }]
+                        });
+                    });
+
                     card.querySelector('.send-btn').addEventListener('click', () => { openSendGiftModal(items); });
                     elements.inventoryGrid.appendChild(card);
                 });
@@ -725,32 +617,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             const balVal = isNaN(val) ? "0.000" : val.toFixed(3);
             safeSetText(elements.balanceDisplayPill, balVal);
             safeSetText(elements.largeBalanceDisplay, balVal);
-        }
-
-        let dailyCaseTimerInterval;
-        function updateDailyCaseTimer() {
-            clearInterval(dailyCaseTimerInterval);
-            if (isNewbieCaseMode) { if (elements.spinBtn) { elements.spinBtn.classList.remove('hidden'); elements.spinBtn.disabled = false; } document.getElementById('timer-container')?.classList.add('hidden'); return; }
-            if (!currentUser.last_daily_case_open) { if (elements.spinBtn) { elements.spinBtn.classList.remove('hidden'); elements.spinBtn.disabled = false; } document.getElementById('timer-container')?.classList.add('hidden'); return; }
-            const lastOpen = new Date(currentUser.last_daily_case_open);
-            const now = new Date(); const cooldown = 24 * 60 * 60 * 1000;
-            const nextOpenTime = new Date(lastOpen.getTime() + cooldown);
-            const timeLeftMs = nextOpenTime.getTime() - now.getTime();
-
-            if (timeLeftMs <= 0) { if (elements.spinBtn) { elements.spinBtn.classList.remove('hidden'); elements.spinBtn.disabled = false; } document.getElementById('timer-container')?.classList.add('hidden'); }
-            else {
-                if (elements.spinBtn) { elements.spinBtn.classList.add('hidden'); elements.spinBtn.disabled = true; }
-                const t = document.getElementById('timer-container'); if (t) t.classList.remove('hidden');
-                const tick = () => {
-                    const nowTick = new Date(); const diff = nextOpenTime.getTime() - nowTick.getTime();
-                    if (diff <= 0) { clearInterval(dailyCaseTimerInterval); updateDailyCaseTimer(); return; }
-                    const hours = Math.floor(diff / (1000 * 60 * 60));
-                    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-                    const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-                    safeSetText(document.getElementById('daily-case-timer'), `${hours}ч ${minutes}м ${seconds}с`);
-                };
-                tick(); dailyCaseTimerInterval = setInterval(tick, 1000);
-            }
         }
 
         async function fetchUserData() {
@@ -771,7 +637,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
             const rawName = currentUser.username || currentUser.first_name || "Пользователь";
             safeSetText(document.getElementById('user-username'), formatUsername(rawName));
-            updateDailyCaseTimer(); renderBetButtons();
+            renderBetButtons();
         }
 
         renderRewardsGrid(); fetchUserData(); navigateTo('home');
