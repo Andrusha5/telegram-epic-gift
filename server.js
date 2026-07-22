@@ -43,9 +43,15 @@ function getUserColor(userId, roundNumber) {
 const userQueues = {};
 function enqueueUserAction(userId, actionFn) {
     const idStr = String(userId);
-    if (!userQueues[idStr]) { userQueues[idStr] = Promise.resolve(); }
-    const nextPromise = userQueues[idStr].then(async () => { return await actionFn(); });
-    userQueues[idStr] = nextPromise.catch((err) => { console.error(`⛔ Ошибка очереди для пользователя ${idStr}:`, err); });
+    if (!userQueues[idStr]) {
+        userQueues[idStr] = Promise.resolve();
+    }
+    const nextPromise = userQueues[idStr].then(async () => {
+        return await actionFn();
+    });
+    userQueues[idStr] = nextPromise.catch((err) => {
+        console.error(`⛔ Ошибка очереди для пользователя ${idStr}:`, err);
+    });
     return nextPromise;
 }
 
@@ -54,7 +60,7 @@ const ADMIN_CHAT_ID = String(process.env.ADMIN_TELEGRAM_ID || process.env.ADMIN_
 const DEPOSIT_ADDRESS = String(process.env.ADMIN_TON_ADDRESS || 'EQC3481up9_gG98_wK8Jv_Zz1yLp9p0_Y-7Jv7x4b9a9JKe6').trim().replace(/^["']|["']$/g, '');
 
 let bot = null;
-const adminStates = {};
+const adminStates = {}; 
 
 if (BOT_TOKEN && BOT_TOKEN !== "undefined" && BOT_TOKEN !== "") {
     try {
@@ -150,6 +156,19 @@ async function dbGetUser(id) {
     return data[String(id)] || null;
 }
 
+async function dbGetUserByUsername(username) {
+    try {
+        if (pgPool) {
+            const cleanUsername = username.replace('@', '').trim();
+            const res = await pgPool.query("SELECT * FROM users WHERE LOWER(username) = LOWER($1)", [cleanUsername]);
+            return res.rows[0] || null;
+        }
+    } catch (e) {
+        console.error("DB GetUserByUsername Error:", e.message);
+    }
+    return null;
+}
+
 async function dbSaveUser(id, user) {
     const isBannedValue = (user.is_banned === true || user.is_banned === 'true');
     try {
@@ -229,8 +248,9 @@ async function dbRemoveInventoryItem(userId, itemId) {
     }
 }
 
+// Состояние раундов Арены
 let arenaState = {
-    status: "waiting",
+    status: "waiting", 
     roundNumber: 1,
     bets: [],
     timeLeft: 15,
@@ -247,9 +267,9 @@ function loadArenaState() {
         if (fs.existsSync(localArenaFile)) {
             const data = JSON.parse(fs.readFileSync(localArenaFile, 'utf8'));
             if (data && typeof data === 'object') {
-                arenaState.roundNumber = data.roundNumber || arenaState.roundNumber;
-                arenaState.bets = [];
-                arenaState.status = "waiting";
+                arenaState.roundNumber = data.roundNumber || arenaState.roundNumber; 
+                arenaState.bets = []; 
+                arenaState.status = "waiting"; 
                 arenaState.timeLeft = 15;
                 arenaState.resolvedAt = 0;
                 arenaState.winnerId = null;
@@ -275,6 +295,7 @@ function saveArenaState() {
 
 loadArenaState();
 
+// Главный бесконечный цикл Арены
 setInterval(() => {
     try {
         let stateChanged = false;
@@ -350,8 +371,8 @@ async function resolveArenaRound() {
         arenaState.winnerY = coords.y;
         arenaState.resolvedAt = Date.now();
         arenaState.status = "finished";
-
-        arenaState.timeLeft = 8;
+        
+        arenaState.timeLeft = 8; 
         saveArenaState();
         console.log(`[ARENA] 🏆 Победитель: @${winnerBet.username} (ID: ${winnerBet.userId}) Банк: ${pool} GRAM! x=${coords.x}, y=${coords.y}`);
 
@@ -450,11 +471,11 @@ function calculateShares(bets) {
     if (total === 0) return betValues.map(() => 1 / N);
 
     let rawShares = betValues.map(b => b / total);
-    const minShare = 0.013;
+    const minShare = 0.013; 
 
     let adjusted = [...rawShares];
     let iterations = 0;
-    while (iterations < 10) {
+    while (iterations < 10) { 
         let underMinCount = 0;
         let underMinSum = 0;
         let overMinSum = 0;
@@ -470,7 +491,7 @@ function calculateShares(bets) {
 
         if (underMinCount === 0) break;
         if (underMinSum >= 1.0) {
-            return adjusted.map(() => 1 / N);
+            return adjusted.map(() => 1 / N); 
         }
 
         const scale = (1.0 - underMinSum) / overMinSum;
@@ -522,7 +543,7 @@ function getPolygonCentroid(pts) {
     let area = 0, cx = 0, cy = 0;
     for (let i = 0; i < pts.length - 1; i++) {
         let p1 = pts[i];
-        let p2 = pts[i + 1];
+        let p2 = pts[i+1];
         let factor = (p1.x * p2.y - p2.x * p1.y);
         area += factor;
         cx += (p1.x + p2.x) * factor;
@@ -552,14 +573,14 @@ function getCornerAnglesRad() {
 async function getOrCreateUser(initDataUnsafe) {
     const tgUser = initDataUnsafe?.user || { id: "guest_user_id", username: "Пользователь", first_name: "Пользователь" };
     const id = String(tgUser.id);
-
+    
     let user = await dbGetUser(id);
     if (!user) {
         user = {
             id: id,
             username: tgUser.username || tgUser.first_name || "Пользователь",
             first_name: tgUser.first_name || "",
-            balance: 50.0,
+            balance: 50.0, 
             avatar_url: tgUser.photo_url || "https://img.icons8.com/color/96/user.png",
             last_daily_case_open: null,
             is_banned: false
@@ -583,9 +604,9 @@ async function parseTelegramInitData(req, res, next) {
             console.error("InitData parsing error:", e);
         }
     }
-
+    
     const user = await getOrCreateUser(initDataUnsafe);
-
+    
     if (user.is_banned === true || user.is_banned === 'true') {
         return res.status(403).json({ banned: true, error: "Ваш аккаунт заблокирован!" });
     }
@@ -597,7 +618,7 @@ async function parseTelegramInitData(req, res, next) {
 app.get('/api/user', parseTelegramInitData, (req, res) => {
     const user = req.user;
     const isAdmin = String(user.id).trim() === String(ADMIN_CHAT_ID).trim();
-
+    
     res.json({
         id: user.id,
         username: user.username,
@@ -627,7 +648,7 @@ app.post('/api/verify_payment', parseTelegramInitData, async (req, res) => {
 
         if (bot && ADMIN_CHAT_ID) {
             const textMsg = "💎 **Пополнение баланса!**\n" +
-                "Игрок @" + user.username + " (ID: " + user.id + ") успешно зачислил через кошелек **+" + paymentAmount.toFixed(3) + " TON**!";
+                            "Игрок @" + user.username + " (ID: " + user.id + ") успешно зачислил через кошелек **+" + paymentAmount.toFixed(3) + " TON**!";
             bot.sendMessage(ADMIN_CHAT_ID, textMsg, { parse_mode: "Markdown" });
         }
 
@@ -646,10 +667,10 @@ app.post('/api/deposit_gift_request', parseTelegramInitData, async (req, res) =>
 
     if (bot && ADMIN_CHAT_ID) {
         const messageText = "📥 **Заявка на ввод NFT-подарка!**\n\n" +
-            "**Игрок:** @" + user.username + " (ID: `" + user.id + "`)\n" +
-            "**Подарок:** *" + gift.name + "*\n" +
-            "**Номинал:** " + gift.value + " GRAM";
-
+                            "**Игрок:** @" + user.username + " (ID: `" + user.id + "`)\n" +
+                            "**Подарок:** *" + gift.name + "*\n" +
+                            "**Номинал:** " + gift.value + " GRAM";
+        
         const inlineKeyboard = {
             inline_keyboard: [
                 [
@@ -699,9 +720,9 @@ app.post('/api/withdraw_gift', parseTelegramInitData, async (req, res) => {
 
     if (bot && ADMIN_CHAT_ID) {
         const textMsg = "📤 **Заявка на вывод подарка!**\n" +
-            "**Игрок:** @" + user.username + " (ID: " + user.id + ")\n" +
-            "**Предмет на вывод:** *" + gift.name + "* (" + gift.value + " GRAM)\n\n" +
-            "_Пожалуйста, отправьте ему этот подарок в Telegram!_";
+                        "**Игрок:** @" + user.username + " (ID: " + user.id + ")\n" +
+                        "**Предмет на вывод:** *" + gift.name + "* (" + gift.value + " GRAM)\n\n" +
+                        "_Пожалуйста, отправьте ему этот подарок в Telegram!_";
         bot.sendMessage(ADMIN_CHAT_ID, textMsg, { parse_mode: "Markdown" });
     }
 
@@ -806,7 +827,7 @@ app.post('/api/open_daily_case', parseTelegramInitData, async (req, res) => {
             await dbAddInventoryItem(user.id, won.id);
             if (bot && ADMIN_CHAT_ID) {
                 const winNotify = "🎉 **Новый выигрыш в Кейсе!**\n" +
-                    "Игрок @" + user.username + " (ID: " + user.id + ") выиграл *" + won.name + "* в **Ежедневном Кейсе**!";
+                                  "Игрок @" + user.username + " (ID: " + user.id + ") выиграл *" + won.name + "* в **Ежедневном Кейсе**!";
                 bot.sendMessage(ADMIN_CHAT_ID, winNotify, { parse_mode: "Markdown" });
             }
         }
@@ -844,7 +865,7 @@ app.post('/api/open_newbie_case', parseTelegramInitData, async (req, res) => {
             await dbAddInventoryItem(user.id, won.id);
             if (bot && ADMIN_CHAT_ID) {
                 const winNotify = "🎉 **Новый выигрыш в Кейсе!**\n" +
-                    "Игрок @" + user.username + " (ID: " + user.id + ") выиграл *" + won.name + "* в **Кейсе Новичка**!";
+                                  "Игрок @" + user.username + " (ID: " + user.id + ") выиграл *" + won.name + "* в **Кейсе Новичка**!";
                 bot.sendMessage(ADMIN_CHAT_ID, winNotify, { parse_mode: "Markdown" });
             }
         }
