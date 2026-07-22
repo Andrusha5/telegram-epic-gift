@@ -9,10 +9,10 @@ tg.ready();
 (function injectStyles() {
     const style = document.createElement('style');
     style.innerHTML = `
-        .arena-player-avatar-node { position: absolute !important; transform: translate(-50%, -50%) !important; border-radius: 50% !important; border: 3px solid #ffffff !important; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5) !important; object-fit: cover !important; pointer-events: none !important; z-index: 5 !important; }
-        #arena-svg-canvas, #arena-ball-svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border-radius: 16px; overflow: hidden; background: transparent !important; aspect-ratio: 1/1 !important; }
-        #physics-ball { fill: #ffffff !important; r: 8 !important; filter: drop-shadow(0 0 8px #ffffff) !important; }
-        @keyframes winningSectorPulse { 0% { filter: drop-shadow(0 0 15px var(--glow-color)) brightness(1.2); stroke: #ffffff; stroke-width: 5px; } 50% { filter: drop-shadow(0 0 35px var(--glow-color)) brightness(1.7); stroke: #ffffff; stroke-width: 8px; } 100% { filter: drop-shadow(0 0 15px var(--glow-color)) brightness(1.2); stroke: #ffffff; stroke-width: 5px; } }
+        .arena-player-avatar-node { position: absolute !important; transform: translate(-50%, -50%) !important; border-radius: 50% !important; border: 2px solid #ffffff !important; box-shadow: 0 0 8px rgba(0,0,0,0.8) !important; object-fit: cover !important; pointer-events: none !important; z-index: 5 !important; }
+        #arena-svg-canvas, #arena-ball-svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border-radius: 16px; overflow: hidden; background: #110e25 !important; }
+        #physics-ball { fill: #ffffff !important; r: 8 !important; filter: drop-shadow(0 0 12px #ffffff) !important; }
+        @keyframes winningSectorPulse { 0% { filter: drop-shadow(0 0 15px var(--glow-color)) brightness(1.2); stroke: #ffffff; stroke-width: 4px; } 50% { filter: drop-shadow(0 0 35px var(--glow-color)) brightness(1.7); stroke: #ffffff; stroke-width: 8px; } 100% { filter: drop-shadow(0 0 15px var(--glow-color)) brightness(1.2); stroke: #ffffff; stroke-width: 4px; } }
         .winning-segment-glow { stroke: #ffffff !important; stroke-width: 6px !important; stroke-linejoin: round !important; animation: winningSectorPulse 0.35s infinite alternate !important; z-index: 100 !important; }
     `;
     document.head.appendChild(style);
@@ -34,22 +34,8 @@ function formatUsername(name) { return name ? (name.length > 15 ? name.substring
 function formatItemName(name) { return name ? name.replace(/\.(png|jpg|jpeg)$/i, '').replace(/_/g, ' ').trim() : ""; }
 function formatWalletAddress(rawAddress) {
     if (!rawAddress) return "";
-    try {
-        if (typeof TON_CONNECT_UI !== 'undefined' && TON_CONNECT_UI.toUserFriendlyAddress) {
-            const friendly = TON_CONNECT_UI.toUserFriendlyAddress(rawAddress);
-            return friendly.substring(0, 4) + "-..." + friendly.substring(friendly.length - 4);
-        }
-    } catch(e) {}
+    try { if (typeof TON_CONNECT_UI !== 'undefined' && TON_CONNECT_UI.toUserFriendlyAddress) { const friendly = TON_CONNECT_UI.toUserFriendlyAddress(rawAddress); return friendly.substring(0, 4) + "-..." + friendly.substring(friendly.length - 4); } } catch(e) {}
     return rawAddress.substring(0, 4) + "-..." + rawAddress.substring(rawAddress.length - 4);
-}
-function preloadImages(urls) { urls.forEach(url => { const img = new Image(); img.src = url; }); }
-
-const defaultColors = ['#ff3b30', '#4cd964', '#007aff', '#ffcc00', '#5856d6', '#ff2d55', '#5ac8fa', '#00e676', '#ff9500', '#0088cc'];
-function getUserColor(userId, roundNumber) {
-    const idStr = String(userId || 'guest') + "_" + String(roundNumber || 1);
-    let hash = 0;
-    for (let i = 0; i < idStr.length; i++) { hash = idStr.charCodeAt(i) + ((hash << 5) - hash); }
-    return defaultColors[Math.abs(hash) % defaultColors.length];
 }
 
 async function fetchWithTimeout(resource, options = {}) {
@@ -59,12 +45,10 @@ async function fetchWithTimeout(resource, options = {}) {
 
 function triggerBalanceBadge(amount) {
     const container = document.getElementById('balance-badge-container'); if (!container) return;
-    const badge = document.createElement('div');
-    const isNegative = amount < 0;
+    const badge = document.createElement('div'); const isNegative = amount < 0;
     badge.className = `balance-popup-badge ${isNegative ? 'negative' : 'positive'}`;
     badge.innerText = (isNegative ? '' : '+') + amount.toFixed(3);
-    container.appendChild(badge);
-    setTimeout(() => badge.remove(), 2500);
+    container.appendChild(badge); setTimeout(() => badge.remove(), 2500);
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -79,39 +63,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         let isPollingActive = false;
         let isBallAnimating = false;
         let arenaStatusStr = "waiting";
+        let currentRoundData = {};
 
-        let lastAnimatedRound = null;
-        let lastObservedRoundNumber = null;
-        let localExpectedBetAmount = 0;
-        let currentServerRoundNumber = 0;
         let countdownIntervalId = null;
         let localCountdownValue = 0;
 
-        const ANIMATION_DURATION_MS = 4000;
-        const POST_ANIMATION_GLOW_DURATION_MS = 1000;
-        let animatingTimeout = null;
-        function setBallAnimating(val) {
-            isBallAnimating = val;
-            if (animatingTimeout) clearTimeout(animatingTimeout);
-            if (val) {
-                animatingTimeout = setTimeout(() => {
-                    if (isBallAnimating) {
-                        console.warn("[ARENA] Сработал предохранитель!");
-                        isBallAnimating = false;
-                        clearArenaRoundUi(true);
-                        fetchUserData();
-                    }
-                }, ANIMATION_DURATION_MS + POST_ANIMATION_GLOW_DURATION_MS + 1000);
-            }
-        }
-
-        let preloadedAdminAddress = "EQC3481up9_gG98_wK8Jv_Zz1yLp9p0_Y-7Jv7x4b9a9JKe6";
-        let preloadedPayloadBase64 = "te6ccgEBAQEAAgAAAA==";
-
         const safeSetText = (el, val) => { if (el) el.innerText = val; };
-
-        const initialName = tg.initDataUnsafe?.user?.username || tg.initDataUnsafe?.user?.first_name || "Пользователь";
-        safeSetText(document.getElementById('user-username'), formatUsername(initialName));
 
         let userId = tg.initDataUnsafe?.user?.id;
         if (!userId) {
@@ -130,138 +87,23 @@ document.addEventListener('DOMContentLoaded', async () => {
             document.querySelectorAll('.app-section').forEach(s => s.classList.add('hidden'));
         }
 
-        async function fetchPaymentParamsInternal() {
-            const addrEndpoints = [`${API_BASE_URL}/api/deposit_address`];
-            for (const url of addrEndpoints) {
-                try { const res = await fetchWithTimeout(url, { timeout: 15000 }); if (res.ok) { const data = await res.json(); if (data.address) { preloadedAdminAddress = data.address; break; } } } catch (e) {}
-            }
-        }
-        fetchPaymentParamsInternal();
-
-        function loadSavedBets() {
-            try {
-                const saved = localStorage.getItem(`custom_bets_${userId}`);
-                if (saved) {
-                    const parsed = JSON.parse(saved);
-                    if (Array.isArray(parsed) && parsed.length === 3) {
-                        customBets = parsed.map(v => (isNaN(parseFloat(v)) || parseFloat(v) < 0.1) ? 0.1 : parseFloat(v));
-                        return;
-                    }
-                }
-            } catch (e) {}
-            customBets = [0.1, 1.0, 5.0];
+        // ===================== АРЕНА: ГЕОМЕТРИЯ И ДВИЖЕНИЕ =====================
+        
+        // Генерация точек пересечения с квадратом
+        function getSquareIntersection(angle, cx, cy, size) {
+            const half = size / 2;
+            const tan = Math.tan(angle);
+            // Нижняя грань
+            if (angle >= 0 && angle < Math.PI / 2) return { x: cx + half, y: cy + half * tan };
+            // Правая грань
+            if (angle >= Math.PI / 2 && angle < Math.PI) return { x: cx - half / tan, y: cy + half };
+            // Верхняя грань
+            if (angle >= Math.PI && angle < 3 * Math.PI / 2) return { x: cx - half, y: cy - half * tan };
+            // Левая грань
+            return { x: cx + half / tan, y: cy - half };
         }
 
-        function loadCachedUserData() {
-            try {
-                const cachedData = localStorage.getItem(`user_cache_${userId}`);
-                if (cachedData) {
-                    const cache = JSON.parse(cachedData);
-                    if (cache) {
-                        if (cache.is_banned === true || cache.is_banned === 'true') { showBannedScreen(); return; }
-                        currentUser = cache;
-                        updateBalanceUI();
-                        const rawName = cache.username || cache.first_name || "Пользователь";
-                        safeSetText(document.getElementById('user-username'), formatUsername(rawName));
-                        const mainAvatar = document.getElementById('user-avatar');
-                        if (mainAvatar && cache.avatar_url) { mainAvatar.src = cache.avatar_url; mainAvatar.onerror = () => { mainAvatar.src = "https://img.icons8.com/color/96/user.png"; }; }
-                    }
-                }
-            } catch (e) {}
-        }
-
-        function saveUserDataToCache(userData) { try { localStorage.setItem(`user_cache_${userId}`, JSON.stringify(userData)); } catch (e) {} }
-        loadSavedBets();
-        loadCachedUserData();
-
-        function showNotification(message, icon = '🎁') {
-            const container = document.getElementById('toast-container'); if (!container) return;
-            const toast = document.createElement('div'); toast.className = 'custom-toast';
-            toast.innerHTML = `<div class="custom-toast-icon">${icon}</div><div class="custom-toast-content">${message}</div><button class="custom-toast-close">&times;</button>`;
-            container.appendChild(toast);
-            setTimeout(() => toast.classList.add('show'), 50);
-            toast.querySelector('.custom-toast-close').addEventListener('click', () => { toast.classList.remove('show'); setTimeout(() => toast.remove(), 400); });
-            setTimeout(() => { if (toast.parentNode) { toast.classList.remove('show'); setTimeout(() => toast.remove(), 400); } }, 5000);
-        }
-
-        function showCustomModal({ icon = '🎁', title, message, buttons = [], onClose = null }) {
-            const overlay = document.getElementById('custom-modal');
-            const modalIcon = document.getElementById('modal-icon'); const modalTitle = document.getElementById('modal-title'); const modalMsg = document.getElementById('modal-message'); const actionsContainer = document.getElementById('modal-actions'); const closeX = document.getElementById('modal-close-btn');
-            if (!overlay) return;
-            if (modalIcon) modalIcon.innerHTML = icon;
-            if (modalTitle) modalTitle.innerText = title;
-            if (modalMsg) modalMsg.innerText = message;
-            if (actionsContainer) actionsContainer.innerHTML = '';
-            buttons.forEach(btnConfig => {
-                const btn = document.createElement('button'); btn.className = `modal-btn ${btnConfig.primary ? 'modal-btn-primary' : 'modal-btn-secondary'}`; btn.innerText = btnConfig.text;
-                btn.addEventListener('click', () => { overlay.classList.add('hidden'); if (btnConfig.onClick) btnConfig.onClick(); });
-                if (actionsContainer) actionsContainer.appendChild(btn);
-            });
-            const handleClose = () => { overlay.classList.add('hidden'); if (onClose) onClose(); };
-            if (closeX) closeX.onclick = handleClose;
-            overlay.classList.remove('hidden');
-        }
-
-        let tonConnectUI = null;
-        try {
-            const manifestUrl = `${API_BASE_URL}/tonconnect-manifest.json`;
-            const customStorage = { setItem: (key, value) => { try { localStorage.setItem(`tc-${userId}-${key}`, value); } catch (e) {} }, getItem: (key) => { try { return localStorage.getItem(`tc-${userId}-${key}`); } catch (e) { return null; } }, removeItem: (key) => { try { localStorage.removeItem(`tc-${userId}-${key}`); } catch (e) {} } };
-            const initTonConnect = () => {
-                const TC_SDK = window.TON_CONNECT_UI || window.TonConnectUI;
-                if (TC_SDK) {
-                    tonConnectUI = new TC_SDK.TonConnectUI({ manifestUrl, storage: customStorage });
-                    tonConnectUI.onStatusChange(wallet => {
-                        if (wallet) {
-                            const displayAddress = formatWalletAddress(wallet.account.address);
-                            if (elements.connectWalletBtn) { elements.connectWalletBtn.innerText = `Привязан: (${displayAddress})`; elements.connectWalletBtn.style.background = 'linear-gradient(135deg, #00e676, #00b34a)'; elements.connectWalletBtn.style.color = '#000000'; }
-                            if (elements.depositBalanceBtn) elements.depositBalanceBtn.removeAttribute('disabled');
-                            if (elements.depositNoticeText) { elements.depositNoticeText.innerText = "Кошелек подключен!"; elements.depositNoticeText.style.color = '#00e676'; }
-                        } else {
-                            if (elements.connectWalletBtn) { elements.connectWalletBtn.innerText = 'Привязать кошелёк'; elements.connectWalletBtn.style.background = 'linear-gradient(135deg, var(--accent-purple), #6a0dad)'; elements.connectWalletBtn.style.color = '#ffffff'; }
-                            if (elements.depositBalanceBtn) elements.depositBalanceBtn.setAttribute('disabled', 'true');
-                            if (elements.depositNoticeText) { elements.depositNoticeText.innerText = "Пополнение доступно после привязки кошелька"; elements.depositNoticeText.style.color = '#a5a1b8'; }
-                        }
-                    });
-                    if (elements.connectWalletBtn) {
-                        elements.connectWalletBtn.addEventListener('click', async () => {
-                            if (tonConnectUI.connected) {
-                                showCustomModal({ icon: '🔌', title: 'Отключить кошелек?', message: 'Вы уверены, что хотите отвязать текущий TON-кошелек?', buttons: [{ text: 'Отвязать', primary: true, onClick: async () => { await tonConnectUI.disconnect(); showNotification("Кошелек успешно отвязан", "🔌"); } }, { text: 'Отмена', primary: false }] });
-                            } else { await tonConnectUI.openModal(); }
-                        });
-                    }
-                }
-            };
-            if (window.TON_CONNECT_UI || window.TonConnectUI) { initTonConnect(); } else { document.addEventListener('ton-connect-ui-loaded', initTonConnect); }
-        } catch (err) {}
-
-        if (elements.depositBalanceBtn) {
-            elements.depositBalanceBtn.addEventListener('click', () => { if (elements.depositAmountModal) { elements.depositAmountModal.classList.remove('hidden'); if (elements.modalDepositInput) elements.modalDepositInput.value = "0.1"; } });
-        }
-        const closeDepositModal = () => { if (elements.depositAmountModal) elements.depositAmountModal.classList.add('hidden'); };
-        if (elements.depositModalCloseBtn) elements.depositModalCloseBtn.addEventListener('click', closeDepositModal);
-        if (elements.modalDepositCancelBtn) elements.modalDepositCancelBtn.addEventListener('click', closeDepositModal);
-        if (elements.modalDepositConfirmBtn) {
-            elements.modalDepositConfirmBtn.addEventListener('click', async () => {
-                const amount = parseFloat(elements.modalDepositInput.value);
-                if (isNaN(amount) || amount < 0.1) { showNotification("Минимальная сумма пополнения — 0.1 TON", "⚠️"); return; }
-                if (!tonConnectUI || !tonConnectUI.connected) { showNotification("Пожалуйста, сначала привяжите кошелек!", "⚠️"); return; }
-                closeDepositModal();
-                try {
-                    const nanoAmount = Math.floor(amount * 1000000000).toString();
-                    const transaction = { validUntil: Math.floor(Date.now() / 1000) + 360, messages: [{ address: preloadedAdminAddress, amount: nanoAmount, payload: preloadedPayloadBase64 }] };
-                    showNotification("Подтвердите транзакцию...", "⏳");
-                    const result = await tonConnectUI.sendTransaction(transaction);
-                    if (result) {
-                        currentUser.balance = parseFloat((parseFloat(currentUser.balance) + amount).toFixed(3));
-                        updateBalanceUI(); triggerBalanceBadge(amount);
-                        showNotification(`Баланс пополнен на +${amount.toFixed(3)} TON!`, "💎");
-                        fetch(`${API_BASE_URL}/api/verify_payment`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': initDataHeader }, body: JSON.stringify({ amount: amount }) }).then(res => { if (res.status === 403) showBannedScreen(); else if (res.ok) fetchUserData(); }).catch(e => console.error("Verify backend error:", e));
-                    }
-                } catch (err) { showNotification("Транзакция отменена кошельком.", "⚠️"); }
-            });
-        }
-
-        // ===================== АРЕНА (ВОССТАНОВЛЕНА ПОЛНАЯ ГЕОМЕТРИЯ) =====================
+        // Алгоритм отрисовки поля (ИДЕАЛЬНОЕ ДЕЛЕНИЕ ПО ДИАГОНАЛИ)
         function drawArenaSegments() {
             const svg = document.getElementById('arena-svg-canvas');
             const avatarsContainer = document.getElementById('arena-avatars-container');
@@ -269,7 +111,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             svg.innerHTML = ''; avatarsContainer.innerHTML = '';
 
             const N = arenaPlayers.length;
-            if (N === 0) return;
+            if (N === 0) {
+                const statusText = document.getElementById('arena-status-text');
+                if (statusText) { statusText.classList.remove('hidden'); statusText.innerText = "Ждем ставки..."; }
+                return;
+            }
 
             const W = 320, H = 320, CX = W / 2, CY = H / 2;
             let totalBet = 0;
@@ -279,89 +125,63 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
                 rect.setAttribute("x", "0"); rect.setAttribute("y", "0"); rect.setAttribute("width", "100%"); rect.setAttribute("height", "100%");
                 rect.setAttribute("fill", arenaPlayers[0].color || '#ff3b30');
-                rect.setAttribute("stroke", "rgba(255, 255, 255, 0.25)"); rect.setAttribute("stroke-width", "3");
                 svg.appendChild(rect);
-                createAvatarElement(CX, 240, arenaPlayers[0].avatar, 56);
+                createAvatarElement(CX, CY + 30, arenaPlayers[0].avatar, 48);
                 return;
             }
 
-            let currentAngle = -Math.PI / 2;
-            const corners = [Math.atan2(1, 1), Math.atan2(1, -1), Math.atan2(-1, -1), Math.atan2(-1, 1)].map(a => a < 0 ? a + 2 * Math.PI : a);
+            // Сортировка игроков по сумме ставки (от большего к меньшему) для красивой диагонали
+            const sortedPlayers = [...arenaPlayers].sort((a, b) => parseFloat(b.bet) - parseFloat(a.bet));
+            
+            let currentAngle = -Math.PI / 2; // Начинаем с верхней точки
+            const corners = [0, Math.PI/2, Math.PI, 3*Math.PI/2].map(a => a < 0 ? a + 2*Math.PI : a);
 
-            for (let i = 0; i < N; i++) {
-                const player = arenaPlayers[i];
+            sortedPlayers.forEach((player, index) => {
                 const share = totalBet > 0 ? parseFloat(player.bet || 0) / totalBet : (1 / N);
                 let nextAngle = currentAngle + 2 * Math.PI * share;
 
                 const pathPoints = [{ x: CX, y: CY }];
-                pathPoints.push(getSquareIntersection(currentAngle, W, H));
+                pathPoints.push(getSquareIntersection(currentAngle, CX, CY, W));
 
                 let normalizedCurrent = (currentAngle % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
                 let normalizedNext = (nextAngle % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
                 if (nextAngle > currentAngle && normalizedNext < normalizedCurrent) normalizedNext += 2 * Math.PI;
 
                 const crossedCorners = [];
-                for (let cAngle of corners) {
+                corners.forEach(cAngle => {
                     let normalizedCAngle = (cAngle % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
                     if (normalizedCAngle < normalizedCurrent && nextAngle > currentAngle) normalizedCAngle += 2 * Math.PI;
                     if (normalizedCAngle > normalizedCurrent && normalizedCAngle < normalizedNext) crossedCorners.push(cAngle);
-                }
+                });
                 crossedCorners.sort((a, b) => a - b);
-                for (let cAngle of crossedCorners) pathPoints.push(getSquareIntersection(cAngle, W, H));
-                pathPoints.push(getSquareIntersection(nextAngle, W, H));
+                crossedCorners.forEach(cAngle => pathPoints.push(getSquareIntersection(cAngle, CX, CY, W)));
+                pathPoints.push(getSquareIntersection(nextAngle, CX, CY, W));
 
                 const poly = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
                 poly.setAttribute("points", pathPoints.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' '));
-                poly.setAttribute("fill", player.color || '#5856d6');
-                poly.setAttribute("stroke", "rgba(255, 255, 255, 0.35)"); poly.setAttribute("stroke-width", "3"); poly.setAttribute("stroke-linejoin", "round");
+                poly.setAttribute("fill", player.color || '#0088cc');
+                poly.setAttribute("stroke", "rgba(255, 255, 255, 0.2)"); poly.setAttribute("stroke-width", "2");
+                poly.setAttribute("data-user-id", player.userId);
                 svg.appendChild(poly);
 
-                const c = getPolygonCentroid(pathPoints);
-                createAvatarElement(Math.max(50, Math.min(270, c.x)), Math.max(50, Math.min(270, c.y)), player.avatar, 38);
+                // Расчет центра масс для аватарки
+                let sumX = 0, sumY = 0, count = 0;
+                pathPoints.forEach(p => { sumX += p.x; sumY += p.y; count++; });
+                const avgX = Math.max(50, Math.min(270, sumX / count));
+                const avgY = Math.max(50, Math.min(270, sumY / count));
+
+                createAvatarElement(avgX, avgY, player.avatar, 36);
                 currentAngle = nextAngle;
-            }
-        }
-
-        function getSquareIntersection(angle, W, H) {
-            const cx = W/2, cy = H/2, halfSize = W/2;
-            const tan = Math.tan(angle);
-            if (angle >= 0 && angle < Math.PI/2) return tan <= 1 ? {x: cx + halfSize, y: cy + halfSize * tan} : {x: cx + halfSize / tan, y: cy + halfSize};
-            if (angle >= Math.PI/2 && angle < Math.PI) return tan >= -1 ? {x: cx - halfSize / tan, y: cy + halfSize} : {x: cx - halfSize, y: cy - halfSize * tan};
-            if (angle >= Math.PI && angle < 3*Math.PI/2) return tan <= 1 ? {x: cx - halfSize, y: cy - halfSize * tan} : {x: cx - halfSize / tan, y: cy - halfSize};
-            if (angle >= 3*Math.PI/2 && angle <= 2*Math.PI) return tan >= -1 ? {x: cx + halfSize / tan, y: cy - halfSize} : {x: cx + halfSize, y: cy + halfSize * tan};
-            return {x: cx + halfSize, y: cy};
-        }
-
-        function getPolygonCentroid(pts) {
-            if (pts.length === 0) return { x: 160, y: 160 };
-            let first = pts[0], last = pts[pts.length - 1];
-            let closeCycle = false;
-            if (first.x !== last.x || first.y !== last.y) { pts.push({ x: first.x, y: first.y }); closeCycle = true; }
-            let area = 0, cx = 0, cy = 0;
-            for (let i = 0; i < pts.length - 1; i++) {
-                let p1 = pts[i], p2 = pts[i+1];
-                let factor = (p1.x * p2.y - p2.x * p1.y);
-                area += factor; cx += (p1.x + p2.x) * factor; cy += (p1.y + p2.y) * factor;
-            }
-            area = area / 2;
-            if (closeCycle) pts.pop();
-            if (Math.abs(area) < 0.01) {
-                let sx = 0, sy = 0; pts.forEach(p => { sx += p.x; sy += p.y; });
-                return { x: sx / pts.length, y: sy / pts.length };
-            }
-            cx = cx / (6 * area); cy = cy / (6 * area);
-            return { x: cx, y: cy };
+            });
+            
+            // Скрыть надпись "Ждем ставки..." при наличии игроков
+            const statusText = document.getElementById('arena-status-text');
+            if (statusText) statusText.classList.add('hidden');
         }
 
         function createAvatarElement(x, y, src, size) {
             const container = document.getElementById('arena-avatars-container');
             if (!container) return;
-            const centerX = 160, centerY = 160;
-            let dx = x - centerX, dy = y - centerY, dist = Math.sqrt(dx * dx + dy * dy);
-            if (dist < 75) {
-                if (dist < 2) { x = centerX + 60; y = centerY + 60; }
-                else { x = centerX + (dx / dist) * 85; y = centerY + (dy / dist) * 85; }
-            }
             const img = document.createElement('img');
             img.className = 'arena-player-avatar-node';
             img.src = src;
@@ -371,13 +191,159 @@ document.addEventListener('DOMContentLoaded', async () => {
             container.appendChild(img);
         }
 
+        // ===================== ФИЗИКА ШАРИКА =====================
+        function simulateAndAnimateBall(targetX, targetY, onComplete) {
+            if (isBallAnimating) return;
+            isBallAnimating = true;
+
+            const W = 320, H = 320;
+            const canvas = document.getElementById('arena-ball-svg');
+            canvas.innerHTML = '';
+
+            // Создаем шарик
+            const ball = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+            ball.setAttribute("id", "physics-ball");
+            ball.setAttribute("r", "8");
+            ball.setAttribute("fill", "#ffffff");
+            canvas.appendChild(ball);
+
+            // Создаем текст победителя
+            const textEl = document.createElementNS("http://www.w3.org/2000/svg", "text");
+            textEl.setAttribute("fill", "#ffffff");
+            textEl.setAttribute("font-size", "12");
+            textEl.setAttribute("font-weight", "900");
+            textEl.setAttribute("text-anchor", "middle");
+            textEl.setAttribute("filter", "drop-shadow(0px 2px 3px rgba(0,0,0,0.9))");
+            canvas.appendChild(textEl);
+
+            // Рандомная начальная позиция (не в центре)
+            let startX = 30 + Math.random() * 260;
+            let startY = 30 + Math.random() * 260;
+            
+            // Рандомный вектор скорости
+            let angle = Math.random() * 2 * Math.PI;
+            let speed = 4 + Math.random() * 6; 
+            let vx = Math.cos(angle) * speed;
+            let vy = Math.sin(angle) * speed;
+            
+            let x = startX, y = startY;
+            let frame = 0;
+            const friction = 0.985;
+            const maxFrames = 350; // Ограничение времени анимации
+
+            ball.setAttribute("cx", x.toFixed(1));
+            ball.setAttribute("cy", y.toFixed(1));
+
+            const animate = () => {
+                frame++;
+                
+                // Торможение
+                vx *= friction;
+                vy *= friction;
+                x += vx;
+                y += vy;
+
+                // Отскок от стенок
+                if (x < 8) { x = 8; vx = -vx; }
+                if (x > W - 8) { x = W - 8; vx = -vx; }
+                if (y < 8) { y = 8; vy = -vy; }
+                if (y > H - 8) { y = H - 8; vy = -vy; }
+
+                ball.setAttribute("cx", x.toFixed(1));
+                ball.setAttribute("cy", y.toFixed(1));
+                textEl.setAttribute("x", x.toFixed(1));
+                textEl.setAttribute("y", (y + 24).toFixed(1));
+
+                // Если скорость почти нулевая или прошло много кадров -> завершаем
+                if ((Math.abs(vx) < 0.15 && Math.abs(vy) < 0.15) || frame > maxFrames) {
+                    // Плавно "приземляем" в финальную точку (серверную)
+                    const finalX = parseFloat(targetX);
+                    const finalY = parseFloat(targetY);
+                    
+                    // Завершающая анимация подлета к центру сектора
+                    let smoothFrame = 0;
+                    const smoothMax = 20;
+                    const startFx = x, startFy = y;
+                    
+                    const smoothLand = () => {
+                        smoothFrame++;
+                        const progress = smoothFrame / smoothMax;
+                        const ease = 1 - Math.pow(1 - progress, 3); // Ease Out
+                        
+                        const curX = startFx + (finalX - startFx) * ease;
+                        const curY = startFy + (finalY - startFy) * ease;
+                        
+                        ball.setAttribute("cx", curX.toFixed(1));
+                        ball.setAttribute("cy", curY.toFixed(1));
+                        textEl.setAttribute("x", curX.toFixed(1));
+                        textEl.setAttribute("y", (curY + 24).toFixed(1));
+
+                        if (smoothFrame < smoothMax) {
+                            requestAnimationFrame(smoothLand);
+                        } else {
+                            ball.setAttribute("cx", finalX.toFixed(1));
+                            ball.setAttribute("cy", finalY.toFixed(1));
+                            textEl.setAttribute("x", finalX.toFixed(1));
+                            textEl.setAttribute("y", (finalY + 24).toFixed(1));
+                            
+                            // Проверяем победителя по координатам
+                            const winner = getPlayerAtCoords(finalX, finalY);
+                            if (winner) textEl.textContent = `🏆 ${winner.username}`;
+                            else textEl.textContent = "🏆 Победитель!";
+
+                            setTimeout(() => {
+                                if (onComplete) onComplete();
+                            }, 1500); // Задержка перед очисткой
+                        }
+                    };
+                    smoothLand();
+                    return;
+                }
+                requestAnimationFrame(animate);
+            };
+            animate();
+        }
+
+        // Определение победителя по координатам
+        function getPlayerAtCoords(x, y) {
+            if (arenaPlayers.length === 0) return null;
+            if (arenaPlayers.length === 1) return arenaPlayers[0];
+            
+            const W = 320, H = 320, CX = W / 2, CY = H / 2;
+            let totalBet = 0;
+            arenaPlayers.forEach(p => totalBet += parseFloat(p.bet || 0));
+
+            // Преобразуем координаты в угол
+            let angle = Math.atan2(y - CY, x - CX);
+            if (angle < 0) angle += 2 * Math.PI;
+
+            let currentAngle = -Math.PI / 2;
+            
+            for (let i = 0; i < arenaPlayers.length; i++) {
+                const player = arenaPlayers[i];
+                const share = totalBet > 0 ? parseFloat(player.bet || 0) / totalBet : (1 / arenaPlayers.length);
+                let nextAngle = currentAngle + 2 * Math.PI * share;
+
+                let normalizedCurrent = (currentAngle % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
+                let normalizedNext = (nextAngle % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
+                let normalizedAngle = angle;
+                
+                if (nextAngle > currentAngle && normalizedNext < normalizedCurrent) normalizedNext += 2 * Math.PI;
+                if (normalizedAngle < normalizedCurrent && nextAngle > currentAngle) normalizedAngle += 2 * Math.PI;
+
+                if (normalizedAngle >= normalizedCurrent && normalizedAngle <= normalizedNext) return player;
+                currentAngle = nextAngle;
+            }
+            return arenaPlayers[arenaPlayers.length - 1];
+        }
+
+        // ===================== UI И ПОЛЛИНГ =====================
         function updatePlayersListUI() {
             const listContainer = document.getElementById('arena-players-list');
             if (!listContainer) return;
             if (arenaPlayers.length === 0) {
                 listContainer.innerHTML = `<div class="empty-list-placeholder">Ставок еще нет. Станьте первым!</div>`;
-                safeSetText(elements.arenaPlayersTotal, '0');
-                return;
+                safeSetText(elements.arenaPlayersTotal, '0'); return;
             }
             let totalBetSum = 0; arenaPlayers.forEach(p => totalBetSum += parseFloat(p.bet || 0));
             listContainer.innerHTML = '';
@@ -389,15 +355,15 @@ document.addEventListener('DOMContentLoaded', async () => {
                 row.style.borderLeft = `4px solid ${p.color || '#8d3df5'}`;
                 row.innerHTML = `
                     <div class="player-row-left">
-                        <img class="player-row-avatar" src="${p.avatar}" onerror="this.src='https://img.icons8.com/color/96/user.png';" alt="Avatar">
+                        <img class="player-row-avatar" src="${p.avatar}" onerror="this.src='https://img.icons8.com/color/96/user.png';">
                         <div class="player-info-column">
                             <span class="player-row-name">${p.username || 'Игрок'}</span>
-                            <span class="player-row-chance">${chance}% шанс</span>
+                            <span class="player-row-chance">${chance}%</span>
                         </div>
                     </div>
                     <div class="player-row-right">
                         <span class="player-row-bet-value">${pBet.toFixed(3)}</span>
-                        <img class="player-row-coin" src="${GRAMCOIN_ICON_URL}" alt="GRAM">
+                        <img class="player-row-coin" src="${GRAMCOIN_ICON_URL}">
                     </div>
                 `;
                 listContainer.appendChild(row);
@@ -435,38 +401,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (countdownTimer) countdownTimer.classList.add('hidden');
             safeSetText(elements.arenaPlayersTotal, '0');
             arenaPlayers = [];
-            localExpectedBetAmount = 0;
             drawArenaSegments();
             updatePlayersListUI();
             renderBetButtons();
+            isBallAnimating = false;
         }
 
-        function getMergedPlayers(serverPlayers, roundNumber) {
-            const myIdStr = String(userId);
-            const serverMe = serverPlayers.find(p => String(p.userId) === myIdStr);
-            const serverMyBet = serverMe ? parseFloat(serverMe.bet) : 0;
-            if (serverMyBet >= localExpectedBetAmount) localExpectedBetAmount = serverMyBet;
-            const diff = localExpectedBetAmount - serverMyBet;
-            let merged = serverPlayers.map(p => ({ ...p }));
-            if (diff > 0.0001) {
-                const existingMe = merged.find(p => String(p.userId) === myIdStr);
-                if (existingMe) existingMe.bet = parseFloat(existingMe.bet) + diff;
-                else {
-                    merged.push({
-                        userId: userId,
-                        username: currentUser.username || "Я",
-                        avatar: currentUser.avatar_url || "https://img.icons8.com/color/96/user.png",
-                        bet: diff,
-                        color: getUserColor(userId, roundNumber)
-                    });
-                }
-            }
-            return merged;
-        }
-
-        async function pollArenaLoop(forceInstant = false) {
-            if (isBallAnimating && !forceInstant) { if (isPollingActive) setTimeout(pollArenaLoop, 1000); return; }
-            if (!isPollingActive && !forceInstant) return;
+        async function pollArenaLoop() {
+            if (!isPollingActive) return;
             const arenaSection = document.getElementById('arena-section');
             if (!arenaSection || arenaSection.classList.contains('hidden')) { stopArenaPolling(); return; }
 
@@ -476,7 +418,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if (res.ok) {
                     const state = await res.json();
                     const correctRoundNumber = state.roundNumber || state.round_number || 1;
-                    currentServerRoundNumber = correctRoundNumber;
                     safeSetText(elements.arenaRoundNumber, correctRoundNumber);
                     arenaStatusStr = state.status || state.state || "waiting";
 
@@ -486,19 +427,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                         username: bet.username || bet.user_name || bet.name || "Игрок",
                         avatar: bet.avatar || bet.avatar_url || "https://img.icons8.com/color/96/user.png",
                         bet: parseFloat(bet.amount || bet.bet || 0),
-                        color: bet.color || getUserColor(bet.userId || bet.user_id || bet.id, correctRoundNumber)
+                        color: bet.color || '#0088cc'
                     }));
 
-                    if (correctRoundNumber !== lastObservedRoundNumber) {
-                        localExpectedBetAmount = 0;
-                        lastObservedRoundNumber = correctRoundNumber;
-                        setBallAnimating(false);
-                        lastAnimatedRound = null;
-                        clearArenaRoundUi(true);
-                    }
-
-                    if (arenaStatusStr === 'waiting' && serverPlayers.length === 0) localExpectedBetAmount = 0;
-                    arenaPlayers = getMergedPlayers(serverPlayers, correctRoundNumber);
+                    arenaPlayers = serverPlayers;
                     drawArenaSegments();
                     updatePlayersListUI();
 
@@ -508,58 +440,68 @@ document.addEventListener('DOMContentLoaded', async () => {
                     const serverTime = state.serverTime || Date.now();
                     const resolvedAt = state.resolvedAt || 0;
 
-                    if (arenaStatusStr === 'countdown') {
+                    if (arenaStatusStr === 'countdown' && arenaPlayers.length >= 2) {
                         if (statusText) statusText.classList.add('hidden');
                         let serverCountdown = parseInt(stateTimeLeft, 10);
                         if (!isNaN(serverCountdown)) {
-                            if (Math.abs(localCountdownValue - serverCountdown) > 1 || !countdownIntervalId) {
-                                localCountdownValue = serverCountdown;
-                                if (countdownTimer) { countdownTimer.classList.remove('hidden'); countdownTimer.innerText = localCountdownValue; }
-                            }
+                            localCountdownValue = serverCountdown;
+                            if (countdownTimer) { countdownTimer.classList.remove('hidden'); countdownTimer.innerText = localCountdownValue; }
+                            
                             if (!countdownIntervalId) {
                                 countdownIntervalId = setInterval(() => {
                                     localCountdownValue--;
-                                    if (localCountdownValue <= 0) { clearInterval(countdownIntervalId); countdownIntervalId = null; if (countdownTimer) countdownTimer.classList.add('hidden'); setTimeout(() => { pollArenaLoop(true); }, 50); }
-                                    else { if (countdownTimer) { countdownTimer.classList.remove('hidden'); countdownTimer.innerText = localCountdownValue; } }
+                                    if (localCountdownValue <= 0) {
+                                        clearInterval(countdownIntervalId); countdownIntervalId = null;
+                                        if (countdownTimer) countdownTimer.classList.add('hidden');
+                                    } else {
+                                        if (countdownTimer) { countdownTimer.classList.remove('hidden'); countdownTimer.innerText = localCountdownValue; }
+                                    }
                                 }, 1000);
                             }
                         }
                     } else if (arenaStatusStr === 'finished') {
                         clearInterval(countdownIntervalId); countdownIntervalId = null;
                         if (countdownTimer) countdownTimer.classList.add('hidden');
-
-                        const winId = state.winnerId || state.winner_id || "";
+                        if (statusText) statusText.classList.add('hidden');
+                        
                         const winX = state.winnerX || state.winner_x || 160;
                         const winY = state.winnerY || state.winner_y || 160;
+                        const winId = state.winnerId || state.winner_id || "";
                         const tPool = state.totalPool || state.total_pool || state.pool || 0;
 
-                        if (correctRoundNumber !== lastAnimatedRound) {
-                            lastAnimatedRound = correctRoundNumber;
-                            setBallAnimating(true);
-                            setTimeout(() => {
-                                setBallAnimating(false);
+                        // Запускаем анимацию только если она еще не идет
+                        if (!isBallAnimating && arenaPlayers.length >= 2) {
+                            // Запуск физики шарика
+                            simulateAndAnimateBall(winX, winY, () => {
+                                // Коллбек после остановки шарика
                                 if (String(winId) === String(userId)) {
-                                    showCustomModal({ icon: '🏆', title: 'Победа!', message: `🎉 Вы получили весь банк: +${parseFloat(tPool).toFixed(3)} GRAM!`, buttons: [{ text: 'Забрать!', primary: true }] });
+                                    showCustomModal({ icon: '🏆', title: 'Победа!', message: `🎉 Вы выиграли банк: +${parseFloat(tPool).toFixed(3)} GRAM!`, buttons: [{ text: 'Забрать!', primary: true }] });
                                     triggerBalanceBadge(parseFloat(tPool));
                                 }
-                                clearArenaRoundUi(false);
-                                fetchUserData();
-                            }, 2000);
+                                
+                                // Очистка поля через 1.5 секунды
+                                setTimeout(() => {
+                                    clearArenaRoundUi(true);
+                                    fetchUserData();
+                                }, 1500);
+                            });
                         }
-                    } else {
+                    } else if (arenaStatusStr === 'waiting') {
+                        if (statusText) statusText.classList.remove('hidden');
+                        if (!isBallAnimating && arenaPlayers.length === 0) {
+                            clearArenaRoundUi(true);
+                        }
                         clearInterval(countdownIntervalId); countdownIntervalId = null;
-                        if (countdownTimer) countdownTimer.classList.add('hidden');
-                        if (statusText && !isBallAnimating) { statusText.classList.remove('hidden'); statusText.innerText = "Ждем ставки..."; }
                     }
                     renderBetButtons();
                     updateBalanceUI();
                 }
-            } catch (err) { console.error("Error polling:", err); }
-            finally { if (isPollingActive && !isBallAnimating && !forceInstant) setTimeout(pollArenaLoop, 1500); }
+            } catch (err) { console.error("Polling error:", err); }
+            finally { if (isPollingActive) setTimeout(pollArenaLoop, 1500); }
         }
 
         function startArenaPolling() { if (isPollingActive) return; isPollingActive = true; pollArenaLoop(); }
-        function stopArenaPolling() { isPollingActive = false; clearInterval(countdownIntervalId); countdownIntervalId = null; if (!isBallAnimating) clearArenaRoundUi(true); }
+        function stopArenaPolling() { isPollingActive = false; clearInterval(countdownIntervalId); countdownIntervalId = null; }
 
         let localBetThrottle = false;
         const handleBetClick = async (e) => {
@@ -570,49 +512,22 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             localBetThrottle = true; btn.style.opacity = '0.5';
             setTimeout(() => { localBetThrottle = false; btn.style.opacity = '1'; renderBetButtons(); }, 250);
-
-            localExpectedBetAmount = parseFloat((localExpectedBetAmount + betValue).toFixed(3));
-            arenaPlayers = getMergedPlayers(arenaPlayers, lastObservedRoundNumber || 1);
-            drawArenaSegments(); updatePlayersListUI(); updateBalanceUI();
             triggerBalanceBadge(-betValue);
 
             try {
                 const res = await fetchWithTimeout(`${API_BASE_URL}/api/place_bet`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': initDataHeader }, body: JSON.stringify({ amount: betValue }), timeout: 10000 });
                 if (res.status === 403) { showBannedScreen(); return; }
                 const data = await res.json();
-                if (res.ok && data.success) { currentUser.balance = data.newBalance; setTimeout(() => { pollArenaLoop(true); }, 150); }
-                else { triggerBalanceBadge(betValue); localExpectedBetAmount = parseFloat(Math.max(0, localExpectedBetAmount - betValue).toFixed(3)); fetchUserData(); }
-            } catch (err) { console.warn("Сетевой лаг. Ставка в очереди..."); }
+                if (res.ok && data.success) { currentUser.balance = data.newBalance; setTimeout(() => { pollArenaLoop(); }, 100); }
+                else { triggerBalanceBadge(betValue); fetchUserData(); }
+            } catch (err) { console.warn("Bet error:", err); }
         };
 
         document.getElementById('bet-btn-1')?.addEventListener('click', handleBetClick);
         document.getElementById('bet-btn-2')?.addEventListener('click', handleBetClick);
         document.getElementById('bet-btn-3')?.addEventListener('click', handleBetClick);
 
-        const editBetsModal = document.getElementById('edit-bets-modal');
-        document.getElementById('bet-edit-trigger')?.addEventListener('click', () => {
-            document.getElementById('bet-input-1').value = customBets[0];
-            document.getElementById('bet-input-2').value = customBets[1];
-            document.getElementById('bet-input-3').value = customBets[2];
-            editBetsModal.classList.remove('hidden');
-        });
-        document.getElementById('edit-bets-close-btn')?.addEventListener('click', () => editBetsModal.classList.add('hidden'));
-        document.getElementById('cancel-bets-btn')?.addEventListener('click', () => editBetsModal.classList.add('hidden'));
-        
-        document.getElementById('save-bets-btn')?.addEventListener('click', () => {
-            let b1 = parseFloat(document.getElementById('bet-input-1').value);
-            let b2 = parseFloat(document.getElementById('bet-input-2').value);
-            let b3 = parseFloat(document.getElementById('bet-input-3').value);
-            b1 = parseFloat(b1.toFixed(3)); b2 = parseFloat(b2.toFixed(3)); b3 = parseFloat(b3.toFixed(3));
-            if (isNaN(b1) || b1 < 0.1 || isNaN(b2) || b2 < 0.1 || isNaN(b3) || b3 < 0.1) { showNotification("Ставка не может быть меньше 0.1 GRAM!", "⚠️"); return; }
-            customBets = [b1, b2, b3];
-            try { localStorage.setItem(`custom_bets_${userId}`, JSON.stringify(customBets)); } catch(e) {}
-            editBetsModal.classList.add('hidden');
-            showNotification("Кнопки настроены!", "✏️");
-            renderBetButtons();
-        });
-
-        // ===================== ПРЕДМЕТЫ (ПОЛНЫЙ СПИСОК) =====================
+        // ===================== КЕЙСЫ И ПРЕДМЕТЫ =====================
         const GIFT_POOL = [
             { id: 1, name: "Статуя птицы серая", icon: "/Images/Items/rare_bird.jpg", price: "20 GRAM", rawPrice: 20.0, isGold: true, type: "gift" },
             { id: 2, name: "Тыква", icon: "/Images/Items/pumpkin.jpg", price: "8 GRAM", rawPrice: 8.0, isGold: true, type: "gift" },
@@ -651,53 +566,29 @@ document.addEventListener('DOMContentLoaded', async () => {
         // ===================== ИНВЕНТАРЬ И ОТПРАВКА =====================
         function openSendGiftModal(userInventory) {
             const overlay = document.getElementById('custom-modal');
-            const modalIcon = document.getElementById('modal-icon');
-            const modalTitle = document.getElementById('modal-title');
-            const modalMsg = document.getElementById('modal-message');
-            const actionsContainer = document.getElementById('modal-actions');
-            const closeX = document.getElementById('modal-close-btn');
+            const modalIcon = document.getElementById('modal-icon'); const modalTitle = document.getElementById('modal-title'); const modalMsg = document.getElementById('modal-message'); const actionsContainer = document.getElementById('modal-actions'); const closeX = document.getElementById('modal-close-btn');
             if (!overlay) return;
-
             if (modalIcon) modalIcon.innerHTML = "📤";
             if (modalTitle) modalTitle.innerText = "Отправить подарок другу";
             
-            let itemsHtml = userInventory.map(item => `
-                <option value="${item.item_id}">${formatItemName(item.name)} (${parseFloat(item.value).toFixed(3)} GRAM)</option>
-            `).join('');
-
+            let itemsHtml = userInventory.map(item => `<option value="${item.item_id}">${formatItemName(item.name)} (${parseFloat(item.value).toFixed(3)} GRAM)</option>`).join('');
             modalMsg.innerHTML = `
                 <div style="display:flex; flex-direction:column; gap:12px; width:100%; text-align:left;">
-                    <div>
-                        <label style="font-size:12px; font-weight:700; color:#a5a1b8; display:block; margin-bottom:4px;">Telegram Юзернейм</label>
-                        <input type="text" id="send-gift-username" placeholder="@friend" style="width:100%; background:#0b0914; border:1px solid #241c44; border-radius:12px; padding:12px; color:#fff; font-size:14px; box-sizing:border-box;">
-                    </div>
-                    <div>
-                        <label style="font-size:12px; font-weight:700; color:#a5a1b8; display:block; margin-bottom:4px;">Выберите подарок</label>
-                        <select id="send-gift-item-select" style="width:100%; background:#0b0914; border:1px solid #241c44; border-radius:12px; padding:12px; color:#fff; font-size:14px; box-sizing:border-box; appearance:none;">
-                            ${itemsHtml}
-                        </select>
-                    </div>
+                    <div><label style="font-size:12px; font-weight:700; color:#a5a1b8; display:block; margin-bottom:4px;">Telegram Юзернейм</label><input type="text" id="send-gift-username" placeholder="@friend" style="width:100%; background:#0b0914; border:1px solid #241c44; border-radius:12px; padding:12px; color:#fff; font-size:14px; box-sizing:border-box;"></div>
+                    <div><label style="font-size:12px; font-weight:700; color:#a5a1b8; display:block; margin-bottom:4px;">Выберите подарок</label><select id="send-gift-item-select" style="width:100%; background:#0b0914; border:1px solid #241c44; border-radius:12px; padding:12px; color:#fff; font-size:14px; box-sizing:border-box; appearance:none;">${itemsHtml}</select></div>
                 </div>
             `;
-
-            actionsContainer.innerHTML = `
-                <button id="send-gift-confirm-btn" class="modal-btn modal-btn-primary" style="margin-top:10px;">Отправить 🎁</button>
-                <button id="send-gift-cancel-btn" class="modal-btn modal-btn-secondary">Отмена</button>
-            `;
-
+            actionsContainer.innerHTML = `<button id="send-gift-confirm-btn" class="modal-btn modal-btn-primary" style="margin-top:10px;">Отправить 🎁</button><button id="send-gift-cancel-btn" class="modal-btn modal-btn-secondary">Отмена</button>`;
             const handleClose = () => { overlay.classList.add('hidden'); };
             if (closeX) closeX.onclick = handleClose;
             document.getElementById('send-gift-cancel-btn').onclick = handleClose;
-
             document.getElementById('send-gift-confirm-btn').onclick = async () => {
                 const targetUsername = document.getElementById('send-gift-username').value.trim();
                 const itemId = document.getElementById('send-gift-item-select').value;
                 if (!targetUsername) { showNotification("Введите юзернейм получателя", "⚠️"); return; }
                 if (!itemId) { showNotification("Выберите предмет", "⚠️"); return; }
-
                 const confirmBtn = document.getElementById('send-gift-confirm-btn');
                 confirmBtn.disabled = true; confirmBtn.innerText = "Отправка...";
-
                 try {
                     const res = await fetchWithTimeout(`${API_BASE_URL}/api/send_gift`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': initDataHeader }, body: JSON.stringify({ targetUsername: targetUsername, itemId: parseInt(itemId) }), timeout: 8000 });
                     const data = await res.json();
@@ -710,11 +601,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             overlay.classList.remove('hidden');
         }
 
-        // ===================== НАВИГАЦИЯ =====================
+        // ===================== НАВИГАЦИЯ И БАЛАНС =====================
         function navigateTo(target) {
             document.querySelectorAll('.app-section').forEach(s => s.classList.add('hidden'));
             if (elements.bottomNavigation) elements.bottomNavigation.classList.remove('hidden');
-
             if (target === 'home') { if (elements.homeSection) elements.homeSection.classList.remove('hidden'); setActiveTab('home'); stopArenaPolling(); }
             else if (target === 'inventory') { if (elements.inventorySection) elements.inventorySection.classList.remove('hidden'); setActiveTab('inventory'); fetchInventory(); stopArenaPolling(); }
             else if (target === 'rating') { if (elements.ratingSection) elements.ratingSection.classList.remove('hidden'); setActiveTab('rating'); stopArenaPolling(); }
@@ -725,23 +615,18 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         function setActiveTab(targetId) { elements.navTabs.forEach(tab => tab.classList.toggle('active', tab.getAttribute('data-target') === targetId)); }
         elements.navTabs.forEach(tab => { tab.addEventListener('click', () => navigateTo(tab.getAttribute('data-target'))); });
-
         document.getElementById('game-arena-trigger')?.addEventListener('click', () => navigateTo('arena'));
         document.getElementById('back-to-home-from-arena')?.addEventListener('click', () => navigateTo('home'));
-        document.getElementById('back-to-home-from-balance')?.addEventListener('click', () => navigateTo('home'));
-        document.getElementById('back-to-home-button')?.addEventListener('click', () => navigateTo('home'));
         document.getElementById('balance-pill')?.addEventListener('click', () => navigateTo('balance'));
 
         elements.dailyCaseBanner?.addEventListener('click', () => { isNewbieCaseMode = false; elements.rewardsSectionContainer.classList.remove('hidden'); safeSetText(elements.casePageMainTitle, "Ежедневный кейс"); safeSetText(elements.rewardsGridTitle, "🏆 Содержимое кейса"); safeSetText(elements.spinBtn, "Запустить"); renderRewardsGrid(); updateDailyCaseTimer(); navigateTo('case'); });
         elements.newbieCaseBanner?.addEventListener('click', () => { isNewbieCaseMode = true; elements.rewardsSectionContainer.classList.remove('hidden'); safeSetText(elements.casePageMainTitle, "Кейс новичка"); safeSetText(elements.rewardsGridTitle, "🏆 Содержимое кейса"); safeSetText(elements.spinBtn, "Открыть (0.1 GRAM)"); renderRewardsGrid(); updateDailyCaseTimer(); navigateTo('case'); });
 
         function renderRewardsGrid() {
-            if (!elements.rewardsGrid) return;
-            elements.rewardsGrid.innerHTML = '';
+            if (!elements.rewardsGrid) return; elements.rewardsGrid.innerHTML = '';
             const currentPool = isNewbieCaseMode ? NEWBIE_GIFT_POOL : GIFT_POOL;
             currentPool.forEach(gift => {
-                const card = document.createElement('div');
-                card.className = `reward-card ${gift.isGold ? 'gold-tier' : ''}`;
+                const card = document.createElement('div'); card.className = `reward-card ${gift.isGold ? 'gold-tier' : ''}`;
                 const randomBadge = gift.type === 'gift' ? '<div class="reward-random-badge">random</div>' : '';
                 card.innerHTML = `<div class="reward-price-top">${gift.price}</div><img src="${gift.icon}" onerror="this.src='https://img.icons8.com/color/96/gift.png'"><div style="margin-bottom: 8px;"></div>${randomBadge}`;
                 elements.rewardsGrid.appendChild(card);
@@ -750,15 +635,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         function initRouletteTrack() {
             if (!elements.rouletteTrack) return;
-            elements.rouletteTrack.style.transition = 'none';
-            elements.rouletteTrack.style.transform = 'translate3d(0, 0, 0)';
-            void elements.rouletteTrack.offsetWidth;
-            elements.rouletteTrack.innerHTML = '';
+            elements.rouletteTrack.style.transition = 'none'; elements.rouletteTrack.style.transform = 'translate3d(0, 0, 0)';
+            void elements.rouletteTrack.offsetWidth; elements.rouletteTrack.innerHTML = '';
             const currentPool = isNewbieCaseMode ? NEWBIE_GIFT_POOL : GIFT_POOL;
             for (let i = 0; i < 60; i++) {
                 const randomItem = currentPool[Math.floor(Math.random() * currentPool.length)];
-                const itemEl = document.createElement('div');
-                itemEl.className = 'roulette-item';
+                const itemEl = document.createElement('div'); itemEl.className = 'roulette-item';
                 itemEl.innerHTML = `<img src="${randomItem.icon}" onerror="this.src='https://img.icons8.com/color/96/gift.png'"><span>${randomItem.price}</span>`;
                 elements.rouletteTrack.appendChild(itemEl);
             }
@@ -768,10 +650,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (!elements.rouletteTrack) return;
             const itemWidth = 96, gap = 8, itemFullWidth = itemWidth + gap, targetIndex = 45;
             const trackItems = elements.rouletteTrack.children;
-            if (trackItems[targetIndex]) {
-                trackItems[targetIndex].className = 'roulette-item';
-                trackItems[targetIndex].innerHTML = `<img src="${winningItem.icon}" onerror="this.src='https://img.icons8.com/color/96/gift.png'"><span>${winningItem.price}</span>`;
-            }
+            if (trackItems[targetIndex]) { trackItems[targetIndex].className = 'roulette-item'; trackItems[targetIndex].innerHTML = `<img src="${winningItem.icon}" onerror="this.src='https://img.icons8.com/color/96/gift.png'"><span>${winningItem.price}</span>`; }
             const containerWidth = elements.rouletteTrack.parentElement.offsetWidth;
             const centerOffset = (containerWidth / 2) - (itemWidth / 2);
             const totalTranslate = (targetIndex * itemFullWidth) - centerOffset;
@@ -784,18 +663,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             const isBalance = winningGift.type === "balance";
             if (apiNewBalance !== null) { currentUser.balance = apiNewBalance; updateBalanceUI(); }
             if (isNewbieCaseMode && elements.spinBtn) elements.spinBtn.disabled = false;
-
-            if (isBalance) {
-                showCustomModal({ icon: '💰', title: 'Баланс пополнен!', message: `🎉 Вы выиграли пополнение счета на +${winningGift.price}!`, buttons: [{ text: 'Отлично!', primary: true }] });
-                triggerBalanceBadge(winningGift.rawPrice); fetchUserData();
-            } else {
-                showCustomModal({
-                    icon: `<img src="${winningGift.icon}" style="width:70px;height:70px;object-fit:contain;" onerror="this.src='https://img.icons8.com/color/96/gift.png'">`,
-                    title: 'Вы выиграли подарок!',
-                    message: `🎁 Ваша награда: "${formatItemName(winningGift.name)}" сохранена в инвентарь!`,
-                    buttons: [{ text: `Продать за ${winningGift.price}`, primary: true, onClick: async () => { await fetch(`${API_BASE_URL}/api/sell_gift`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': initDataHeader }, body: JSON.stringify({ itemId: winningGift.id, price: winningGift.rawPrice }) }); fetchUserData(); fetchInventory(); } }, { text: 'В инвентарь', primary: false, onClick: () => { showNotification(`📦 Сохранено в инвентарь!`, '🎒'); fetchUserData(); } }]
-                });
-            }
+            if (isBalance) { showCustomModal({ icon: '💰', title: 'Баланс пополнен!', message: `🎉 Вы выиграли пополнение счета на +${winningGift.price}!`, buttons: [{ text: 'Отлично!', primary: true }] }); triggerBalanceBadge(winningGift.rawPrice); fetchUserData(); }
+            else { showCustomModal({ icon: `<img src="${winningGift.icon}" style="width:70px;height:70px;object-fit:contain;" onerror="this.src='https://img.icons8.com/color/96/gift.png'">`, title: 'Вы выиграли подарок!', message: `🎁 Ваша награда: "${formatItemName(winningGift.name)}" сохранена в инвентарь!`, buttons: [{ text: `Продать за ${winningGift.price}`, primary: true, onClick: async () => { await fetch(`${API_BASE_URL}/api/sell_gift`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': initDataHeader }, body: JSON.stringify({ itemId: winningGift.id, price: winningGift.rawPrice }) }); fetchUserData(); fetchInventory(); } }, { text: 'В инвентарь', primary: false, onClick: () => { showNotification(`📦 Сохранено в инвентарь!`, '🎒'); fetchUserData(); } }] }); }
         }
 
         elements.spinBtn?.addEventListener('click', async () => {
@@ -804,30 +673,19 @@ document.addEventListener('DOMContentLoaded', async () => {
             elements.spinBtn.disabled = true;
             if (isNewbieCaseMode) { triggerBalanceBadge(-spinCost); updateBalanceUI(Math.max(0, parseFloat(currentUser.balance || 0) - spinCost)); }
             initRouletteTrack();
-
             setTimeout(async () => {
                 try {
                     const endpoint = isNewbieCaseMode ? `${API_BASE_URL}/api/open_newbie_case` : `${API_BASE_URL}/api/open_daily_case`;
                     const response = await fetchWithTimeout(endpoint, { method: 'POST', headers: { 'X-Telegram-Init-Data': initDataHeader }, timeout: 4500 });
                     if (response.status === 403) { showBannedScreen(); return; }
                     const data = await response.json();
-
                     if (response.ok) {
                         const currentPool = isNewbieCaseMode ? NEWBIE_GIFT_POOL : GIFT_POOL;
                         let winningGift = currentPool.find(g => g.id === data.wonItem.id);
                         if (!winningGift) winningGift = currentPool.find(g => g.name.toLowerCase() === data.wonItem.name.toLowerCase());
                         spinRoulette(winningGift, () => { processWinning(winningGift, data.newBalance); });
-                    } else {
-                        if (isNewbieCaseMode) triggerBalanceBadge(spinCost);
-                        fetchUserData();
-                        showNotification(data.error || 'Ошибка.', "⚠️");
-                        elements.spinBtn.disabled = false;
-                    }
-                } catch (error) {
-                    if (isNewbieCaseMode) triggerBalanceBadge(spinCost);
-                    fetchUserData(); elements.spinBtn.disabled = false;
-                    showNotification('Ошибка сети при открытии.', '⚠️');
-                }
+                    } else { if (isNewbieCaseMode) triggerBalanceBadge(spinCost); fetchUserData(); showNotification(data.error || 'Ошибка.', "⚠️"); elements.spinBtn.disabled = false; }
+                } catch (error) { if (isNewbieCaseMode) triggerBalanceBadge(spinCost); fetchUserData(); elements.spinBtn.disabled = false; showNotification('Ошибка сети при открытии.', '⚠️'); }
             }, 50);
         });
 
@@ -837,20 +695,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const res = await fetchWithTimeout(`${API_BASE_URL}/api/inventory`, { headers: { 'X-Telegram-Init-Data': initDataHeader }, timeout: 3000 });
                 if (res.status === 403) { showBannedScreen(); return; }
                 if (!res.ok) throw new Error();
-                const items = await res.json();
-                elements.inventoryGrid.innerHTML = '';
-
-                if (items.length === 0) {
-                    elements.inventoryGrid.innerHTML = `<div class="empty-inventory">🎒 Ваш инвентарь пуст.<br>Открывайте кейсы!</div>`;
-                    return;
-                }
-
+                const items = await res.json(); elements.inventoryGrid.innerHTML = '';
+                if (items.length === 0) { elements.inventoryGrid.innerHTML = `<div class="empty-inventory">🎒 Ваш инвентарь пуст.<br>Открывайте кейсы!</div>`; return; }
                 items.forEach(item => {
                     const matchedItem = GIFT_POOL.find(g => parseInt(g.id) === parseInt(item.item_id)) || NEWBIE_GIFT_POOL.find(g => parseInt(g.id) === parseInt(item.item_id)) || {};
                     const imageSrc = matchedItem.icon || item.image_url;
-
-                    const card = document.createElement('div');
-                    card.className = 'reward-card';
+                    const card = document.createElement('div'); card.className = 'reward-card';
                     card.innerHTML = `
                         <div class="reward-price-top">${parseFloat(item.value).toFixed(2)} GRAM</div>
                         <img src="${imageSrc}" onerror="this.src='https://img.icons8.com/color/96/gift.png'">
@@ -861,36 +711,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                             <button class="inv-btn send-btn" style="background:#0088cc; color:#fff;">Отправить</button>
                         </div>
                     `;
-
-                    card.querySelector('.withdraw-btn').addEventListener('click', () => {
-                        showCustomModal({
-                            icon: `<img src="${imageSrc}" style="width:70px;height:70px;object-fit:contain;" onerror="this.src='https://img.icons8.com/color/96/gift.png'">`,
-                            title: 'Вывод подарка',
-                            message: `Отправить "${formatItemName(item.name)}" вам в Telegram?`,
-                            buttons: [{ text: 'Подтвердить вывод', primary: true, onClick: async () => {
-                                const withdrawRes = await fetchWithTimeout(`${API_BASE_URL}/api/withdraw_gift`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': initDataHeader }, body: JSON.stringify({ itemId: item.item_id }), timeout: 3000 });
-                                if (withdrawRes.status === 403) { showBannedScreen(); return; }
-                                if (withdrawRes.ok) { showNotification(`Подарок в очереди на вывод!`, '📥'); fetchInventory(); }
-                                else { const errorData = await withdrawRes.json(); showNotification(errorData.error || 'Заявка отклонена.', '⚠️'); }
-                            } }, { text: 'Отмена', primary: false }]
-                        });
-                    });
-
-                    card.querySelector('.sell-btn').addEventListener('click', () => {
-                        showCustomModal({
-                            icon: '💰', title: 'Продажа подарка', message: `Продать подарок "${formatItemName(item.name)}" за ${item.value} GRAM?`,
-                            buttons: [{ text: 'Продать за GRAM', primary: true, onClick: async () => {
-                                const sellRes = await fetchWithTimeout(`${API_BASE_URL}/api/sell_gift`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': initDataHeader }, body: JSON.stringify({ itemId: item.item_id, price: item.value }), timeout: 3000 });
-                                if (sellRes.status === 403) { showBannedScreen(); return; }
-                                if (sellRes.ok) { const sellData = await sellRes.json(); currentUser.balance = sellData.newBalance; triggerBalanceBadge(parseFloat(item.value)); fetchUserData(); fetchInventory(); }
-                            } }, { text: 'Отмена', primary: false }]
-                        });
-                    });
-
-                    card.querySelector('.send-btn').addEventListener('click', () => {
-                        openSendGiftModal(items);
-                    });
-
+                    card.querySelector('.withdraw-btn').addEventListener('click', () => { showCustomModal({ icon: `<img src="${imageSrc}" style="width:70px;height:70px;object-fit:contain;" onerror="this.src='https://img.icons8.com/color/96/gift.png'">`, title: 'Вывод подарка', message: `Отправить "${formatItemName(item.name)}" вам в Telegram?`, buttons: [{ text: 'Подтвердить вывод', primary: true, onClick: async () => { const withdrawRes = await fetchWithTimeout(`${API_BASE_URL}/api/withdraw_gift`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': initDataHeader }, body: JSON.stringify({ itemId: item.item_id }), timeout: 3000 }); if (withdrawRes.status === 403) { showBannedScreen(); return; } if (withdrawRes.ok) { showNotification(`Подарок в очереди на вывод!`, '📥'); fetchInventory(); } else { const errorData = await withdrawRes.json(); showNotification(errorData.error || 'Заявка отклонена.', '⚠️'); } } }, { text: 'Отмена', primary: false }] }); });
+                    card.querySelector('.sell-btn').addEventListener('click', () => { showCustomModal({ icon: '💰', title: 'Продажа подарка', message: `Продать подарок "${formatItemName(item.name)}" за ${item.value} GRAM?`, buttons: [{ text: 'Продать за GRAM', primary: true, onClick: async () => { const sellRes = await fetchWithTimeout(`${API_BASE_URL}/api/sell_gift`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': initDataHeader }, body: JSON.stringify({ itemId: item.item_id, price: item.value }), timeout: 3000 }); if (sellRes.status === 403) { showBannedScreen(); return; } if (sellRes.ok) { const sellData = await sellRes.json(); currentUser.balance = sellData.newBalance; triggerBalanceBadge(parseFloat(item.value)); fetchUserData(); fetchInventory(); } } }, { text: 'Отмена', primary: false }] }); });
+                    card.querySelector('.send-btn').addEventListener('click', () => { openSendGiftModal(items); });
                     elements.inventoryGrid.appendChild(card);
                 });
             } catch (error) { console.error("Inventory fetch error:", error); }
@@ -899,12 +722,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         function updateBalanceUI(forcedValue = null) {
             const baseBalance = (currentUser && currentUser.balance) ? parseFloat(currentUser.balance) : 0;
             const val = forcedValue !== null ? parseFloat(forcedValue) : baseBalance;
-            const myIdStr = String(userId);
-            const serverMe = arenaPlayers.find(p => String(p.userId) === myIdStr);
-            const serverMyBet = serverMe ? parseFloat(serverMe.bet) : 0;
-            const diff = Math.max(0, localExpectedBetAmount - serverMyBet);
-            const finalBalance = Math.max(0, val - diff);
-            const balVal = isNaN(finalBalance) ? "0.000" : finalBalance.toFixed(3);
+            const balVal = isNaN(val) ? "0.000" : val.toFixed(3);
             safeSetText(elements.balanceDisplayPill, balVal);
             safeSetText(elements.largeBalanceDisplay, balVal);
         }
@@ -912,41 +730,26 @@ document.addEventListener('DOMContentLoaded', async () => {
         let dailyCaseTimerInterval;
         function updateDailyCaseTimer() {
             clearInterval(dailyCaseTimerInterval);
-            if (currentUser && (currentUser.isAdmin === true || currentUser.isAdmin === "true")) {
-                if (elements.spinBtn) { elements.spinBtn.classList.remove('hidden'); elements.spinBtn.disabled = false; }
-                document.getElementById('timer-container')?.classList.add('hidden'); return;
-            }
-            if (isNewbieCaseMode) {
-                if (elements.spinBtn) { elements.spinBtn.classList.remove('hidden'); elements.spinBtn.disabled = false; }
-                document.getElementById('timer-container')?.classList.add('hidden'); return;
-            }
-            if (!currentUser.last_daily_case_open) {
-                if (elements.spinBtn) { elements.spinBtn.classList.remove('hidden'); elements.spinBtn.disabled = false; }
-                document.getElementById('timer-container')?.classList.add('hidden'); return;
-            }
+            if (isNewbieCaseMode) { if (elements.spinBtn) { elements.spinBtn.classList.remove('hidden'); elements.spinBtn.disabled = false; } document.getElementById('timer-container')?.classList.add('hidden'); return; }
+            if (!currentUser.last_daily_case_open) { if (elements.spinBtn) { elements.spinBtn.classList.remove('hidden'); elements.spinBtn.disabled = false; } document.getElementById('timer-container')?.classList.add('hidden'); return; }
             const lastOpen = new Date(currentUser.last_daily_case_open);
-            const now = new Date();
-            const cooldown = 24 * 60 * 60 * 1000;
+            const now = new Date(); const cooldown = 24 * 60 * 60 * 1000;
             const nextOpenTime = new Date(lastOpen.getTime() + cooldown);
             const timeLeftMs = nextOpenTime.getTime() - now.getTime();
 
-            if (timeLeftMs <= 0) {
-                if (elements.spinBtn) { elements.spinBtn.classList.remove('hidden'); elements.spinBtn.disabled = false; }
-                document.getElementById('timer-container')?.classList.add('hidden');
-            } else {
+            if (timeLeftMs <= 0) { if (elements.spinBtn) { elements.spinBtn.classList.remove('hidden'); elements.spinBtn.disabled = false; } document.getElementById('timer-container')?.classList.add('hidden'); }
+            else {
                 if (elements.spinBtn) { elements.spinBtn.classList.add('hidden'); elements.spinBtn.disabled = true; }
                 const t = document.getElementById('timer-container'); if (t) t.classList.remove('hidden');
                 const tick = () => {
-                    const nowTick = new Date();
-                    const diff = nextOpenTime.getTime() - nowTick.getTime();
+                    const nowTick = new Date(); const diff = nextOpenTime.getTime() - nowTick.getTime();
                     if (diff <= 0) { clearInterval(dailyCaseTimerInterval); updateDailyCaseTimer(); return; }
                     const hours = Math.floor(diff / (1000 * 60 * 60));
                     const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
                     const seconds = Math.floor((diff % (1000 * 60)) / 1000);
                     safeSetText(document.getElementById('daily-case-timer'), `${hours}ч ${minutes}м ${seconds}с`);
                 };
-                tick();
-                dailyCaseTimerInterval = setInterval(tick, 1000);
+                tick(); dailyCaseTimerInterval = setInterval(tick, 1000);
             }
         }
 
@@ -956,7 +759,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if (res.status === 403) { showBannedScreen(); return; }
                 if (!res.ok) throw new Error();
                 currentUser = await res.json();
-                saveUserDataToCache(currentUser);
             } catch (e) { console.warn("Local cache loaded"); }
             if (!currentUser) currentUser = {};
             updateBalanceUI();
@@ -969,13 +771,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
             const rawName = currentUser.username || currentUser.first_name || "Пользователь";
             safeSetText(document.getElementById('user-username'), formatUsername(rawName));
-            updateDailyCaseTimer();
-            renderBetButtons();
+            updateDailyCaseTimer(); renderBetButtons();
         }
 
-        renderRewardsGrid();
-        fetchUserData();
-        navigateTo('home');
+        renderRewardsGrid(); fetchUserData(); navigateTo('home');
 
     } catch (globalError) { console.error("Global init error:", globalError); }
 });
