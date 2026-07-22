@@ -1,23 +1,16 @@
 const tg = (window.Telegram && window.Telegram.WebApp) ? window.Telegram.WebApp : {
-    expand: () => {},
-    ready: () => {},
-    initData: "",
-    initDataUnsafe: { user: { id: "guest_user_id", username: "Пользователь", first_name: "Пользователь" } },
-    openLink: (url) => window.open(url, '_blank'),
-    openTelegramLink: (url) => window.open(url, '_blank')
+    expand: () => {}, ready: () => {}, initData: "", initDataUnsafe: { user: { id: "guest_user_id", username: "Пользователь", first_name: "Пользователь" } },
+    openLink: (url) => window.open(url, '_blank'), openTelegramLink: (url) => window.open(url, '_blank')
 };
 
 tg.expand();
 tg.ready();
 
-// Инъекция стилей
 (function injectStyles() {
     const style = document.createElement('style');
     style.innerHTML = `
         .arena-player-avatar-node { position: absolute !important; transform: translate(-50%, -50%) !important; border-radius: 50% !important; border: 3px solid #ffffff !important; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5) !important; object-fit: cover !important; pointer-events: none !important; z-index: 5 !important; }
         #arena-svg-canvas, #arena-ball-svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border-radius: 16px; overflow: hidden; background: transparent !important; aspect-ratio: 1/1 !important; }
-        .ball-container, .ball-wrapper, .ball-svg, #arena-ball-svg, .arena-ball-svg, [class*="ball-container"], [class*="ball-wrapper"] { background: transparent !important; background-color: transparent !important; border: none !important; box-shadow: none !important; filter: none !important; }
-        .game-arena-trigger .ball, .game-card .ball, .best-arena-preview .ball, #arena-preview-ball, .arena-preview-ball, .game-arena-trigger div.ball { background: #ffffff !important; background-color: #ffffff !important; border-radius: 50% !important; width: 12px !important; height: 12px !important; box-shadow: 0 0 12px #ffffff, 0 0 24px #ffffff, 0 0 35px #ffffff !important; filter: drop-shadow(0 0 6px #ffffff) !important; }
         #physics-ball { fill: #ffffff !important; r: 8 !important; filter: drop-shadow(0 0 8px #ffffff) !important; }
         @keyframes winningSectorPulse { 0% { filter: drop-shadow(0 0 15px var(--glow-color)) brightness(1.2); stroke: #ffffff; stroke-width: 5px; } 50% { filter: drop-shadow(0 0 35px var(--glow-color)) brightness(1.7); stroke: #ffffff; stroke-width: 8px; } 100% { filter: drop-shadow(0 0 15px var(--glow-color)) brightness(1.2); stroke: #ffffff; stroke-width: 5px; } }
         .winning-segment-glow { stroke: #ffffff !important; stroke-width: 6px !important; stroke-linejoin: round !important; animation: winningSectorPulse 0.35s infinite alternate !important; z-index: 100 !important; }
@@ -51,12 +44,6 @@ function formatWalletAddress(rawAddress) {
 }
 function preloadImages(urls) { urls.forEach(url => { const img = new Image(); img.src = url; }); }
 
-function createPRNG(seedString) {
-    let h = 1779033703 ^ seedString.length;
-    for (let i = 0; i < seedString.length; i++) { h = Math.imul(h ^ seedString.charCodeAt(i), 3432918353); h = h << 13 | h >>> 19; }
-    return function() { h = Math.imul(h ^ (h >>> 16), 2246822507); h = Math.imul(h ^ (h >>> 13), 3266489909); return ((h ^= h >>> 16) >>> 0) / 4294967296; }
-}
-
 const defaultColors = ['#ff3b30', '#4cd964', '#007aff', '#ffcc00', '#5856d6', '#ff2d55', '#5ac8fa', '#00e676', '#ff9500', '#0088cc'];
 function getUserColor(userId, roundNumber) {
     const idStr = String(userId || 'guest') + "_" + String(roundNumber || 1);
@@ -66,19 +53,12 @@ function getUserColor(userId, roundNumber) {
 }
 
 async function fetchWithTimeout(resource, options = {}) {
-    const { timeout = 10000 } = options;
-    const controller = new AbortController();
-    const id = setTimeout(() => controller.abort(), timeout);
-    try {
-        const response = await fetch(resource, { ...options, signal: controller.signal });
-        clearTimeout(id);
-        return response;
-    } catch (e) { clearTimeout(id); throw e; }
+    const { timeout = 10000 } = options; const controller = new AbortController(); const id = setTimeout(() => controller.abort(), timeout);
+    try { const response = await fetch(resource, { ...options, signal: controller.signal }); clearTimeout(id); return response; } catch (e) { clearTimeout(id); throw e; }
 }
 
 function triggerBalanceBadge(amount) {
-    const container = document.getElementById('balance-badge-container');
-    if (!container) return;
+    const container = document.getElementById('balance-badge-container'); if (!container) return;
     const badge = document.createElement('div');
     const isNegative = amount < 0;
     badge.className = `balance-popup-badge ${isNegative ? 'negative' : 'positive'}`;
@@ -104,13 +84,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         let lastObservedRoundNumber = null;
         let localExpectedBetAmount = 0;
         let currentServerRoundNumber = 0;
-
         let countdownIntervalId = null;
         let localCountdownValue = 0;
 
         const ANIMATION_DURATION_MS = 4000;
         const POST_ANIMATION_GLOW_DURATION_MS = 1000;
-
         let animatingTimeout = null;
         function setBallAnimating(val) {
             isBallAnimating = val;
@@ -137,46 +115,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         let userId = tg.initDataUnsafe?.user?.id;
         if (!userId) {
-            try {
-                const params = new URLSearchParams(initDataHeader);
-                const userRaw = params.get('user');
-                if (userRaw) userId = JSON.parse(userRaw).id;
-            } catch (e) {}
+            try { const params = new URLSearchParams(initDataHeader); const userRaw = params.get('user'); if (userRaw) userId = JSON.parse(userRaw).id; } catch (e) {}
         }
         if (!userId) userId = localGuestId;
 
         const elements = {
-            homeSection: document.getElementById('home-section'),
-            caseSection: document.getElementById('case-section'),
-            inventorySection: document.getElementById('inventory-section'),
-            ratingSection: document.getElementById('rating-section'),
-            balanceSection: document.getElementById('balance-section'),
-            arenaSection: document.getElementById('arena-section'),
-            rouletteTrack: document.getElementById('roulette-track'),
-            spinBtn: document.getElementById('spin-case-button'),
-            balanceDisplayPill: document.getElementById('user-balance-pill-value'),
-            largeBalanceDisplay: document.getElementById('large-balance-value'),
-            rewardsGrid: document.getElementById('rewards-grid'),
-            inventoryGrid: document.getElementById('inventory-grid'),
-            bottomNavigation: document.querySelector('.floating-nav-container'),
-            navTabs: document.querySelectorAll('.nav-tab'),
-            dailyCaseBanner: document.getElementById('daily-case-banner'),
-            newbieCaseBanner: document.getElementById('newbie-case-banner'),
-            rewardsSectionContainer: document.getElementById('rewards-section-container'),
-            rewardsGridTitle: document.getElementById('rewards-grid-title'),
-            casePageMainTitle: document.getElementById('case-page-main-title'),
-            connectWalletBtn: document.getElementById('connect-wallet-btn'),
-            depositBalanceBtn: document.getElementById('deposit-balance-btn'),
-            depositNoticeText: document.getElementById('deposit-notice-text'),
-            depositAmountModal: document.getElementById('deposit-amount-modal'),
-            depositModalCloseBtn: document.getElementById('deposit-modal-close-btn'),
-            modalDepositInput: document.getElementById('modal-deposit-input'),
-            modalDepositConfirmBtn: document.getElementById('modal-deposit-confirm-btn'),
-            modalDepositCancelBtn: document.getElementById('modal-deposit-cancel-btn'),
-            adminTgChatTrigger: document.getElementById('admin-tg-chat-trigger'),
-            arenaRoundNumber: document.getElementById('arena-round-number'),
-            arenaPlayersTotal: document.getElementById('arena-players-total'),
-            bannedOverlay: document.getElementById('banned-screen')
+            homeSection: document.getElementById('home-section'), caseSection: document.getElementById('case-section'), inventorySection: document.getElementById('inventory-section'), ratingSection: document.getElementById('rating-section'), balanceSection: document.getElementById('balance-section'), arenaSection: document.getElementById('arena-section'), rouletteTrack: document.getElementById('roulette-track'), spinBtn: document.getElementById('spin-case-button'), balanceDisplayPill: document.getElementById('user-balance-pill-value'), largeBalanceDisplay: document.getElementById('large-balance-value'), rewardsGrid: document.getElementById('rewards-grid'), inventoryGrid: document.getElementById('inventory-grid'), bottomNavigation: document.querySelector('.floating-nav-container'), navTabs: document.querySelectorAll('.nav-tab'), dailyCaseBanner: document.getElementById('daily-case-banner'), newbieCaseBanner: document.getElementById('newbie-case-banner'), rewardsSectionContainer: document.getElementById('rewards-section-container'), rewardsGridTitle: document.getElementById('rewards-grid-title'), casePageMainTitle: document.getElementById('case-page-main-title'), connectWalletBtn: document.getElementById('connect-wallet-btn'), depositBalanceBtn: document.getElementById('deposit-balance-btn'), depositNoticeText: document.getElementById('deposit-notice-text'), depositAmountModal: document.getElementById('deposit-amount-modal'), depositModalCloseBtn: document.getElementById('deposit-modal-close-btn'), modalDepositInput: document.getElementById('modal-deposit-input'), modalDepositConfirmBtn: document.getElementById('modal-deposit-confirm-btn'), modalDepositCancelBtn: document.getElementById('modal-deposit-cancel-btn'), adminTgChatTrigger: document.getElementById('admin-tg-chat-trigger'), arenaRoundNumber: document.getElementById('arena-round-number'), arenaPlayersTotal: document.getElementById('arena-players-total'), bannedOverlay: document.getElementById('banned-screen')
         };
 
         function showBannedScreen() {
@@ -189,13 +133,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         async function fetchPaymentParamsInternal() {
             const addrEndpoints = [`${API_BASE_URL}/api/deposit_address`];
             for (const url of addrEndpoints) {
-                try {
-                    const res = await fetchWithTimeout(url, { timeout: 15000 });
-                    if (res.ok) {
-                        const data = await res.json();
-                        if (data.address) { preloadedAdminAddress = data.address; break; }
-                    }
-                } catch (e) {}
+                try { const res = await fetchWithTimeout(url, { timeout: 15000 }); if (res.ok) { const data = await res.json(); if (data.address) { preloadedAdminAddress = data.address; break; } } } catch (e) {}
             }
         }
         fetchPaymentParamsInternal();
@@ -226,53 +164,36 @@ document.addEventListener('DOMContentLoaded', async () => {
                         const rawName = cache.username || cache.first_name || "Пользователь";
                         safeSetText(document.getElementById('user-username'), formatUsername(rawName));
                         const mainAvatar = document.getElementById('user-avatar');
-                        if (mainAvatar && cache.avatar_url) {
-                            mainAvatar.src = cache.avatar_url;
-                            mainAvatar.onerror = () => { mainAvatar.src = "https://img.icons8.com/color/96/user.png"; };
-                        }
+                        if (mainAvatar && cache.avatar_url) { mainAvatar.src = cache.avatar_url; mainAvatar.onerror = () => { mainAvatar.src = "https://img.icons8.com/color/96/user.png"; }; }
                     }
                 }
             } catch (e) {}
         }
 
-        function saveUserDataToCache(userData) {
-            try { localStorage.setItem(`user_cache_${userId}`, JSON.stringify(userData)); } catch (e) {}
-        }
-
+        function saveUserDataToCache(userData) { try { localStorage.setItem(`user_cache_${userId}`, JSON.stringify(userData)); } catch (e) {} }
         loadSavedBets();
         loadCachedUserData();
 
         function showNotification(message, icon = '🎁') {
-            const container = document.getElementById('toast-container');
-            if (!container) return;
-            const toast = document.createElement('div');
-            toast.className = 'custom-toast';
+            const container = document.getElementById('toast-container'); if (!container) return;
+            const toast = document.createElement('div'); toast.className = 'custom-toast';
             toast.innerHTML = `<div class="custom-toast-icon">${icon}</div><div class="custom-toast-content">${message}</div><button class="custom-toast-close">&times;</button>`;
             container.appendChild(toast);
             setTimeout(() => toast.classList.add('show'), 50);
-            toast.querySelector('.custom-toast-close').addEventListener('click', () => {
-                toast.classList.remove('show');
-                setTimeout(() => toast.remove(), 400);
-            });
+            toast.querySelector('.custom-toast-close').addEventListener('click', () => { toast.classList.remove('show'); setTimeout(() => toast.remove(), 400); });
             setTimeout(() => { if (toast.parentNode) { toast.classList.remove('show'); setTimeout(() => toast.remove(), 400); } }, 5000);
         }
 
         function showCustomModal({ icon = '🎁', title, message, buttons = [], onClose = null }) {
             const overlay = document.getElementById('custom-modal');
-            const modalIcon = document.getElementById('modal-icon');
-            const modalTitle = document.getElementById('modal-title');
-            const modalMsg = document.getElementById('modal-message');
-            const actionsContainer = document.getElementById('modal-actions');
-            const closeX = document.getElementById('modal-close-btn');
+            const modalIcon = document.getElementById('modal-icon'); const modalTitle = document.getElementById('modal-title'); const modalMsg = document.getElementById('modal-message'); const actionsContainer = document.getElementById('modal-actions'); const closeX = document.getElementById('modal-close-btn');
             if (!overlay) return;
             if (modalIcon) modalIcon.innerHTML = icon;
             if (modalTitle) modalTitle.innerText = title;
             if (modalMsg) modalMsg.innerText = message;
             if (actionsContainer) actionsContainer.innerHTML = '';
             buttons.forEach(btnConfig => {
-                const btn = document.createElement('button');
-                btn.className = `modal-btn ${btnConfig.primary ? 'modal-btn-primary' : 'modal-btn-secondary'}`;
-                btn.innerText = btnConfig.text;
+                const btn = document.createElement('button'); btn.className = `modal-btn ${btnConfig.primary ? 'modal-btn-primary' : 'modal-btn-secondary'}`; btn.innerText = btnConfig.text;
                 btn.addEventListener('click', () => { overlay.classList.add('hidden'); if (btnConfig.onClick) btnConfig.onClick(); });
                 if (actionsContainer) actionsContainer.appendChild(btn);
             });
@@ -281,15 +202,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             overlay.classList.remove('hidden');
         }
 
-        // TON Connect
         let tonConnectUI = null;
         try {
             const manifestUrl = `${API_BASE_URL}/tonconnect-manifest.json`;
-            const customStorage = {
-                setItem: (key, value) => { try { localStorage.setItem(`tc-${userId}-${key}`, value); } catch (e) {} },
-                getItem: (key) => { try { return localStorage.getItem(`tc-${userId}-${key}`); } catch (e) { return null; } },
-                removeItem: (key) => { try { localStorage.removeItem(`tc-${userId}-${key}`); } catch (e) {} }
-            };
+            const customStorage = { setItem: (key, value) => { try { localStorage.setItem(`tc-${userId}-${key}`, value); } catch (e) {} }, getItem: (key) => { try { return localStorage.getItem(`tc-${userId}-${key}`); } catch (e) { return null; } }, removeItem: (key) => { try { localStorage.removeItem(`tc-${userId}-${key}`); } catch (e) {} } };
             const initTonConnect = () => {
                 const TC_SDK = window.TON_CONNECT_UI || window.TonConnectUI;
                 if (TC_SDK) {
@@ -297,41 +213,20 @@ document.addEventListener('DOMContentLoaded', async () => {
                     tonConnectUI.onStatusChange(wallet => {
                         if (wallet) {
                             const displayAddress = formatWalletAddress(wallet.account.address);
-                            if (elements.connectWalletBtn) {
-                                elements.connectWalletBtn.innerText = `Привязан: (${displayAddress})`;
-                                elements.connectWalletBtn.style.background = 'linear-gradient(135deg, #00e676, #00b34a)';
-                                elements.connectWalletBtn.style.color = '#000000';
-                            }
+                            if (elements.connectWalletBtn) { elements.connectWalletBtn.innerText = `Привязан: (${displayAddress})`; elements.connectWalletBtn.style.background = 'linear-gradient(135deg, #00e676, #00b34a)'; elements.connectWalletBtn.style.color = '#000000'; }
                             if (elements.depositBalanceBtn) elements.depositBalanceBtn.removeAttribute('disabled');
-                            if (elements.depositNoticeText) {
-                                elements.depositNoticeText.innerText = "Кошелек подключен!";
-                                elements.depositNoticeText.style.color = '#00e676';
-                            }
+                            if (elements.depositNoticeText) { elements.depositNoticeText.innerText = "Кошелек подключен!"; elements.depositNoticeText.style.color = '#00e676'; }
                         } else {
-                            if (elements.connectWalletBtn) {
-                                elements.connectWalletBtn.innerText = 'Привязать кошелёк';
-                                elements.connectWalletBtn.style.background = 'linear-gradient(135deg, var(--accent-purple), #6a0dad)';
-                                elements.connectWalletBtn.style.color = '#ffffff';
-                            }
+                            if (elements.connectWalletBtn) { elements.connectWalletBtn.innerText = 'Привязать кошелёк'; elements.connectWalletBtn.style.background = 'linear-gradient(135deg, var(--accent-purple), #6a0dad)'; elements.connectWalletBtn.style.color = '#ffffff'; }
                             if (elements.depositBalanceBtn) elements.depositBalanceBtn.setAttribute('disabled', 'true');
-                            if (elements.depositNoticeText) {
-                                elements.depositNoticeText.innerText = "Пополнение доступно после привязки кошелька";
-                                elements.depositNoticeText.style.color = '#a5a1b8';
-                            }
+                            if (elements.depositNoticeText) { elements.depositNoticeText.innerText = "Пополнение доступно после привязки кошелька"; elements.depositNoticeText.style.color = '#a5a1b8'; }
                         }
                     });
                     if (elements.connectWalletBtn) {
                         elements.connectWalletBtn.addEventListener('click', async () => {
                             if (tonConnectUI.connected) {
-                                showCustomModal({
-                                    icon: '🔌',
-                                    title: 'Отключить кошелек?',
-                                    message: 'Вы уверены, что хотите отвязать текущий TON-кошелек?',
-                                    buttons: [{ text: 'Отвязать', primary: true, onClick: async () => { await tonConnectUI.disconnect(); showNotification("Кошелек успешно отвязан", "🔌"); } }, { text: 'Отмена', primary: false }]
-                                });
-                            } else {
-                                await tonConnectUI.openModal();
-                            }
+                                showCustomModal({ icon: '🔌', title: 'Отключить кошелек?', message: 'Вы уверены, что хотите отвязать текущий TON-кошелек?', buttons: [{ text: 'Отвязать', primary: true, onClick: async () => { await tonConnectUI.disconnect(); showNotification("Кошелек успешно отвязан", "🔌"); } }, { text: 'Отмена', primary: false }] });
+                            } else { await tonConnectUI.openModal(); }
                         });
                     }
                 }
@@ -358,8 +253,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     const result = await tonConnectUI.sendTransaction(transaction);
                     if (result) {
                         currentUser.balance = parseFloat((parseFloat(currentUser.balance) + amount).toFixed(3));
-                        updateBalanceUI();
-                        triggerBalanceBadge(amount);
+                        updateBalanceUI(); triggerBalanceBadge(amount);
                         showNotification(`Баланс пополнен на +${amount.toFixed(3)} TON!`, "💎");
                         fetch(`${API_BASE_URL}/api/verify_payment`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': initDataHeader }, body: JSON.stringify({ amount: amount }) }).then(res => { if (res.status === 403) showBannedScreen(); else if (res.ok) fetchUserData(); }).catch(e => console.error("Verify backend error:", e));
                     }
@@ -367,13 +261,12 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
         }
 
-        // ===================== АРЕНА =====================
+        // ===================== АРЕНА (ВОССТАНОВЛЕНА ПОЛНАЯ ГЕОМЕТРИЯ) =====================
         function drawArenaSegments() {
             const svg = document.getElementById('arena-svg-canvas');
             const avatarsContainer = document.getElementById('arena-avatars-container');
             if (!svg || !avatarsContainer) return;
-            svg.innerHTML = '';
-            avatarsContainer.innerHTML = '';
+            svg.innerHTML = ''; avatarsContainer.innerHTML = '';
 
             const N = arenaPlayers.length;
             if (N === 0) return;
@@ -643,7 +536,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                         if (correctRoundNumber !== lastAnimatedRound) {
                             lastAnimatedRound = correctRoundNumber;
                             setBallAnimating(true);
-                            // Имитация анимации
                             setTimeout(() => {
                                 setBallAnimating(false);
                                 if (String(winId) === String(userId)) {
@@ -697,7 +589,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.getElementById('bet-btn-2')?.addEventListener('click', handleBetClick);
         document.getElementById('bet-btn-3')?.addEventListener('click', handleBetClick);
 
-        // Настройка кнопок ставок
         const editBetsModal = document.getElementById('edit-bets-modal');
         document.getElementById('bet-edit-trigger')?.addEventListener('click', () => {
             document.getElementById('bet-input-1').value = customBets[0];
@@ -721,6 +612,42 @@ document.addEventListener('DOMContentLoaded', async () => {
             renderBetButtons();
         });
 
+        // ===================== ПРЕДМЕТЫ (ПОЛНЫЙ СПИСОК) =====================
+        const GIFT_POOL = [
+            { id: 1, name: "Статуя птицы серая", icon: "/Images/Items/rare_bird.jpg", price: "20 GRAM", rawPrice: 20.0, isGold: true, type: "gift" },
+            { id: 2, name: "Тыква", icon: "/Images/Items/pumpkin.jpg", price: "8 GRAM", rawPrice: 8.0, isGold: true, type: "gift" },
+            { id: 3, name: "Шляпа", icon: "/Images/Items/hat.jpg", price: "7 GRAM", rawPrice: 7.0, isGold: true, type: "gift" },
+            { id: 4, name: "Собачка Snoop Dogg", icon: "/Images/Items/snoopdog.jpg", price: "4 GRAM", rawPrice: 4.0, isGold: false, type: "gift" },
+            { id: 5, name: "Рюкзак черный", icon: "/Images/Items/pack.jpg", price: "3 GRAM", rawPrice: 3.0, isGold: false, type: "gift" },
+            { id: 6, name: "Доширак лапша", icon: "/Images/Items/ramen.jpg", price: "2.7 GRAM", rawPrice: 2.7, isGold: false, type: "gift" },
+            { id: 7, name: "Факел", icon: "/Images/Items/chill_flame.jpg", price: "2.5 GRAM", rawPrice: 2.5, isGold: false, type: "gift" },
+            { id: 8, name: "Мороженое пломбир", icon: "/Images/Items/plombir.jpg", price: "2.5 GRAM", rawPrice: 2.5, isGold: false, type: "gift" },
+            { id: 9, name: "Алмазик", icon: "/Images/Items/almaz.jpg", price: "0.9 GRAM", rawPrice: 0.9, isGold: false, type: "gift" },
+            { id: 10, name: "Роза", icon: "/Images/Items/roza.jpg", price: "0.27 GRAM", rawPrice: 0.27, isGold: false, type: "gift" },
+            { id: 11, name: "Пополнение 0.1 GRAM", icon: GRAMCOIN_ICON_URL, price: "0.1 GRAM", rawPrice: 0.1, isGold: false, type: "balance" },
+            { id: 12, name: "Пополнение 0.07 GRAM", icon: GRAMCOIN_ICON_URL, price: "0.07 GRAM", rawPrice: 0.07, isGold: false, type: "balance" },
+            { id: 13, name: "Пополнение 0.05 GRAM", icon: GRAMCOIN_ICON_URL, price: "0.05 GRAM", rawPrice: 0.05, isGold: false, type: "balance" },
+            { id: 14, name: "Пополнение 0.03 GRAM", icon: GRAMCOIN_ICON_URL, price: "0.03 GRAM", rawPrice: 0.03, isGold: false, type: "balance" }
+        ];
+
+        const NEWBIE_GIFT_POOL = [
+            { id: 101, name: "Розовый мишка", icon: "/Images/Items/bearpink.png", price: "29 GRAM", rawPrice: 29.0, isGold: true, type: "gift" },
+            { id: 102, name: "Шлем Неко", icon: "/Images/Items/Neko_helmet.png", price: "26.8 GRAM", rawPrice: 26.8, isGold: true, type: "gift" },
+            { id: 103, name: "Перстень печатка", icon: "/Images/Items/signet_ring.png", price: "25.7 GRAM", rawPrice: 25.7, isGold: true, type: "gift" },
+            { id: 104, name: "Папаха", icon: "/Images/Items/papakha.png", price: "18.5 GRAM", rawPrice: 18.5, isGold: true, type: "gift" },
+            { id: 105, name: "Амулет Купидона", icon: "/Images/Items/cupid_charm.png", price: "15 GRAM", rawPrice: 15.0, isGold: true, type: "gift" },
+            { id: 106, name: "Любовное зелье", icon: "/Images/Items/love_potion.png", price: "10 GRAM", rawPrice: 10.0, isGold: false, type: "gift" },
+            { id: 107, name: "UFC Бокс", icon: "/Images/Items/UFC_box.png", price: "9.9 GRAM", rawPrice: 9.9, isGold: false, type: "gift" },
+            { id: 108, name: "Всевидящее око", icon: "/Images/Items/eye.png", price: "5 GRAM", rawPrice: 5.0, isGold: false, type: "gift" },
+            { id: 109, name: "Холодный огонь", icon: "/Images/Items/chill_flame.jpg", price: "2.2 GRAM", rawPrice: 2.2, isGold: false, type: "gift" },
+            { id: 110, name: "Вкусный пломбир", icon: "/Images/Items/plombir.jpg", price: "2.2 GRAM", rawPrice: 2.2, isGold: false, type: "gift" },
+            { id: 111, name: "Прекрасная роза", icon: "/Images/Items/roza.jpg", price: "0.2 GRAM", rawPrice: 0.2, isGold: false, type: "gift" },
+            { id: 112, name: "Мишка классический", icon: "/Images/Items/michka.jpg", price: "0.11 GRAM", rawPrice: 0.11, isGold: false, type: "gift" },
+            { id: 113, name: "Пополнение 0.1 GRAM (Новичок)", icon: GRAMCOIN_ICON_URL, price: "0.1 GRAM", rawPrice: 0.1, isGold: false, type: "balance" },
+            { id: 114, name: "Пополнение 0.07 GRAM (Новичок)", icon: GRAMCOIN_ICON_URL, price: "0.07 GRAM", rawPrice: 0.07, isGold: false, type: "balance" },
+            { id: 115, name: "Пополнение 0.05 GRAM (Новичок)", icon: GRAMCOIN_ICON_URL, price: "0.05 GRAM", rawPrice: 0.05, isGold: false, type: "balance" }
+        ];
+
         // ===================== ИНВЕНТАРЬ И ОТПРАВКА =====================
         function openSendGiftModal(userInventory) {
             const overlay = document.getElementById('custom-modal');
@@ -729,10 +656,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             const modalMsg = document.getElementById('modal-message');
             const actionsContainer = document.getElementById('modal-actions');
             const closeX = document.getElementById('modal-close-btn');
-
             if (!overlay) return;
 
-            // Создаем контент модалки
             if (modalIcon) modalIcon.innerHTML = "📤";
             if (modalTitle) modalTitle.innerText = "Отправить подарок другу";
             
@@ -767,42 +692,21 @@ document.addEventListener('DOMContentLoaded', async () => {
             document.getElementById('send-gift-confirm-btn').onclick = async () => {
                 const targetUsername = document.getElementById('send-gift-username').value.trim();
                 const itemId = document.getElementById('send-gift-item-select').value;
-
                 if (!targetUsername) { showNotification("Введите юзернейм получателя", "⚠️"); return; }
                 if (!itemId) { showNotification("Выберите предмет", "⚠️"); return; }
 
                 const confirmBtn = document.getElementById('send-gift-confirm-btn');
-                confirmBtn.disabled = true;
-                confirmBtn.innerText = "Отправка...";
+                confirmBtn.disabled = true; confirmBtn.innerText = "Отправка...";
 
                 try {
-                    const res = await fetchWithTimeout(`${API_BASE_URL}/api/send_gift`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': initDataHeader },
-                        body: JSON.stringify({ targetUsername: targetUsername, itemId: parseInt(itemId) }),
-                        timeout: 8000
-                    });
-
+                    const res = await fetchWithTimeout(`${API_BASE_URL}/api/send_gift`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': initDataHeader }, body: JSON.stringify({ targetUsername: targetUsername, itemId: parseInt(itemId) }), timeout: 8000 });
                     const data = await res.json();
-
                     if (res.status === 403) { showBannedScreen(); return; }
-                    
-                    if (res.ok) {
-                        showNotification(data.message || "Подарок успешно отправлен!", "🎉");
-                        overlay.classList.add('hidden');
-                        fetchInventory(); // Обновляем инвентарь
-                        fetchUserData();
-                    } else {
-                        showNotification(data.error || "Ошибка при отправке", "❌");
-                    }
-                } catch (err) {
-                    showNotification("Ошибка сети. Попробуйте позже.", "⚠️");
-                } finally {
-                    confirmBtn.disabled = false;
-                    confirmBtn.innerText = "Отправить 🎁";
-                }
+                    if (res.ok) { showNotification(data.message || "Подарок успешно отправлен!", "🎉"); overlay.classList.add('hidden'); fetchInventory(); fetchUserData(); }
+                    else { showNotification(data.error || "Ошибка при отправке", "❌"); }
+                } catch (err) { showNotification("Ошибка сети. Попробуйте позже.", "⚠️"); }
+                finally { confirmBtn.disabled = false; confirmBtn.innerText = "Отправить 🎁"; }
             };
-
             overlay.classList.remove('hidden');
         }
 
@@ -828,18 +732,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.getElementById('back-to-home-button')?.addEventListener('click', () => navigateTo('home'));
         document.getElementById('balance-pill')?.addEventListener('click', () => navigateTo('balance'));
 
-        // Кейсы
-        const GIFT_POOL = [
-            { id: 1, name: "Статуя птицы серая", icon: "/Images/Items/rare_bird.jpg", price: "20 GRAM", rawPrice: 20.0, isGold: true, type: "gift" },
-            { id: 2, name: "Тыква", icon: "/Images/Items/pumpkin.jpg", price: "8 GRAM", rawPrice: 8.0, isGold: true, type: "gift" },
-            { id: 10, name: "Роза", icon: "/Images/Items/roza.jpg", price: "0.27 GRAM", rawPrice: 0.27, isGold: false, type: "gift" },
-            { id: 11, name: "Пополнение 0.1 GRAM", icon: GRAMCOIN_ICON_URL, price: "0.1 GRAM", rawPrice: 0.1, isGold: false, type: "balance" }
-        ];
-        const NEWBIE_GIFT_POOL = [
-            { id: 101, name: "Розовый мишка", icon: "/Images/Items/bearpink.png", price: "29 GRAM", rawPrice: 29.0, isGold: true, type: "gift" },
-            { id: 112, name: "Мишка классический", icon: "/Images/Items/michka.jpg", price: "0.11 GRAM", rawPrice: 0.11, isGold: false, type: "gift" }
-        ];
-
         elements.dailyCaseBanner?.addEventListener('click', () => { isNewbieCaseMode = false; elements.rewardsSectionContainer.classList.remove('hidden'); safeSetText(elements.casePageMainTitle, "Ежедневный кейс"); safeSetText(elements.rewardsGridTitle, "🏆 Содержимое кейса"); safeSetText(elements.spinBtn, "Запустить"); renderRewardsGrid(); updateDailyCaseTimer(); navigateTo('case'); });
         elements.newbieCaseBanner?.addEventListener('click', () => { isNewbieCaseMode = true; elements.rewardsSectionContainer.classList.remove('hidden'); safeSetText(elements.casePageMainTitle, "Кейс новичка"); safeSetText(elements.rewardsGridTitle, "🏆 Содержимое кейса"); safeSetText(elements.spinBtn, "Открыть (0.1 GRAM)"); renderRewardsGrid(); updateDailyCaseTimer(); navigateTo('case'); });
 
@@ -850,7 +742,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             currentPool.forEach(gift => {
                 const card = document.createElement('div');
                 card.className = `reward-card ${gift.isGold ? 'gold-tier' : ''}`;
-                card.innerHTML = `<div class="reward-price-top">${gift.price}</div><img src="${gift.icon}" onerror="this.src='https://img.icons8.com/color/96/gift.png'"><div style="margin-bottom: 8px;"></div>`;
+                const randomBadge = gift.type === 'gift' ? '<div class="reward-random-badge">random</div>' : '';
+                card.innerHTML = `<div class="reward-price-top">${gift.price}</div><img src="${gift.icon}" onerror="this.src='https://img.icons8.com/color/96/gift.png'"><div style="margin-bottom: 8px;"></div>${randomBadge}`;
                 elements.rewardsGrid.appendChild(card);
             });
         }
@@ -894,8 +787,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             if (isBalance) {
                 showCustomModal({ icon: '💰', title: 'Баланс пополнен!', message: `🎉 Вы выиграли пополнение счета на +${winningGift.price}!`, buttons: [{ text: 'Отлично!', primary: true }] });
-                triggerBalanceBadge(winningGift.rawPrice);
-                fetchUserData();
+                triggerBalanceBadge(winningGift.rawPrice); fetchUserData();
             } else {
                 showCustomModal({
                     icon: `<img src="${winningGift.icon}" style="width:70px;height:70px;object-fit:contain;" onerror="this.src='https://img.icons8.com/color/96/gift.png'">`,
@@ -939,7 +831,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             }, 50);
         });
 
-        // ===================== ИНВЕНТАРЬ И ДЕПОЗИТ =====================
         async function fetchInventory() {
             if (!elements.inventoryGrid) return;
             try {
@@ -996,7 +887,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                         });
                     });
 
-                    // НОВАЯ КНОПКА "ОТПРАВИТЬ"
                     card.querySelector('.send-btn').addEventListener('click', () => {
                         openSendGiftModal(items);
                     });
@@ -1006,7 +896,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             } catch (error) { console.error("Inventory fetch error:", error); }
         }
 
-        // ===================== БАЛАНС =====================
         function updateBalanceUI(forcedValue = null) {
             const baseBalance = (currentUser && currentUser.balance) ? parseFloat(currentUser.balance) : 0;
             const val = forcedValue !== null ? parseFloat(forcedValue) : baseBalance;
@@ -1025,18 +914,15 @@ document.addEventListener('DOMContentLoaded', async () => {
             clearInterval(dailyCaseTimerInterval);
             if (currentUser && (currentUser.isAdmin === true || currentUser.isAdmin === "true")) {
                 if (elements.spinBtn) { elements.spinBtn.classList.remove('hidden'); elements.spinBtn.disabled = false; }
-                document.getElementById('timer-container')?.classList.add('hidden');
-                return;
+                document.getElementById('timer-container')?.classList.add('hidden'); return;
             }
             if (isNewbieCaseMode) {
                 if (elements.spinBtn) { elements.spinBtn.classList.remove('hidden'); elements.spinBtn.disabled = false; }
-                document.getElementById('timer-container')?.classList.add('hidden');
-                return;
+                document.getElementById('timer-container')?.classList.add('hidden'); return;
             }
             if (!currentUser.last_daily_case_open) {
                 if (elements.spinBtn) { elements.spinBtn.classList.remove('hidden'); elements.spinBtn.disabled = false; }
-                document.getElementById('timer-container')?.classList.add('hidden');
-                return;
+                document.getElementById('timer-container')?.classList.add('hidden'); return;
             }
             const lastOpen = new Date(currentUser.last_daily_case_open);
             const now = new Date();
