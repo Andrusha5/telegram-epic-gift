@@ -31,7 +31,7 @@ tg.ready();
             height: 100%;
             border-radius: 16px;
             overflow: hidden;
-            background: transparent !important;
+            background: #110e25 !important;
             aspect-ratio: 1/1 !important;
         }
         #physics-ball {
@@ -39,17 +39,17 @@ tg.ready();
             r: 8 !important;
             filter: drop-shadow(0 0 8px #ffffff) !important;
         }
-        @keyframes winningSectorPulse {
-            0% { filter: drop-shadow(0 0 15px var(--glow-color)) brightness(1.2); stroke: #ffffff; stroke-width: 5px; }
-            50% { filter: drop-shadow(0 0 35px var(--glow-color)) brightness(1.7); stroke: #ffffff; stroke-width: 8px; }
-            100% { filter: drop-shadow(0 0 15px var(--glow-color)) brightness(1.2); stroke: #ffffff; stroke-width: 5px; }
-        }
         .winning-segment-glow {
             stroke: #ffffff !important;
             stroke-width: 6px !important;
             stroke-linejoin: round !important;
             animation: winningSectorPulse 0.35s infinite alternate !important;
             z-index: 100 !important;
+        }
+        @keyframes winningSectorPulse {
+            0% { filter: drop-shadow(0 0 15px var(--glow-color)) brightness(1.2); stroke: #ffffff; stroke-width: 5px; }
+            50% { filter: drop-shadow(0 0 35px var(--glow-color)) brightness(1.7); stroke: #ffffff; stroke-width: 8px; }
+            100% { filter: drop-shadow(0 0 15px var(--glow-color)) brightness(1.2); stroke: #ffffff; stroke-width: 5px; }
         }
     `;
     document.head.appendChild(style);
